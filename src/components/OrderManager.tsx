@@ -4,7 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Clock, CheckCircle2, XCircle } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Plus, Clock, CheckCircle2, Edit2, DollarSign, Truck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface OrderItem {
@@ -12,6 +14,7 @@ interface OrderItem {
   name: string;
   price: number;
   quantity: number;
+  prepared: boolean;
 }
 
 interface Order {
@@ -19,7 +22,7 @@ interface Order {
   number: string;
   items: OrderItem[];
   total: number;
-  status: 'pending' | 'preparing' | 'ready' | 'delivered' | 'cancelled';
+  status: 'pending' | 'preparing' | 'ready' | 'delivered' | 'paid';
   createdAt: Date;
   table?: string;
 }
@@ -38,8 +41,8 @@ export default function OrderManager() {
       id: '1',
       number: '#001',
       items: [
-        { id: '1', name: 'Pizza Margherita', price: 15.00, quantity: 1 },
-        { id: '2', name: 'Hamburguesa Clásica', price: 12.50, quantity: 1 }
+        { id: '1', name: 'Pizza Margherita', price: 15.00, quantity: 1, prepared: true },
+        { id: '2', name: 'Hamburguesa Clásica', price: 12.50, quantity: 1, prepared: false }
       ],
       total: 27.50,
       status: 'preparing',
@@ -50,7 +53,7 @@ export default function OrderManager() {
       id: '2',
       number: '#002',
       items: [
-        { id: '3', name: 'Pasta Carbonara', price: 14.00, quantity: 2 }
+        { id: '3', name: 'Pasta Carbonara', price: 14.00, quantity: 2, prepared: true }
       ],
       total: 28.00,
       status: 'ready',
@@ -62,13 +65,14 @@ export default function OrderManager() {
   const [isNewOrderOpen, setIsNewOrderOpen] = useState(false);
   const [selectedItems, setSelectedItems] = useState<OrderItem[]>([]);
   const [selectedTable, setSelectedTable] = useState<string>('');
+  const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
 
   const statusConfig = {
-    pending: { label: 'Pendiente', color: 'bg-muted text-muted-foreground', icon: Clock },
-    preparing: { label: 'Preparando', color: 'bg-warning/10 text-warning', icon: Clock },
+    pending: { label: 'Por Preparar', color: 'bg-muted text-muted-foreground', icon: Clock },
+    preparing: { label: 'En Preparación', color: 'bg-warning/10 text-warning', icon: Clock },
     ready: { label: 'Listo', color: 'bg-success/10 text-success', icon: CheckCircle2 },
-    delivered: { label: 'Entregado', color: 'bg-muted text-muted-foreground', icon: CheckCircle2 },
-    cancelled: { label: 'Cancelado', color: 'bg-destructive/10 text-destructive', icon: XCircle },
+    delivered: { label: 'Entregado', color: 'bg-info/10 text-info', icon: Truck },
+    paid: { label: 'Pagado', color: 'bg-muted text-muted-foreground', icon: DollarSign },
   };
 
   const addItemToOrder = (menuItem: typeof menuItems[0]) => {
@@ -87,7 +91,8 @@ export default function OrderManager() {
         id: menuItem.id,
         name: menuItem.name,
         price: menuItem.price,
-        quantity: 1
+        quantity: 1,
+        prepared: false
       }]);
     }
   };
@@ -113,6 +118,41 @@ export default function OrderManager() {
     return selectedItems.reduce((total, item) => total + (item.price * item.quantity), 0);
   };
 
+  const toggleItemPrepared = (orderId: string, itemId: string) => {
+    setOrders(orders => 
+      orders.map(order => {
+        if (order.id === orderId) {
+          const updatedItems = order.items.map(item =>
+            item.id === itemId ? { ...item, prepared: !item.prepared } : item
+          );
+          
+          // Auto-advance order status based on item completion
+          let newStatus = order.status;
+          const allPrepared = updatedItems.every(item => item.prepared);
+          
+          if (order.status === 'pending' && updatedItems.some(item => item.prepared)) {
+            newStatus = 'preparing';
+          } else if (order.status === 'preparing' && allPrepared) {
+            newStatus = 'ready';
+          }
+          
+          return { ...order, items: updatedItems, status: newStatus };
+        }
+        return order;
+      })
+    );
+  };
+
+  const editOrder = (orderId: string) => {
+    const order = orders.find(o => o.id === orderId);
+    if (order) {
+      setSelectedItems([...order.items]);
+      setSelectedTable(order.table || '');
+      setEditingOrderId(orderId);
+      setIsNewOrderOpen(true);
+    }
+  };
+
   const createOrder = () => {
     if (selectedItems.length === 0) {
       toast({
@@ -123,25 +163,49 @@ export default function OrderManager() {
       return;
     }
 
-    const newOrder: Order = {
-      id: Date.now().toString(),
-      number: `#${String(orders.length + 1).padStart(3, '0')}`,
-      items: [...selectedItems],
-      total: calculateTotal(),
-      status: 'pending',
-      createdAt: new Date(),
-      table: selectedTable || undefined
-    };
+    if (editingOrderId) {
+      // Update existing order
+      setOrders(orders => 
+        orders.map(order => 
+          order.id === editingOrderId 
+            ? { 
+                ...order, 
+                items: [...selectedItems], 
+                total: calculateTotal(),
+                table: selectedTable || undefined
+              }
+            : order
+        )
+      );
+      
+      toast({
+        title: "Orden actualizada",
+        description: "La orden ha sido modificada exitosamente"
+      });
+    } else {
+      // Create new order
+      const newOrder: Order = {
+        id: Date.now().toString(),
+        number: `#${String(orders.length + 1).padStart(3, '0')}`,
+        items: [...selectedItems],
+        total: calculateTotal(),
+        status: 'pending',
+        createdAt: new Date(),
+        table: selectedTable || undefined
+      };
 
-    setOrders(orders => [newOrder, ...orders]);
+      setOrders(orders => [newOrder, ...orders]);
+      
+      toast({
+        title: "Orden creada",
+        description: `Orden ${newOrder.number} creada exitosamente`
+      });
+    }
+
     setSelectedItems([]);
     setSelectedTable('');
+    setEditingOrderId(null);
     setIsNewOrderOpen(false);
-    
-    toast({
-      title: "Orden creada",
-      description: `Orden ${newOrder.number} creada exitosamente`
-    });
   };
 
   const updateOrderStatus = (orderId: string, status: Order['status']) => {
@@ -158,8 +222,87 @@ export default function OrderManager() {
     });
   };
 
-  const getOrdersByStatus = (status: Order['status']) => {
-    return orders.filter(order => order.status === status);
+  const getOrdersByStatus = (statuses: Order['status'][]) => {
+    return orders.filter(order => statuses.includes(order.status));
+  };
+
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString('es-ES', { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+  };
+
+  const OrderCard = ({ order }: { order: Order }) => {
+    const StatusIcon = statusConfig[order.status].icon;
+    const preparedCount = order.items.filter(item => item.prepared).length;
+    const totalItems = order.items.length;
+    
+    return (
+      <div key={order.id} className="p-4 border border-border rounded-lg space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="font-semibold">{order.number}</div>
+            {order.table && <div className="text-sm text-muted-foreground">{order.table}</div>}
+            <div className="text-xs text-muted-foreground">{formatTime(order.createdAt)}</div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge className={statusConfig[order.status].color}>
+              <StatusIcon className="h-3 w-3 mr-1" />
+              {statusConfig[order.status].label}
+            </Badge>
+            <Button 
+              size="sm" 
+              variant="ghost" 
+              onClick={() => editOrder(order.id)}
+              className="h-8 w-8 p-0"
+            >
+              <Edit2 className="h-3 w-3" />
+            </Button>
+          </div>
+        </div>
+        
+        <div className="space-y-2">
+          {order.items.map(item => (
+            <div key={item.id} className="flex items-center justify-between text-sm">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  checked={item.prepared}
+                  onCheckedChange={() => toggleItemPrepared(order.id, item.id)}
+                  className="h-4 w-4"
+                />
+                <span className={item.prepared ? 'line-through text-muted-foreground' : ''}>
+                  {item.quantity}x {item.name}
+                </span>
+              </div>
+              <span>${(item.price * item.quantity).toFixed(2)}</span>
+            </div>
+          ))}
+          
+          {order.status === 'preparing' && (
+            <div className="text-xs text-muted-foreground">
+              Preparados: {preparedCount}/{totalItems}
+            </div>
+          )}
+        </div>
+        
+        <div className="flex items-center justify-between pt-2 border-t border-border">
+          <span className="font-semibold">Total: ${order.total.toFixed(2)}</span>
+          <div className="flex gap-1">
+            {order.status === 'ready' && (
+              <Button size="sm" onClick={() => updateOrderStatus(order.id, 'delivered')}>
+                Entregar
+              </Button>
+            )}
+            {order.status === 'delivered' && (
+              <Button size="sm" onClick={() => updateOrderStatus(order.id, 'paid')}>
+                Pagar
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -179,7 +322,9 @@ export default function OrderManager() {
           </DialogTrigger>
           <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Crear Nueva Orden</DialogTitle>
+              <DialogTitle>
+                {editingOrderId ? 'Editar Orden' : 'Crear Nueva Orden'}
+              </DialogTitle>
             </DialogHeader>
             
             <div className="grid gap-6 md:grid-cols-2">
@@ -248,7 +393,7 @@ export default function OrderManager() {
                           onClick={() => removeItemFromOrder(item.id)}
                           className="text-destructive"
                         >
-                          <XCircle className="h-4 w-4" />
+                          ×
                         </Button>
                       </div>
                     </div>
@@ -262,9 +407,17 @@ export default function OrderManager() {
                   </div>
                   <div className="flex gap-2">
                     <Button onClick={createOrder} className="bg-gradient-primary hover:opacity-90 flex-1">
-                      Crear Orden
+                      {editingOrderId ? 'Actualizar' : 'Crear'} Orden
                     </Button>
-                    <Button variant="outline" onClick={() => setIsNewOrderOpen(false)}>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => {
+                        setIsNewOrderOpen(false);
+                        setEditingOrderId(null);
+                        setSelectedItems([]);
+                        setSelectedTable('');
+                      }}
+                    >
                       Cancelar
                     </Button>
                   </div>
@@ -275,138 +428,92 @@ export default function OrderManager() {
         </Dialog>
       </div>
 
-      {/* Orders Board */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Pending & Preparing Orders */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5" />
-              En Proceso
-              <Badge variant="secondary">
-                {getOrdersByStatus('pending').length + getOrdersByStatus('preparing').length}
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {[...getOrdersByStatus('pending'), ...getOrdersByStatus('preparing')].map(order => {
-              const StatusIcon = statusConfig[order.status].icon;
-              return (
-                <div key={order.id} className="p-4 border border-border rounded-lg space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="font-semibold">{order.number}</div>
-                      {order.table && <div className="text-sm text-muted-foreground">{order.table}</div>}
-                    </div>
-                    <Badge className={statusConfig[order.status].color}>
-                      <StatusIcon className="h-3 w-3 mr-1" />
-                      {statusConfig[order.status].label}
-                    </Badge>
-                  </div>
-                  
-                  <div className="space-y-1">
-                    {order.items.map(item => (
-                      <div key={item.id} className="text-sm flex justify-between">
-                        <span>{item.quantity}x {item.name}</span>
-                        <span>${(item.price * item.quantity).toFixed(2)}</span>
-                      </div>
-                    ))}
-                  </div>
-                  
-                  <div className="flex items-center justify-between pt-2 border-t border-border">
-                    <span className="font-semibold">Total: ${order.total.toFixed(2)}</span>
-                    <div className="flex gap-1">
-                      {order.status === 'pending' && (
-                        <Button size="sm" onClick={() => updateOrderStatus(order.id, 'preparing')}>
-                          Preparar
-                        </Button>
-                      )}
-                      {order.status === 'preparing' && (
-                        <Button size="sm" onClick={() => updateOrderStatus(order.id, 'ready')}>
-                          Listo
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </CardContent>
-        </Card>
+      {/* Orders Tabs */}
+      <Tabs defaultValue="resumen" className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="resumen">
+            Resumen ({orders.length})
+          </TabsTrigger>
+          <TabsTrigger value="preparacion">
+            En Preparación ({getOrdersByStatus(['pending', 'preparing']).length})
+          </TabsTrigger>
+          <TabsTrigger value="listo">
+            Listo ({getOrdersByStatus(['ready']).length})
+          </TabsTrigger>
+          <TabsTrigger value="entregado">
+            Entregado ({getOrdersByStatus(['delivered', 'paid']).length})
+          </TabsTrigger>
+        </TabsList>
 
-        {/* Ready Orders */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5" />
-              Listos
-              <Badge variant="secondary">{getOrdersByStatus('ready').length}</Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {getOrdersByStatus('ready').map(order => {
-              const StatusIcon = statusConfig[order.status].icon;
-              return (
-                <div key={order.id} className="p-4 border border-success/20 bg-success/5 rounded-lg space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="font-semibold">{order.number}</div>
-                      {order.table && <div className="text-sm text-muted-foreground">{order.table}</div>}
-                    </div>
-                    <Badge className={statusConfig[order.status].color}>
-                      <StatusIcon className="h-3 w-3 mr-1" />
-                      {statusConfig[order.status].label}
-                    </Badge>
-                  </div>
-                  
-                  <div className="space-y-1">
-                    {order.items.map(item => (
-                      <div key={item.id} className="text-sm flex justify-between">
-                        <span>{item.quantity}x {item.name}</span>
-                        <span>${(item.price * item.quantity).toFixed(2)}</span>
-                      </div>
-                    ))}
-                  </div>
-                  
-                  <div className="flex items-center justify-between pt-2 border-t border-border">
-                    <span className="font-semibold">Total: ${order.total.toFixed(2)}</span>
-                    <Button size="sm" onClick={() => updateOrderStatus(order.id, 'delivered')}>
-                      Entregar
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
-          </CardContent>
-        </Card>
-
-        {/* Completed Orders */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5" />
-              Completadas
-              <Badge variant="secondary">{getOrdersByStatus('delivered').length}</Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4 max-h-96 overflow-y-auto">
-            {getOrdersByStatus('delivered').map(order => (
-              <div key={order.id} className="p-3 border border-border rounded-lg space-y-2 opacity-75">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="font-semibold text-sm">{order.number}</div>
-                    {order.table && <div className="text-xs text-muted-foreground">{order.table}</div>}
-                  </div>
-                  <span className="text-sm font-medium">${order.total.toFixed(2)}</span>
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  Entregado • {order.createdAt.toLocaleTimeString()}
-                </div>
+        <TabsContent value="resumen" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Resumen de Todas las Órdenes</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {orders.map(order => (
+                  <OrderCard key={order.id} order={order} />
+                ))}
               </div>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="preparacion" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="h-5 w-5" />
+                En Preparación
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 md:grid-cols-2">
+                {getOrdersByStatus(['pending', 'preparing']).map(order => (
+                  <OrderCard key={order.id} order={order} />
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="listo" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5" />
+                Listos para Entregar
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 md:grid-cols-2">
+                {getOrdersByStatus(['ready']).map(order => (
+                  <OrderCard key={order.id} order={order} />
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="entregado" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Truck className="h-5 w-5" />
+                Entregados y Pagados
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {getOrdersByStatus(['delivered', 'paid']).map(order => (
+                  <OrderCard key={order.id} order={order} />
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
