@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, Clock, CheckCircle2, Edit2, DollarSign, Truck } from 'lucide-react';
+import { Plus, Clock, Truck, DollarSign, Edit2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface OrderItem {
@@ -22,7 +22,7 @@ interface Order {
   number: string;
   items: OrderItem[];
   total: number;
-  status: 'pending' | 'preparing' | 'ready' | 'delivered' | 'paid';
+  status: 'preparando' | 'entregando' | 'pagando';
   createdAt: Date;
   table?: string;
 }
@@ -45,7 +45,7 @@ export default function OrderManager() {
         { id: '2', name: 'Hamburguesa Clásica', price: 12.50, quantity: 1, prepared: false }
       ],
       total: 27.50,
-      status: 'preparing',
+      status: 'preparando',
       createdAt: new Date(Date.now() - 300000),
       table: 'Mesa 5'
     },
@@ -56,7 +56,7 @@ export default function OrderManager() {
         { id: '3', name: 'Pasta Carbonara', price: 14.00, quantity: 2, prepared: true }
       ],
       total: 28.00,
-      status: 'ready',
+      status: 'entregando',
       createdAt: new Date(Date.now() - 600000),
       table: 'Mesa 3'
     }
@@ -68,11 +68,9 @@ export default function OrderManager() {
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
 
   const statusConfig = {
-    pending: { label: 'Por Preparar', color: 'bg-muted text-muted-foreground', icon: Clock },
-    preparing: { label: 'En Preparación', color: 'bg-warning/10 text-warning', icon: Clock },
-    ready: { label: 'Listo', color: 'bg-success/10 text-success', icon: CheckCircle2 },
-    delivered: { label: 'Entregado', color: 'bg-info/10 text-info', icon: Truck },
-    paid: { label: 'Pagado', color: 'bg-muted text-muted-foreground', icon: DollarSign },
+    preparando: { label: 'Preparando', color: 'bg-warning/10 text-warning', icon: Clock },
+    entregando: { label: 'Entregando', color: 'bg-info/10 text-info', icon: Truck },
+    pagando: { label: 'Pagando', color: 'bg-success/10 text-success', icon: DollarSign },
   };
 
   const addItemToOrder = (menuItem: typeof menuItems[0]) => {
@@ -130,10 +128,8 @@ export default function OrderManager() {
           let newStatus = order.status;
           const allPrepared = updatedItems.every(item => item.prepared);
           
-          if (order.status === 'pending' && updatedItems.some(item => item.prepared)) {
-            newStatus = 'preparing';
-          } else if (order.status === 'preparing' && allPrepared) {
-            newStatus = 'ready';
+          if (order.status === 'preparando' && allPrepared) {
+            newStatus = 'entregando';
           }
           
           return { ...order, items: updatedItems, status: newStatus };
@@ -189,7 +185,7 @@ export default function OrderManager() {
         number: `#${String(orders.length + 1).padStart(3, '0')}`,
         items: [...selectedItems],
         total: calculateTotal(),
-        status: 'pending',
+        status: 'preparando',
         createdAt: new Date(),
         table: selectedTable || undefined
       };
@@ -275,11 +271,10 @@ export default function OrderManager() {
                   {item.quantity}x {item.name}
                 </span>
               </div>
-              <span>${(item.price * item.quantity).toFixed(2)}</span>
             </div>
           ))}
           
-          {order.status === 'preparing' && (
+          {order.status === 'preparando' && (
             <div className="text-xs text-muted-foreground">
               Preparados: {preparedCount}/{totalItems}
             </div>
@@ -289,14 +284,9 @@ export default function OrderManager() {
         <div className="flex items-center justify-between pt-2 border-t border-border">
           <span className="font-semibold">Total: ${order.total.toFixed(2)}</span>
           <div className="flex gap-1">
-            {order.status === 'ready' && (
-              <Button size="sm" onClick={() => updateOrderStatus(order.id, 'delivered')}>
-                Entregar
-              </Button>
-            )}
-            {order.status === 'delivered' && (
-              <Button size="sm" onClick={() => updateOrderStatus(order.id, 'paid')}>
-                Pagar
+            {order.status === 'entregando' && (
+              <Button size="sm" onClick={() => updateOrderStatus(order.id, 'pagando')}>
+                Cobrar
               </Button>
             )}
           </div>
@@ -369,7 +359,7 @@ export default function OrderManager() {
                     <div key={item.id} className="flex items-center justify-between p-2 border border-border rounded">
                       <div className="flex-1">
                         <div className="font-medium text-sm">{item.name}</div>
-                        <div className="text-xs text-muted-foreground">${item.price.toFixed(2)} c/u</div>
+                        <div className="text-xs text-muted-foreground">Cant: {item.quantity}</div>
                       </div>
                       <div className="flex items-center gap-2">
                         <Button 
@@ -429,48 +419,30 @@ export default function OrderManager() {
       </div>
 
       {/* Orders Tabs */}
-      <Tabs defaultValue="resumen" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="resumen">
-            Resumen ({orders.length})
+      <Tabs defaultValue="preparando" className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="preparando">
+            Preparando ({getOrdersByStatus(['preparando']).length})
           </TabsTrigger>
-          <TabsTrigger value="preparacion">
-            En Preparación ({getOrdersByStatus(['pending', 'preparing']).length})
+          <TabsTrigger value="entregando">
+            Entregando ({getOrdersByStatus(['entregando']).length})
           </TabsTrigger>
-          <TabsTrigger value="listo">
-            Listo ({getOrdersByStatus(['ready']).length})
-          </TabsTrigger>
-          <TabsTrigger value="entregado">
-            Entregado ({getOrdersByStatus(['delivered', 'paid']).length})
+          <TabsTrigger value="pagando">
+            Pagando ({getOrdersByStatus(['pagando']).length})
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="resumen" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Resumen de Todas las Órdenes</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {orders.map(order => (
-                  <OrderCard key={order.id} order={order} />
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="preparacion" className="mt-6">
+        <TabsContent value="preparando" className="mt-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Clock className="h-5 w-5" />
-                En Preparación
+                Preparando
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid gap-4 md:grid-cols-2">
-                {getOrdersByStatus(['pending', 'preparing']).map(order => (
+                {getOrdersByStatus(['preparando']).map(order => (
                   <OrderCard key={order.id} order={order} />
                 ))}
               </div>
@@ -478,35 +450,35 @@ export default function OrderManager() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="listo" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CheckCircle2 className="h-5 w-5" />
-                Listos para Entregar
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 md:grid-cols-2">
-                {getOrdersByStatus(['ready']).map(order => (
-                  <OrderCard key={order.id} order={order} />
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="entregado" className="mt-6">
+        <TabsContent value="entregando" className="mt-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Truck className="h-5 w-5" />
-                Entregados y Pagados
+                Entregando
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 md:grid-cols-2">
+                {getOrdersByStatus(['entregando']).map(order => (
+                  <OrderCard key={order.id} order={order} />
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="pagando" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <DollarSign className="h-5 w-5" />
+                Pagando
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {getOrdersByStatus(['delivered', 'paid']).map(order => (
+                {getOrdersByStatus(['pagando']).map(order => (
                   <OrderCard key={order.id} order={order} />
                 ))}
               </div>
