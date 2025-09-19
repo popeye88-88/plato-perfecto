@@ -1,129 +1,362 @@
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { TrendingUp, DollarSign, ShoppingCart, Users } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { CalendarIcon, DollarSign, ShoppingCart, Users, TrendingUp } from 'lucide-react';
+import { format, startOfWeek, endOfWeek, addDays } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+
+interface DashboardFilters {
+  dateRange: {
+    from: Date;
+    to: Date;
+  };
+  paymentMethod: 'all' | 'efectivo' | 'tarjeta' | 'transferencia';
+  serviceType: 'all' | 'puesto' | 'takeaway' | 'delivery';
+  groupBy: 'day' | 'week' | 'month';
+}
+
+interface Product {
+  name: string;
+  sold: number;
+  revenue: number;
+}
+
+const mockChartData = [
+  { name: 'Lun', facturacion: 450, pedidos: 18 },
+  { name: 'Mar', facturacion: 380, pedidos: 15 },
+  { name: 'Mié', facturacion: 520, pedidos: 22 },
+  { name: 'Jue', facturacion: 670, pedidos: 28 },
+  { name: 'Vie', facturacion: 890, pedidos: 35 },
+  { name: 'Sáb', facturacion: 1200, pedidos: 48 },
+  { name: 'Dom', facturacion: 950, pedidos: 38 },
+];
 
 export default function Dashboard() {
-  const stats = [
-    {
-      title: 'Ventas Hoy',
-      value: '$2,850',
-      change: '+12%',
-      icon: DollarSign,
-      trend: 'up',
+  const [filters, setFilters] = useState<DashboardFilters>({
+    dateRange: {
+      from: startOfWeek(new Date(), { weekStartsOn: 1 }),
+      to: endOfWeek(new Date(), { weekStartsOn: 1 })
     },
-    {
-      title: 'Órdenes Activas',
-      value: '23',
-      change: '+3',
-      icon: ShoppingCart,
-      trend: 'up',
-    },
-    {
-      title: 'Clientes Atendidos',
-      value: '187',
-      change: '+18%',
-      icon: Users,
-      trend: 'up',
-    },
-    {
-      title: 'Promedio por Orden',
-      value: '$45.30',
-      change: '+8%',
-      icon: TrendingUp,
-      trend: 'up',
-    },
+    paymentMethod: 'all',
+    serviceType: 'all',
+    groupBy: 'day'
+  });
+
+  const updateFilter = <K extends keyof DashboardFilters>(key: K, value: DashboardFilters[K]) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+  };
+
+  // Mock data - in real app this would be filtered based on the filters
+  const stats = {
+    facturacion: 4560,
+    pedidos: 204,
+    clientes: 187,
+    ordenPromedio: 22.35
+  };
+
+  const topProducts: Product[] = [
+    { name: 'Pizza Margherita', sold: 35, revenue: 525.00 },
+    { name: 'Hamburguesa Clásica', sold: 28, revenue: 350.00 },
+    { name: 'Pasta Carbonara', sold: 22, revenue: 308.00 },
+    { name: 'Ensalada César', sold: 18, revenue: 171.00 },
+    { name: 'Tacos de Pollo', sold: 15, revenue: 180.00 },
   ];
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-foreground mb-2">Dashboard</h1>
-        <p className="text-muted-foreground">Resumen del día de tu restaurante</p>
+        <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Dashboard</h1>
+        <p className="text-muted-foreground">Resumen del desempeño de tu restaurante</p>
       </div>
+
+      {/* Filters */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Filtros</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {/* Date Range */}
+            <div className="space-y-2">
+              <Label>Período</Label>
+              <div className="flex gap-2">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start text-left font-normal">
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {format(filters.dateRange.from, "dd/MM", { locale: es })}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={filters.dateRange.from}
+                      onSelect={(date) => date && updateFilter('dateRange', { ...filters.dateRange, from: date })}
+                      initialFocus
+                      className="pointer-events-auto"
+                    />
+                  </PopoverContent>
+                </Popover>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start text-left font-normal">
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {format(filters.dateRange.to, "dd/MM", { locale: es })}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={filters.dateRange.to}
+                      onSelect={(date) => date && updateFilter('dateRange', { ...filters.dateRange, to: date })}
+                      initialFocus
+                      className="pointer-events-auto"
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div className="flex gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => updateFilter('dateRange', {
+                    from: startOfWeek(new Date(), { weekStartsOn: 1 }),
+                    to: endOfWeek(new Date(), { weekStartsOn: 1 })
+                  })}
+                  className="text-xs"
+                >
+                  Esta semana
+                </Button>
+              </div>
+            </div>
+
+            {/* Payment Method */}
+            <div className="space-y-2">
+              <Label>Método de Pago</Label>
+              <Select 
+                value={filters.paymentMethod} 
+                onValueChange={(value: typeof filters.paymentMethod) => updateFilter('paymentMethod', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="efectivo">Efectivo</SelectItem>
+                  <SelectItem value="tarjeta">Tarjeta</SelectItem>
+                  <SelectItem value="transferencia">Transferencia</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Service Type */}
+            <div className="space-y-2">
+              <Label>Tipo de Servicio</Label>
+              <Select 
+                value={filters.serviceType} 
+                onValueChange={(value: typeof filters.serviceType) => updateFilter('serviceType', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="puesto">En Puesto</SelectItem>
+                  <SelectItem value="takeaway">Take Away</SelectItem>
+                  <SelectItem value="delivery">Delivery</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Group By */}
+            <div className="space-y-2">
+              <Label>Agrupar por</Label>
+              <Select 
+                value={filters.groupBy} 
+                onValueChange={(value: typeof filters.groupBy) => updateFilter('groupBy', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="day">Día</SelectItem>
+                  <SelectItem value="week">Semana</SelectItem>
+                  <SelectItem value="month">Mes</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Stats Grid */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat) => {
-          const Icon = stat.icon;
-          return (
-            <Card key={stat.title} className="hover:shadow-lg transition-shadow">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  {stat.title}
-                </CardTitle>
-                <Icon className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-foreground mb-1">
-                  {stat.value}
-                </div>
-                <p className="text-xs text-success">
-                  {stat.change} desde ayer
-                </p>
-              </CardContent>
-            </Card>
-          );
-        })}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card className="hover:shadow-lg transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Facturación
+            </CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-foreground mb-1">
+              ${stats.facturacion.toLocaleString()}
+            </div>
+            <p className="text-xs text-success">
+              +12% desde el período anterior
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="hover:shadow-lg transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Pedidos
+            </CardTitle>
+            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-foreground mb-1">
+              {stats.pedidos}
+            </div>
+            <p className="text-xs text-success">
+              +8% desde el período anterior
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="hover:shadow-lg transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Clientes
+            </CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-foreground mb-1">
+              {stats.clientes}
+            </div>
+            <p className="text-xs text-success">
+              +15% desde el período anterior
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="hover:shadow-lg transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Orden Promedio
+            </CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-foreground mb-1">
+              ${stats.ordenPromedio.toFixed(2)}
+            </div>
+            <p className="text-xs text-success">
+              +5% desde el período anterior
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Recent Activity */}
-      <div className="grid gap-6 md:grid-cols-2">
+      {/* Charts and Top Products */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Revenue Chart */}
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle>Facturación Comparativa</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={mockChartData}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis dataKey="name" className="fill-muted-foreground" />
+                  <YAxis className="fill-muted-foreground" />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'hsl(var(--card))', 
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px'
+                    }}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="facturacion" 
+                    stroke="hsl(var(--primary))" 
+                    strokeWidth={2}
+                    dot={{ fill: 'hsl(var(--primary))' }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Top Products */}
         <Card>
           <CardHeader>
-            <CardTitle>Órdenes Recientes</CardTitle>
+            <CardTitle>Top 5 Productos</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {[
-                { id: '#001', time: '14:30', total: '$28.50', status: 'Preparando' },
-                { id: '#002', time: '14:25', total: '$42.00', status: 'Listo' },
-                { id: '#003', time: '14:20', total: '$35.75', status: 'Entregado' },
-              ].map((order) => (
-                <div key={order.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-                  <div>
-                    <div className="font-medium text-foreground">Orden {order.id}</div>
-                    <div className="text-sm text-muted-foreground">{order.time}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-medium text-foreground">{order.total}</div>
-                    <div className={`text-xs px-2 py-1 rounded-full ${
-                      order.status === 'Listo' 
-                        ? 'bg-success/10 text-success' 
-                        : order.status === 'Preparando'
-                        ? 'bg-warning/10 text-warning'
-                        : 'bg-muted text-muted-foreground'
-                    }`}>
-                      {order.status}
+              {topProducts.map((product, index) => (
+                <div key={product.name} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                  <div className="flex items-center gap-3">
+                    <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-semibold">
+                      {index + 1}
+                    </div>
+                    <div>
+                      <div className="font-medium text-foreground text-sm">{product.name}</div>
+                      <div className="text-xs text-muted-foreground">{product.sold} vendidos</div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Productos Más Vendidos</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {[
-                { name: 'Pizza Margherita', sold: 15, revenue: '$225.00' },
-                { name: 'Hamburguesa Clásica', sold: 12, revenue: '$180.00' },
-                { name: 'Pasta Carbonara', sold: 8, revenue: '$120.00' },
-              ].map((product) => (
-                <div key={product.name} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-                  <div>
-                    <div className="font-medium text-foreground">{product.name}</div>
-                    <div className="text-sm text-muted-foreground">{product.sold} vendidos</div>
+                  <div className="text-right">
+                    <div className="font-medium text-foreground text-sm">${product.revenue.toFixed(2)}</div>
                   </div>
-                  <div className="font-medium text-foreground">{product.revenue}</div>
                 </div>
               ))}
             </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* Orders Chart */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Número de Pedidos</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={mockChartData}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis dataKey="name" className="fill-muted-foreground" />
+                <YAxis className="fill-muted-foreground" />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: 'hsl(var(--card))', 
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '8px'
+                  }}
+                />
+                <Bar 
+                  dataKey="pedidos" 
+                  fill="hsl(var(--accent))"
+                  radius={[4, 4, 0, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

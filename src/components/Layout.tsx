@@ -1,7 +1,7 @@
 import { ReactNode, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Menu, Users, ClipboardList, BarChart3, ChefHat } from 'lucide-react';
+import { Menu, Settings, ClipboardList, BarChart3, ChefHat } from 'lucide-react';
 
 interface LayoutProps {
   children: ReactNode;
@@ -13,7 +13,7 @@ const navigation = [
   { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
   { id: 'menu', label: 'Menú', icon: ChefHat },
   { id: 'orders', label: 'Comandas', icon: ClipboardList },
-  { id: 'users', label: 'Usuarios', icon: Users },
+  { id: 'settings', label: 'Ajustes', icon: Settings },
 ];
 
 export default function Layout({ children, currentPage, onPageChange }: LayoutProps) {
@@ -24,7 +24,8 @@ export default function Layout({ children, currentPage, onPageChange }: LayoutPr
       {/* Sidebar */}
       <div className={cn(
         "fixed inset-y-0 left-0 z-50 bg-card border-r border-border transition-all duration-300",
-        isSidebarOpen ? "w-64" : "w-16"
+        isSidebarOpen ? "w-64" : "w-16",
+        "md:relative md:inset-auto" // Make sidebar responsive
       )}>
         <div className="flex h-16 items-center justify-between px-4">
           <div className="flex items-center space-x-2">
@@ -68,9 +69,10 @@ export default function Layout({ children, currentPage, onPageChange }: LayoutPr
       {/* Main content */}
       <div className={cn(
         "transition-all duration-300",
-        isSidebarOpen ? "ml-64" : "ml-16"
+        isSidebarOpen ? "md:ml-64" : "md:ml-16",
+        "ml-0" // Remove margin on mobile
       )}>
-        <main className="p-6">
+        <main className="p-4 md:p-6">
           {children}
         </main>
       </div>
