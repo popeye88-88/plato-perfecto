@@ -10,13 +10,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Plus, Clock, Truck, DollarSign, Edit2, Calendar } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import PaymentDialog from './PaymentDialog';
 
 interface OrderItem {
   id: string;
   name: string;
   price: number;
   quantity: number;
-  status: 'preparando' | 'entregando' | 'cobrando';
+  status: 'preparando' | 'preparado' | 'entregando' | 'entregado' | 'cobrando';
   removed?: boolean;
   removalReason?: string;
 }
@@ -30,7 +31,10 @@ interface Order {
   status: 'preparando' | 'entregando' | 'cobrando' | 'pagado';
   createdAt: Date;
   table?: string;
-  paymentMethod?: 'efectivo' | 'tarjeta';
+  paymentMethod?: 'efectivo' | 'tarjeta' | 'transferencia';
+  serviceType?: 'en_puesto' | 'take_away' | 'delivery';
+  deliveryCharge?: number;
+  diners?: number;
 }
 
 const menuItems = [
@@ -48,7 +52,7 @@ export default function OrderManager() {
       number: '#001',
       customerName: 'Juan Pérez',
       items: [
-        { id: '1', name: 'Pizza Margherita', price: 15.00, quantity: 1, status: 'entregando' },
+        { id: '1', name: 'Pizza Margherita', price: 15.00, quantity: 1, status: 'preparado' },
         { id: '2', name: 'Hamburguesa Clásica', price: 12.50, quantity: 1, status: 'preparando' }
       ],
       total: 27.50,
@@ -61,7 +65,7 @@ export default function OrderManager() {
       number: '#002',
       customerName: 'María García',
       items: [
-        { id: '3', name: 'Pasta Carbonara', price: 14.00, quantity: 2, status: 'cobrando' }
+        { id: '3', name: 'Pasta Carbonara', price: 14.00, quantity: 2, status: 'entregado' }
       ],
       total: 28.00,
       status: 'cobrando',
@@ -73,13 +77,15 @@ export default function OrderManager() {
       number: '#003',
       customerName: 'Carlos López',
       items: [
-        { id: '4', name: 'Ensalada César', price: 10.00, quantity: 1, status: 'cobrando' }
+        { id: '4', name: 'Ensalada César', price: 10.00, quantity: 1, status: 'entregado' }
       ],
       total: 10.00,
       status: 'pagado',
       createdAt: new Date(Date.now() - 86400000),
       table: 'Mesa 1',
-      paymentMethod: 'efectivo'
+      paymentMethod: 'efectivo',
+      serviceType: 'en_puesto',
+      diners: 2
     }
   ]);
 
@@ -97,7 +103,9 @@ export default function OrderManager() {
 
   const statusConfig = {
     preparando: { label: 'Preparando', color: 'bg-warning/10 text-warning', icon: Clock },
+    preparado: { label: 'Preparado', color: 'bg-info/10 text-info', icon: Clock },
     entregando: { label: 'Entregando', color: 'bg-info/10 text-info', icon: Truck },
+    entregado: { label: 'Entregado', color: 'bg-success/10 text-success', icon: Truck },
     cobrando: { label: 'Cobrando', color: 'bg-success/10 text-success', icon: DollarSign },
     pagado: { label: 'Pagado', color: 'bg-primary/10 text-primary', icon: DollarSign },
   };
@@ -166,11 +174,14 @@ export default function OrderManager() {
             if (activeItems.length === 0) return 'pagado';
             
             const hasPreparando = activeItems.some(item => item.status === 'preparando');
+            const hasPreparado = activeItems.some(item => item.status === 'preparado');
             const hasEntregando = activeItems.some(item => item.status === 'entregando');
+            const hasEntregado = activeItems.some(item => item.status === 'entregado');
             const hasCobrando = activeItems.some(item => item.status === 'cobrando');
             
             if (hasPreparando) return 'preparando';
-            if (hasEntregando) return 'entregando';
+            if (hasPreparado || hasEntregando) return 'entregando';
+            if (hasEntregado) return 'cobrando';
             if (hasCobrando) return 'cobrando';
             return 'pagado';
           };
@@ -262,7 +273,7 @@ export default function OrderManager() {
     setIsNewOrderOpen(false);
   };
 
-  const processPayment = (orderId: string, paymentMethod: 'efectivo' | 'tarjeta') => {
+  const processPayment = (orderId: string, paymentMethod: 'efectivo' | 'tarjeta' | 'transferencia', removeDeliveryCharge: boolean = false) => {
     setOrders(orders => 
       orders.map(order => 
         order.id === orderId 
@@ -270,6 +281,10 @@ export default function OrderManager() {
               ...order, 
               status: 'pagado', 
               paymentMethod,
+              deliveryCharge: removeDeliveryCharge ? 0 : order.deliveryCharge,
+              total: removeDeliveryCharge && order.deliveryCharge 
+                ? order.total - order.deliveryCharge 
+                : order.total,
               items: order.items.map(item => ({ ...item, status: 'cobrando' as const }))
             }
           : order
@@ -307,7 +322,7 @@ export default function OrderManager() {
         return activeItems.some(item => item.status === 'preparando');
       }
       if (tab === 'entregando') {
-        return activeItems.some(item => item.status === 'entregando');
+        return activeItems.some(item => item.status === 'preparado' || item.status === 'entregando');
       }
       return false;
     });
@@ -356,8 +371,8 @@ export default function OrderManager() {
   const OrderCard = ({ order, currentTab }: { order: Order; currentTab: string }) => {
     const StatusIcon = statusConfig[order.status].icon;
     const preparandoCount = order.items.filter(item => !item.removed && item.status === 'preparando').length;
-    const entregandoCount = order.items.filter(item => !item.removed && item.status === 'entregando').length;
-    const cobrandoCount = order.items.filter(item => !item.removed && item.status === 'cobrando').length;
+    const entregandoCount = order.items.filter(item => !item.removed && (item.status === 'preparado' || item.status === 'entregando')).length;
+    const cobrandoCount = order.items.filter(item => !item.removed && (item.status === 'entregado' || item.status === 'cobrando')).length;
     
     return (
       <div key={order.id} className="p-4 border border-border rounded-lg space-y-3">
@@ -366,6 +381,19 @@ export default function OrderManager() {
             <div className="font-semibold">{order.number}</div>
             <div className="text-sm text-muted-foreground">{order.customerName}</div>
             {order.table && <div className="text-sm text-muted-foreground">{order.table}</div>}
+            {order.serviceType && (
+              <div className="text-xs text-muted-foreground">
+                {order.serviceType === 'en_puesto' ? 'En Puesto' : 
+                 order.serviceType === 'take_away' ? 'Take Away' : 'Delivery'}
+                {order.diners && ` • ${order.diners} comensales`}
+              </div>
+            )}
+            {order.paymentMethod && currentTab === 'pagado' && (
+              <div className="text-xs text-muted-foreground">
+                Pago: {order.paymentMethod === 'efectivo' ? 'Efectivo' : 
+                       order.paymentMethod === 'tarjeta' ? 'Tarjeta' : 'Transferencia'}
+              </div>
+            )}
             <div className="text-xs text-muted-foreground">{formatDateTime(order.createdAt)}</div>
           </div>
           <div className="flex items-center gap-2">
@@ -388,17 +416,24 @@ export default function OrderManager() {
         
         <div className="space-y-2">
           {order.items.map(item => {
-            const isEnabled = currentTab === 'preparando' 
+            const isPreparandoTab = currentTab === 'preparando';
+            const isEntregandoTab = currentTab === 'entregando';
+            
+            // For preparando tab: show items that are in preparando status
+            // For entregando tab: show items that are preparado or entregando, disable preparando items
+            const showInTab = isPreparandoTab 
               ? item.status === 'preparando'
-              : currentTab === 'entregando' 
-                ? item.status === 'entregando'
+              : isEntregandoTab 
+                ? ['preparado', 'entregando', 'preparando'].includes(item.status)
                 : true;
             
-            const isDisabled = currentTab === 'entregando' && item.status === 'preparando';
+            const isDisabled = isEntregandoTab && item.status === 'preparando';
+            
+            if (!showInTab && (isPreparandoTab || isEntregandoTab)) return null;
             
             return (
               <div key={item.id} className="flex items-center justify-between text-sm">
-                <div className={`flex items-center gap-2 ${isDisabled ? 'text-muted-foreground' : ''}`}>
+                <div className={`flex items-center gap-2 ${isDisabled ? 'text-muted-foreground opacity-50' : ''}`}>
                   <span className={item.removed ? 'line-through text-muted-foreground' : ''}>
                     {item.quantity}x {item.name}
                     {item.removed && item.removalReason && (
@@ -414,20 +449,22 @@ export default function OrderManager() {
                 {!item.removed && (currentTab === 'preparando' || currentTab === 'entregando') && (
                   <Checkbox
                     checked={
-                      (currentTab === 'preparando' && item.status !== 'preparando') ||
-                      (currentTab === 'entregando' && item.status === 'cobrando')
+                      (currentTab === 'preparando' && item.status === 'preparado') ||
+                      (currentTab === 'entregando' && item.status === 'entregado')
                     }
                     disabled={isDisabled}
                     onCheckedChange={(checked) => {
                       if (checked) {
                         if (currentTab === 'preparando' && item.status === 'preparando') {
+                          updateItemStatus(order.id, item.id, 'preparado');
+                        } else if (currentTab === 'entregando' && item.status === 'preparado') {
                           updateItemStatus(order.id, item.id, 'entregando');
                         } else if (currentTab === 'entregando' && item.status === 'entregando') {
-                          updateItemStatus(order.id, item.id, 'cobrando');
+                          updateItemStatus(order.id, item.id, 'entregado');
                         }
                       }
                     }}
-                    className="h-4 w-4"
+                    className="h-4 w-4 ml-auto"
                   />
                 )}
               </div>
@@ -436,13 +473,20 @@ export default function OrderManager() {
           
           {currentTab === 'resumen' && (
             <div className="text-xs text-muted-foreground">
-              Preparando: {preparandoCount} | Entregando: {entregandoCount} | Cobrando: {cobrandoCount}
+              En preparación: {preparandoCount} | Para entregar: {entregandoCount} | Cobrando: {cobrandoCount}
             </div>
           )}
         </div>
         
         <div className="flex items-center justify-between pt-2 border-t border-border">
-          <span className="font-semibold">Total: ${order.total.toFixed(2)}</span>
+          <div>
+            <span className="font-semibold">Total: ${order.total.toFixed(2)}</span>
+            {order.deliveryCharge && order.deliveryCharge > 0 && (
+              <div className="text-xs text-muted-foreground">
+                (Inc. entrega: ${order.deliveryCharge.toFixed(2)})
+              </div>
+            )}
+          </div>
           <div className="flex gap-1">
             {order.status === 'cobrando' && currentTab === 'cobrando' && (
               <Button size="sm" onClick={() => setPaymentDialog(order.id)}>
@@ -624,17 +668,7 @@ export default function OrderManager() {
           </TabsList>
 
           <TabsContent value="resumen" className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Órdenes Totales</CardTitle>
-                  <div className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{summary.totalOrders}</div>
-                </CardContent>
-              </Card>
-              
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">En Preparación</CardTitle>
@@ -654,14 +688,39 @@ export default function OrderManager() {
                   <div className="text-2xl font-bold text-info">{summary.entregandoCount}</div>
                 </CardContent>
               </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Cobrando</CardTitle>
+                  <DollarSign className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-success">{summary.cobrandoCount}</div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Pagadas Hoy</CardTitle>
+                  <DollarSign className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-primary">{summary.pagadoCount}</div>
+                </CardContent>
+              </Card>
             </div>
 
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold">Todas las Comandas</h3>
+              <h3 className="text-lg font-semibold">Órdenes Activas</h3>
               <div className="grid gap-4">
-                {orders.map(order => (
+                {orders.filter(order => ['preparando', 'entregando', 'cobrando'].includes(order.status)).map(order => (
                   <OrderCard key={order.id} order={order} currentTab="resumen" />
                 ))}
+                {orders.filter(order => ['preparando', 'entregando', 'cobrando'].includes(order.status)).length === 0 && (
+                  <div className="text-center text-muted-foreground py-8">
+                    No hay órdenes activas
+                  </div>
+                )}
               </div>
             </div>
           </TabsContent>
@@ -744,27 +803,23 @@ export default function OrderManager() {
       </div>
 
       {/* Payment Dialog */}
-      <Dialog open={!!paymentDialog} onOpenChange={() => setPaymentDialog(null)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>¿Cómo se va a realizar el pago?</DialogTitle>
-          </DialogHeader>
-          <div className="flex gap-4 justify-center pt-4">
-            <Button 
-              onClick={() => paymentDialog && processPayment(paymentDialog, 'efectivo')}
-              className="flex-1"
-            >
-              Efectivo
-            </Button>
-            <Button 
-              onClick={() => paymentDialog && processPayment(paymentDialog, 'tarjeta')}
-              className="flex-1"
-            >
-              Tarjeta
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {paymentDialog && (
+        <PaymentDialog
+          open={!!paymentDialog}
+          onOpenChange={() => setPaymentDialog(null)}
+          onConfirmPayment={(paymentMethod, removeDeliveryCharge) => {
+            if (paymentDialog) {
+              processPayment(paymentDialog, paymentMethod, removeDeliveryCharge);
+            }
+          }}
+          hasDeliveryCharge={
+            paymentDialog ? (orders.find(o => o.id === paymentDialog)?.deliveryCharge || 0) > 0 : false
+          }
+          deliveryAmount={
+            paymentDialog ? (orders.find(o => o.id === paymentDialog)?.deliveryCharge || 0) : 0
+          }
+        />
+      )}
     </div>
   );
 }
