@@ -2,15 +2,14 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, Clock, Truck, DollarSign, Edit2, Calendar } from 'lucide-react';
+import { Plus, Clock, Truck, DollarSign, Edit2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import PaymentDialog from './PaymentDialog';
+import NewOrderDialog from './NewOrderDialog';
 
 interface OrderItem {
   id: string;
@@ -30,9 +29,8 @@ interface Order {
   total: number;
   status: 'preparando' | 'entregando' | 'cobrando' | 'pagado';
   createdAt: Date;
-  table?: string;
   paymentMethod?: 'efectivo' | 'tarjeta' | 'transferencia';
-  serviceType?: 'en_puesto' | 'take_away' | 'delivery';
+  serviceType?: 'puesto' | 'takeaway' | 'delivery';
   deliveryCharge?: number;
   diners?: number;
 }
@@ -58,7 +56,8 @@ export default function OrderManager() {
       total: 27.50,
       status: 'preparando',
       createdAt: new Date(Date.now() - 300000),
-      table: 'Mesa 5'
+      serviceType: 'puesto',
+      diners: 2
     },
     {
       id: '2',
@@ -70,7 +69,8 @@ export default function OrderManager() {
       total: 28.00,
       status: 'cobrando',
       createdAt: new Date(Date.now() - 600000),
-      table: 'Mesa 3'
+      serviceType: 'takeaway',
+      diners: 1
     },
     {
       id: '3',
@@ -79,22 +79,17 @@ export default function OrderManager() {
       items: [
         { id: '4', name: 'Ensalada César', price: 10.00, quantity: 1, status: 'entregado' }
       ],
-      total: 10.00,
+      total: 70.00,
       status: 'pagado',
       createdAt: new Date(Date.now() - 86400000),
-      table: 'Mesa 1',
       paymentMethod: 'efectivo',
-      serviceType: 'en_puesto',
-      diners: 2
+      serviceType: 'delivery',
+      diners: 2,
+      deliveryCharge: 60
     }
   ]);
 
   const [isNewOrderOpen, setIsNewOrderOpen] = useState(false);
-  const [selectedItems, setSelectedItems] = useState<OrderItem[]>([]);
-  const [selectedTable, setSelectedTable] = useState<string>('');
-  const [customerName, setCustomerName] = useState<string>('');
-  const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [paymentDialog, setPaymentDialog] = useState<string | null>(null);
   const [dateFilter, setDateFilter] = useState<{ start: string; end: string }>({
     start: new Date().toISOString().split('T')[0],
@@ -110,54 +105,37 @@ export default function OrderManager() {
     pagado: { label: 'Pagado', color: 'bg-primary/10 text-primary', icon: DollarSign },
   };
 
-  const addItemToOrder = (menuItem: typeof menuItems[0]) => {
-    const existingItem = selectedItems.find(item => item.id === menuItem.id && !item.removed);
+  const handleNewOrder = (orderData: {
+    items: Array<{menuItem: any, quantity: number}>;
+    serviceType: 'puesto' | 'takeaway' | 'delivery';
+    diners: number;
+    deliveryCharge: number;
+  }) => {
+    const newOrder: Order = {
+      id: Date.now().toString(),
+      number: `#${String(orders.length + 1).padStart(3, '0')}`,
+      customerName: 'Cliente',
+      items: orderData.items.map(item => ({
+        id: item.menuItem.id,
+        name: item.menuItem.name,
+        price: item.menuItem.price,
+        quantity: item.quantity,
+        status: 'preparando' as const
+      })),
+      total: orderData.items.reduce((sum, item) => sum + (item.menuItem.price * item.quantity), 0) + orderData.deliveryCharge,
+      status: 'preparando',
+      createdAt: new Date(),
+      serviceType: orderData.serviceType,
+      diners: orderData.diners,
+      deliveryCharge: orderData.deliveryCharge
+    };
+
+    setOrders(orders => [newOrder, ...orders]);
     
-    if (existingItem) {
-      setSelectedItems(items => 
-        items.map(item => 
-          item.id === menuItem.id && !item.removed
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        )
-      );
-    } else {
-      setSelectedItems(items => [...items, {
-        id: menuItem.id,
-        name: menuItem.name,
-        price: menuItem.price,
-        quantity: 1,
-        status: 'preparando'
-      }]);
-    }
-  };
-
-  const removeItemFromOrder = (itemId: string, reason?: string) => {
-    setSelectedItems(items => 
-      items.map(item => 
-        item.id === itemId 
-          ? { ...item, removed: true, removalReason: reason }
-          : item
-      )
-    );
-  };
-
-  const updateItemQuantity = (itemId: string, quantity: number) => {
-    if (quantity <= 0) {
-      removeItemFromOrder(itemId);
-      return;
-    }
-    
-    setSelectedItems(items => 
-      items.map(item => 
-        item.id === itemId ? { ...item, quantity } : item
-      )
-    );
-  };
-
-  const calculateTotal = () => {
-    return selectedItems.reduce((total, item) => 
-      total + (item.removed ? 0 : item.price * item.quantity), 0);
+    toast({
+      title: "Orden creada",
+      description: `Orden ${newOrder.number} creada exitosamente`
+    });
   };
 
   const updateItemStatus = (orderId: string, itemId: string, newStatus: OrderItem['status']) => {
@@ -195,83 +173,6 @@ export default function OrderManager() {
     );
   };
 
-  const editOrder = (orderId: string) => {
-    const order = orders.find(o => o.id === orderId);
-    if (order) {
-      setSelectedItems([...order.items]);
-      setSelectedTable(order.table || '');
-      setCustomerName(order.customerName);
-      setEditingOrderId(orderId);
-      setIsNewOrderOpen(true);
-    }
-  };
-
-  const createOrder = () => {
-    if (selectedItems.length === 0) {
-      toast({
-        title: "Error",
-        description: "Agrega al menos un producto a la orden",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (!customerName.trim()) {
-      toast({
-        title: "Error",
-        description: "El nombre del cliente es obligatorio",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (editingOrderId) {
-      // Update existing order
-      setOrders(orders => 
-        orders.map(order => 
-          order.id === editingOrderId 
-            ? { 
-                ...order, 
-                customerName,
-                items: [...selectedItems], 
-                total: calculateTotal(),
-                table: selectedTable || undefined
-              }
-            : order
-        )
-      );
-      
-      toast({
-        title: "Orden actualizada",
-        description: "La orden ha sido modificada exitosamente"
-      });
-    } else {
-      // Create new order
-      const newOrder: Order = {
-        id: Date.now().toString(),
-        number: `#${String(orders.length + 1).padStart(3, '0')}`,
-        customerName,
-        items: [...selectedItems],
-        total: calculateTotal(),
-        status: 'preparando',
-        createdAt: new Date(),
-        table: selectedTable || undefined
-      };
-
-      setOrders(orders => [newOrder, ...orders]);
-      
-      toast({
-        title: "Orden creada",
-        description: `Orden ${newOrder.number} creada exitosamente`
-      });
-    }
-
-    setSelectedItems([]);
-    setSelectedTable('');
-    setCustomerName('');
-    setEditingOrderId(null);
-    setIsNewOrderOpen(false);
-  };
 
   const processPayment = (orderId: string, paymentMethod: 'efectivo' | 'tarjeta' | 'transferencia', removeDeliveryCharge: boolean = false) => {
     setOrders(orders => 
@@ -340,16 +241,6 @@ export default function OrderManager() {
     );
   };
 
-  const getCategories = () => {
-    return ['all', ...new Set(menuItems.map(item => item.category))];
-  };
-
-  const getFilteredMenuItems = () => {
-    if (selectedCategory === 'all') {
-      return menuItems;
-    }
-    return menuItems.filter(item => item.category === selectedCategory);
-  };
 
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString('es-ES', { 
@@ -380,11 +271,10 @@ export default function OrderManager() {
           <div>
             <div className="font-semibold">{order.number}</div>
             <div className="text-sm text-muted-foreground">{order.customerName}</div>
-            {order.table && <div className="text-sm text-muted-foreground">{order.table}</div>}
             {order.serviceType && (
               <div className="text-xs text-muted-foreground">
-                {order.serviceType === 'en_puesto' ? 'En Puesto' : 
-                 order.serviceType === 'take_away' ? 'Take Away' : 'Delivery'}
+                {order.serviceType === 'puesto' ? 'En Puesto' : 
+                 order.serviceType === 'takeaway' ? 'Take Away' : 'Delivery'}
                 {order.diners && ` • ${order.diners} comensales`}
               </div>
             )}
@@ -401,16 +291,6 @@ export default function OrderManager() {
               <StatusIcon className="h-3 w-3 mr-1" />
               {statusConfig[order.status].label}
             </Badge>
-            {order.status !== 'pagado' && (
-              <Button 
-                size="sm" 
-                variant="ghost" 
-                onClick={() => editOrder(order.id)}
-                className="h-8 w-8 p-0"
-              >
-                <Edit2 className="h-3 w-3" />
-              </Button>
-            )}
           </div>
         </div>
         
@@ -473,7 +353,7 @@ export default function OrderManager() {
           
           {currentTab === 'resumen' && (
             <div className="text-xs text-muted-foreground">
-              En preparación: {preparandoCount} | Para entregar: {entregandoCount} | Cobrando: {cobrandoCount}
+              Preparando: {preparandoCount} | Entregando: {entregandoCount} | Cobrando: {cobrandoCount}
             </div>
           )}
         </div>
@@ -505,173 +385,55 @@ export default function OrderManager() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground mb-2">Gestión de Comandas</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Gestión de Comandas</h1>
           <p className="text-muted-foreground">Administra las órdenes de tu restaurante</p>
         </div>
         
-        <Dialog open={isNewOrderOpen} onOpenChange={setIsNewOrderOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-gradient-primary hover:opacity-90">
-              <Plus className="h-4 w-4 mr-2" />
-              Nueva Orden
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>
-                {editingOrderId ? 'Editar Orden' : 'Crear Nueva Orden'}
-              </DialogTitle>
-            </DialogHeader>
-            
-            <div className="grid gap-6 md:grid-cols-2">
-              {/* Menu Items */}
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold">Menú</h3>
-                  <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                    <SelectTrigger className="w-40">
-                      <SelectValue placeholder="Categoría" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {getCategories().map(category => (
-                        <SelectItem key={category} value={category}>
-                          {category === 'all' ? 'Todas' : category}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {getFilteredMenuItems().map(item => (
-                    <div key={item.id} className="flex items-center justify-between p-3 border border-border rounded-lg">
-                      <div>
-                        <div className="font-medium">{item.name}</div>
-                        <div className="text-sm text-muted-foreground">${item.price.toFixed(2)} - {item.category}</div>
-                      </div>
-                      <Button size="sm" onClick={() => addItemToOrder(item)}>
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Order Summary */}
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold">Orden Actual</h3>
-                  <Select value={selectedTable} onValueChange={setSelectedTable}>
-                    <SelectTrigger className="w-32">
-                      <SelectValue placeholder="Mesa" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Array.from({ length: 10 }, (_, i) => (
-                        <SelectItem key={i + 1} value={`Mesa ${i + 1}`}>
-                          Mesa {i + 1}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="mb-4">
-                  <Label htmlFor="customerName">Nombre del Cliente *</Label>
-                  <Input
-                    id="customerName"
-                    value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    placeholder="Ej: Juan Pérez"
-                    className="mt-1"
-                  />
-                </div>
-                
-                <div className="space-y-2 mb-4 max-h-64 overflow-y-auto">
-                  {selectedItems.map(item => (
-                    <div key={item.id} className="flex items-center justify-between p-2 border border-border rounded">
-                      <div className={item.removed ? 'line-through text-muted-foreground' : ''}>
-                        <div className="font-medium">{item.name}</div>
-                        <div className="text-sm text-muted-foreground">
-                          ${item.price.toFixed(2)} x {item.quantity} = ${(item.price * item.quantity).toFixed(2)}
-                          {item.removed && item.removalReason && (
-                            <span className="ml-2">({item.removalReason})</span>
-                          )}
-                        </div>
-                      </div>
-                      {!item.removed && (
-                        <div className="flex items-center gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => updateItemQuantity(item.id, item.quantity - 1)}
-                          >
-                            -
-                          </Button>
-                          <span className="w-8 text-center">{item.quantity}</span>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => updateItemQuantity(item.id, item.quantity + 1)}
-                          >
-                            +
-                          </Button>
-                          <Select onValueChange={(reason) => removeItemFromOrder(item.id, reason)}>
-                            <SelectTrigger className="w-24">
-                              <SelectValue placeholder="..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="sin_stock">Sin stock</SelectItem>
-                              <SelectItem value="cliente_cambio">Cliente cambió de opinión</SelectItem>
-                              <SelectItem value="error_orden">Error en la orden</SelectItem>
-                              <SelectItem value="otro">Otro</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                
-                <div className="p-3 border border-border rounded-lg mb-4">
-                  <div className="flex justify-between items-center text-lg font-semibold">
-                    <span>Total:</span>
-                    <span>${calculateTotal().toFixed(2)}</span>
-                  </div>
-                </div>
-                
-                <Button onClick={createOrder} className="w-full">
-                  {editingOrderId ? 'Actualizar Orden' : 'Crear Orden'}
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <Button 
+          onClick={() => setIsNewOrderOpen(true)}
+          className="bg-gradient-primary hover:opacity-90"
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          <span className="hidden sm:inline">Nueva Orden</span>
+          <span className="sm:hidden">Nueva</span>
+        </Button>
       </div>
 
       <div>
         <Tabs defaultValue="resumen" className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="resumen">
-              Resumen ({summary.totalOrders})
+          <TabsList className="grid w-full grid-cols-5 text-xs sm:text-sm">
+            <TabsTrigger value="resumen" className="px-2">
+              <span className="hidden sm:inline">Resumen</span>
+              <span className="sm:hidden">Res</span>
+              <span className="ml-1">({orders.filter(o => ['preparando', 'entregando', 'cobrando'].includes(o.status)).length})</span>
             </TabsTrigger>
-            <TabsTrigger value="preparando">
-              Preparando ({summary.preparandoCount})
+            <TabsTrigger value="preparando" className="px-2">
+              <span className="hidden sm:inline">Preparando</span>
+              <span className="sm:hidden">Prep</span>
+              <span className="ml-1">({summary.preparandoCount})</span>
             </TabsTrigger>
-            <TabsTrigger value="entregando">
-              Entregando ({summary.entregandoCount})
+            <TabsTrigger value="entregando" className="px-2">
+              <span className="hidden sm:inline">Entregando</span>
+              <span className="sm:hidden">Entr</span>
+              <span className="ml-1">({summary.entregandoCount})</span>
             </TabsTrigger>
-            <TabsTrigger value="cobrando">
-              Cobrando ({summary.cobrandoCount})
+            <TabsTrigger value="cobrando" className="px-2">
+              <span className="hidden sm:inline">Cobrando</span>
+              <span className="sm:hidden">Cobr</span>
+              <span className="ml-1">({summary.cobrandoCount})</span>
             </TabsTrigger>
-            <TabsTrigger value="pagado">
-              Pagado ({summary.pagadoCount})
+            <TabsTrigger value="pagado" className="px-2">
+              <span className="hidden sm:inline">Pagado</span>
+              <span className="sm:hidden">Pag</span>
+              <span className="ml-1">({summary.pagadoCount})</span>
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="resumen" className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 md:grid-cols-3">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">En Preparación</CardTitle>
+                  <CardTitle className="text-sm font-medium">Preparando</CardTitle>
                   <Clock className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
@@ -681,7 +443,7 @@ export default function OrderManager() {
               
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Para Entregar</CardTitle>
+                  <CardTitle className="text-sm font-medium">Entregando</CardTitle>
                   <Truck className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
@@ -696,16 +458,6 @@ export default function OrderManager() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-success">{summary.cobrandoCount}</div>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Pagadas Hoy</CardTitle>
-                  <DollarSign className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-primary">{summary.pagadoCount}</div>
                 </CardContent>
               </Card>
             </div>
@@ -801,6 +553,12 @@ export default function OrderManager() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <NewOrderDialog
+        open={isNewOrderOpen}
+        onOpenChange={setIsNewOrderOpen}
+        onCreateOrder={handleNewOrder}
+      />
 
       {/* Payment Dialog */}
       {paymentDialog && (

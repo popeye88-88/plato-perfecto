@@ -232,7 +232,7 @@ export default function MenuManager() {
                   </SelectContent>
                 </Select>
                 
-                {(formData.category === '' && newCategoryName === '') && (
+                {!formData.category && (
                   <Input
                     value={newCategoryName}
                     onChange={(e) => setNewCategoryName(e.target.value)}
