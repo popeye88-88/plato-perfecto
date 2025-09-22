@@ -298,49 +298,58 @@ export default function OrderManager() {
           {order.items.map(item => {
             const isPreparandoTab = currentTab === 'preparando';
             const isEntregandoTab = currentTab === 'entregando';
+            const isCobrandoTab = currentTab === 'cobrando';
             
-            // For preparando tab: show items that are in preparando status
-            // For entregando tab: show items that are preparado or entregando, disable preparando items
-            const showInTab = isPreparandoTab 
-              ? item.status === 'preparando'
-              : isEntregandoTab 
-                ? ['preparado', 'entregando', 'preparando'].includes(item.status)
-                : true;
+            // Always show all items, but determine if they should be enabled/disabled
+            let isEnabled = true;
+            let showCheckbox = false;
+            let isChecked = false;
             
-            const isDisabled = isEntregandoTab && item.status === 'preparando';
-            
-            if (!showInTab && (isPreparandoTab || isEntregandoTab)) return null;
+            if (isPreparandoTab) {
+              // In preparando tab, only enable items that are currently preparando
+              isEnabled = item.status === 'preparando' && !item.removed;
+              showCheckbox = !item.removed;
+              isChecked = item.status !== 'preparando'; // Check if item has moved past preparando
+            } else if (isEntregandoTab) {
+              // In entregando tab, only enable items that are preparado or entregando
+              isEnabled = (item.status === 'preparado' || item.status === 'entregando') && !item.removed;
+              showCheckbox = !item.removed;
+              isChecked = item.status === 'entregado'; // Check if item has been delivered
+            } else if (isCobrandoTab) {
+              // In cobrando tab, show all items but don't allow interaction
+              isEnabled = false;
+              showCheckbox = false;
+            }
             
             return (
               <div key={item.id} className="flex items-center justify-between text-sm">
-                <div className={`flex items-center gap-2 ${isDisabled ? 'text-muted-foreground opacity-50' : ''}`}>
+                <div className={`flex items-center gap-2 ${!isEnabled ? 'text-muted-foreground opacity-50' : ''}`}>
                   <span className={item.removed ? 'line-through text-muted-foreground' : ''}>
                     {item.quantity}x {item.name}
                     {item.removed && item.removalReason && (
                       <span className="text-xs text-muted-foreground ml-2">({item.removalReason})</span>
                     )}
                   </span>
-                  {currentTab !== 'resumen' && currentTab !== 'cobrando' && currentTab !== 'pagado' && (
+                  {(currentTab !== 'resumen' && currentTab !== 'pagado') && (
                     <Badge variant="secondary" className="text-xs">
                       {statusConfig[item.status].label}
                     </Badge>
                   )}
                 </div>
-                {!item.removed && (currentTab === 'preparando' || currentTab === 'entregando') && (
+                {showCheckbox && (
                   <Checkbox
-                    checked={
-                      (currentTab === 'preparando' && item.status === 'preparado') ||
-                      (currentTab === 'entregando' && item.status === 'entregado')
-                    }
-                    disabled={isDisabled}
+                    checked={isChecked}
+                    disabled={!isEnabled}
                     onCheckedChange={(checked) => {
-                      if (checked) {
-                        if (currentTab === 'preparando' && item.status === 'preparando') {
+                      if (checked && isEnabled) {
+                        if (isPreparandoTab && item.status === 'preparando') {
                           updateItemStatus(order.id, item.id, 'preparado');
-                        } else if (currentTab === 'entregando' && item.status === 'preparado') {
-                          updateItemStatus(order.id, item.id, 'entregando');
-                        } else if (currentTab === 'entregando' && item.status === 'entregando') {
-                          updateItemStatus(order.id, item.id, 'entregado');
+                        } else if (isEntregandoTab) {
+                          if (item.status === 'preparado') {
+                            updateItemStatus(order.id, item.id, 'entregando');
+                          } else if (item.status === 'entregando') {
+                            updateItemStatus(order.id, item.id, 'entregado');
+                          }
                         }
                       }
                     }}
