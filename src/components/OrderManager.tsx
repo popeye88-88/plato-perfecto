@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, Clock, Truck, DollarSign, Edit2 } from 'lucide-react';
+import { Plus, Clock, Truck, DollarSign, Edit2, X, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import PaymentDialog from './PaymentDialog';
 import NewOrderDialog from './NewOrderDialog';
@@ -16,9 +16,10 @@ interface OrderItem {
   name: string;
   price: number;
   quantity: number;
-  status: 'preparando' | 'preparado' | 'entregando' | 'entregado' | 'cobrando';
-  removed?: boolean;
-  removalReason?: string;
+  status: 'preparando' | 'entregando' | 'cobrando';
+  cancelled?: boolean;
+  cancellationReason?: string;
+  ingredients?: string[];
 }
 
 interface Order {
@@ -50,10 +51,11 @@ export default function OrderManager() {
       number: '#001',
       customerName: 'Juan Pérez',
       items: [
-        { id: '1', name: 'Pizza Margherita', price: 15.00, quantity: 1, status: 'preparado' },
-        { id: '2', name: 'Hamburguesa Clásica', price: 12.50, quantity: 1, status: 'preparando' }
+        { id: '1-1', name: 'Pizza Margherita', price: 15.00, quantity: 1, status: 'entregando' },
+        { id: '1-2', name: 'Pizza Margherita', price: 15.00, quantity: 1, status: 'preparando' },
+        { id: '2-1', name: 'Hamburguesa Clásica', price: 12.50, quantity: 1, status: 'preparando' }
       ],
-      total: 27.50,
+      total: 42.50,
       status: 'preparando',
       createdAt: new Date(Date.now() - 300000),
       serviceType: 'puesto',
@@ -64,7 +66,8 @@ export default function OrderManager() {
       number: '#002',
       customerName: 'María García',
       items: [
-        { id: '3', name: 'Pasta Carbonara', price: 14.00, quantity: 2, status: 'entregado' }
+        { id: '3-1', name: 'Pasta Carbonara', price: 14.00, quantity: 1, status: 'cobrando' },
+        { id: '3-2', name: 'Pasta Carbonara', price: 14.00, quantity: 1, status: 'cobrando' }
       ],
       total: 28.00,
       status: 'cobrando',
@@ -77,7 +80,7 @@ export default function OrderManager() {
       number: '#003',
       customerName: 'Carlos López',
       items: [
-        { id: '4', name: 'Ensalada César', price: 10.00, quantity: 1, status: 'entregado' }
+        { id: '4-1', name: 'Ensalada César', price: 10.00, quantity: 1, status: 'cobrando' }
       ],
       total: 70.00,
       status: 'pagado',
@@ -97,31 +100,40 @@ export default function OrderManager() {
   });
 
   const statusConfig = {
-    preparando: { label: 'Preparando', color: 'bg-warning/10 text-warning', icon: Clock },
-    preparado: { label: 'Preparado', color: 'bg-info/10 text-info', icon: Clock },
-    entregando: { label: 'Entregando', color: 'bg-info/10 text-info', icon: Truck },
-    entregado: { label: 'Entregado', color: 'bg-success/10 text-success', icon: Truck },
-    cobrando: { label: 'Cobrando', color: 'bg-success/10 text-success', icon: DollarSign },
-    pagado: { label: 'Pagado', color: 'bg-primary/10 text-primary', icon: DollarSign },
+    preparando: { label: 'Preparando', color: 'bg-yellow-100 text-yellow-800', icon: Clock, symbol: '🔥' },
+    entregando: { label: 'Entregando', color: 'bg-blue-100 text-blue-800', icon: Truck, symbol: '📦' },
+    cobrando: { label: 'Cobrando', color: 'bg-green-100 text-green-800', icon: DollarSign, symbol: '💰' },
+    pagado: { label: 'Pagado', color: 'bg-purple-100 text-purple-800', icon: Check, symbol: '✅' },
   };
 
   const handleNewOrder = (orderData: {
-    items: Array<{menuItem: any, quantity: number}>;
+    items: Array<{menuItem: any, quantity: number, customIngredients?: string[]}>;
     serviceType: 'puesto' | 'takeaway' | 'delivery';
     diners: number;
+    customerName: string;
     deliveryCharge: number;
   }) => {
+    const newOrderItems: OrderItem[] = [];
+    
+    // Create individual items for each quantity
+    orderData.items.forEach((item, itemIndex) => {
+      for (let i = 0; i < item.quantity; i++) {
+        newOrderItems.push({
+          id: `${item.menuItem.id}-${itemIndex}-${i}`,
+          name: item.menuItem.name,
+          price: item.menuItem.price,
+          quantity: 1,
+          status: 'preparando' as const,
+          ingredients: item.customIngredients
+        });
+      }
+    });
+
     const newOrder: Order = {
       id: Date.now().toString(),
       number: `#${String(orders.length + 1).padStart(3, '0')}`,
-      customerName: 'Cliente',
-      items: orderData.items.map(item => ({
-        id: item.menuItem.id,
-        name: item.menuItem.name,
-        price: item.menuItem.price,
-        quantity: item.quantity,
-        status: 'preparando' as const
-      })),
+      customerName: orderData.customerName,
+      items: newOrderItems,
       total: orderData.items.reduce((sum, item) => sum + (item.menuItem.price * item.quantity), 0) + orderData.deliveryCharge,
       status: 'preparando',
       createdAt: new Date(),
@@ -146,25 +158,22 @@ export default function OrderManager() {
             item.id === itemId ? { ...item, status: newStatus } : item
           );
           
-          // Determine order status based on lowest item status
-          const getLowestStatus = (items: OrderItem[]): Order['status'] => {
-            const activeItems = items.filter(item => !item.removed);
+          // Determine order status based on item states
+          const getOrderStatus = (items: OrderItem[]): Order['status'] => {
+            const activeItems = items.filter(item => !item.cancelled);
             if (activeItems.length === 0) return 'pagado';
             
             const hasPreparando = activeItems.some(item => item.status === 'preparando');
-            const hasPreparado = activeItems.some(item => item.status === 'preparado');
             const hasEntregando = activeItems.some(item => item.status === 'entregando');
-            const hasEntregado = activeItems.some(item => item.status === 'entregado');
             const hasCobrando = activeItems.some(item => item.status === 'cobrando');
             
             if (hasPreparando) return 'preparando';
-            if (hasPreparado || hasEntregando) return 'entregando';
-            if (hasEntregado) return 'cobrando';
+            if (hasEntregando) return 'entregando';
             if (hasCobrando) return 'cobrando';
             return 'pagado';
           };
           
-          const newOrderStatus = getLowestStatus(updatedItems);
+          const newOrderStatus = getOrderStatus(updatedItems);
           
           return { ...order, items: updatedItems, status: newOrderStatus };
         }
@@ -218,12 +227,12 @@ export default function OrderManager() {
   
   const getOrdersForTab = (tab: 'preparando' | 'entregando') => {
     return orders.filter(order => {
-      const activeItems = order.items.filter(item => !item.removed);
+      const activeItems = order.items.filter(item => !item.cancelled);
       if (tab === 'preparando') {
         return activeItems.some(item => item.status === 'preparando');
       }
       if (tab === 'entregando') {
-        return activeItems.some(item => item.status === 'preparado' || item.status === 'entregando');
+        return activeItems.some(item => item.status === 'entregando');
       }
       return false;
     });
@@ -261,12 +270,12 @@ export default function OrderManager() {
 
   const OrderCard = ({ order, currentTab }: { order: Order; currentTab: string }) => {
     const StatusIcon = statusConfig[order.status].icon;
-    const preparandoCount = order.items.filter(item => !item.removed && item.status === 'preparando').length;
-    const entregandoCount = order.items.filter(item => !item.removed && (item.status === 'preparado' || item.status === 'entregando')).length;
-    const cobrandoCount = order.items.filter(item => !item.removed && (item.status === 'entregado' || item.status === 'cobrando')).length;
+    const preparandoCount = order.items.filter(item => !item.cancelled && item.status === 'preparando').length;
+    const entregandoCount = order.items.filter(item => !item.cancelled && item.status === 'entregando').length;
+    const cobrandoCount = order.items.filter(item => !item.cancelled && item.status === 'cobrando').length;
     
     return (
-      <div key={order.id} className="p-4 border border-border rounded-lg space-y-3">
+      <div key={order.id} className="p-3 md:p-4 border border-border rounded-lg space-y-3">
         <div className="flex items-center justify-between">
           <div>
             <div className="font-semibold">{order.number}</div>
@@ -294,74 +303,101 @@ export default function OrderManager() {
           </div>
         </div>
         
-        <div className="space-y-2">
-          {order.items.map(item => {
+        <div className="space-y-1">
+          {order.items.map((item, itemIndex) => {
             const isPreparandoTab = currentTab === 'preparando';
             const isEntregandoTab = currentTab === 'entregando';
             const isCobrandoTab = currentTab === 'cobrando';
             
-            // Always show all items, but determine if they should be enabled/disabled
-            let isEnabled = true;
-            let showCheckbox = false;
+            // Determine if checkbox should be enabled and checked for this item
+            let isEnabled = false;
+            let showCheckbox = true;
             let isChecked = false;
             
             if (isPreparandoTab) {
-              // In preparando tab, only enable items that are currently preparando
-              isEnabled = item.status === 'preparando' && !item.removed;
-              showCheckbox = !item.removed;
-              isChecked = item.status !== 'preparando'; // Check if item has moved past preparando
+              // In preparando tab, enable items that are preparando
+              isEnabled = item.status === 'preparando' && !item.cancelled;
+              isChecked = item.status !== 'preparando';
             } else if (isEntregandoTab) {
-              // In entregando tab, only enable items that are preparado or entregando
-              isEnabled = (item.status === 'preparado' || item.status === 'entregando') && !item.removed;
-              showCheckbox = !item.removed;
-              isChecked = item.status === 'entregado'; // Check if item has been delivered
+              // In entregando tab, enable items that are entregando
+              isEnabled = item.status === 'entregando' && !item.cancelled;
+              isChecked = item.status === 'cobrando';
             } else if (isCobrandoTab) {
-              // In cobrando tab, show all items but don't allow interaction
-              isEnabled = false;
+              // In cobrando tab, enable items that are cobrando
+              isEnabled = item.status === 'cobrando' && !item.cancelled;
+              isChecked = false;
+            } else if (currentTab === 'pagado' || currentTab === 'resumen') {
+              // In these tabs, don't show checkboxes
               showCheckbox = false;
             }
             
             return (
-              <div key={item.id} className="flex items-center justify-between text-sm">
-                <div className={`flex items-center gap-2 ${!isEnabled ? 'text-muted-foreground opacity-50' : ''}`}>
-                  <span className={item.removed ? 'line-through text-muted-foreground' : ''}>
-                    {item.quantity}x {item.name}
-                    {item.removed && item.removalReason && (
-                      <span className="text-xs text-muted-foreground ml-2">({item.removalReason})</span>
-                    )}
-                  </span>
-                  {(currentTab !== 'resumen' && currentTab !== 'pagado') && (
-                    <Badge variant="secondary" className="text-xs">
-                      {statusConfig[item.status].label}
-                    </Badge>
-                  )}
+              <div key={`${item.id}-${itemIndex}`} className="flex items-center justify-between text-sm py-1">
+                <div className={`flex items-center gap-2 ${!isEnabled && showCheckbox ? 'text-muted-foreground' : ''}`}>
+                  <div className="flex items-center gap-1">
+                    <span className="text-lg">{statusConfig[item.status]?.symbol || '•'}</span>
+                    <span className={item.cancelled ? 'line-through text-muted-foreground' : ''}>
+                      {item.name}
+                      {item.cancelled && item.cancellationReason && (
+                        <span className="text-xs text-muted-foreground ml-2">({item.cancellationReason})</span>
+                      )}
+                      {item.ingredients && item.ingredients.length > 0 && (
+                        <div className="text-xs text-muted-foreground">
+                          {item.ingredients.join(', ')}
+                        </div>
+                      )}
+                    </span>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    ${item.price.toFixed(2)}
+                  </div>
                 </div>
-                {showCheckbox && (
+                {showCheckbox && !item.cancelled && (
                   <Checkbox
                     checked={isChecked}
                     disabled={!isEnabled}
                     onCheckedChange={(checked) => {
                       if (checked && isEnabled) {
                         if (isPreparandoTab && item.status === 'preparando') {
-                          updateItemStatus(order.id, item.id, 'preparado');
-                        } else if (isEntregandoTab) {
-                          if (item.status === 'preparado') {
-                            updateItemStatus(order.id, item.id, 'entregando');
-                          } else if (item.status === 'entregando') {
-                            updateItemStatus(order.id, item.id, 'entregado');
-                          }
+                          updateItemStatus(order.id, item.id, 'entregando');
+                        } else if (isEntregandoTab && item.status === 'entregando') {
+                          updateItemStatus(order.id, item.id, 'cobrando');
                         }
                       }
                     }}
-                    className="h-4 w-4 ml-auto"
+                    className="h-4 w-4"
                   />
+                )}
+                {(currentTab === 'cobrando' || currentTab === 'pagado') && !item.cancelled && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setOrders(orders => 
+                        orders.map(o => 
+                          o.id === order.id 
+                            ? {
+                                ...o,
+                                items: o.items.map(i => 
+                                  i.id === item.id 
+                                    ? { ...i, cancelled: true, cancellationReason: 'Cancelado' }
+                                    : i
+                                )
+                              }
+                            : o
+                        )
+                      );
+                    }}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
                 )}
               </div>
             );
           })}
           
           {currentTab === 'resumen' && (
-            <div className="text-xs text-muted-foreground">
+            <div className="text-xs text-muted-foreground pt-2">
               Preparando: {preparandoCount} | Entregando: {entregandoCount} | Cobrando: {cobrandoCount}
             </div>
           )}
@@ -439,34 +475,34 @@ export default function OrderManager() {
           </TabsList>
 
           <TabsContent value="resumen" className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Preparando</CardTitle>
-                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-2xl">{statusConfig.preparando.symbol}</span>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-warning">{summary.preparandoCount}</div>
+                  <div className="text-2xl font-bold text-yellow-600">{summary.preparandoCount}</div>
                 </CardContent>
               </Card>
-              
+
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Entregando</CardTitle>
-                  <Truck className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-2xl">{statusConfig.entregando.symbol}</span>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-info">{summary.entregandoCount}</div>
+                  <div className="text-2xl font-bold text-blue-600">{summary.entregandoCount}</div>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Cobrando</CardTitle>
-                  <DollarSign className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-2xl">{statusConfig.cobrando.symbol}</span>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-success">{summary.cobrandoCount}</div>
+                  <div className="text-2xl font-bold text-green-600">{summary.cobrandoCount}</div>
                 </CardContent>
               </Card>
             </div>

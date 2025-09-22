@@ -4,11 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Settings, Users, Globe, DollarSign, UserPlus } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Settings, Users, Globe, DollarSign, UserPlus, ChefHat } from 'lucide-react';
 
 interface AppSettings {
   language: 'es' | 'en';
   currency: 'MXN' | 'EUR' | 'USD';
+  ingredientManagement: boolean;
 }
 
 const currencySymbols = {
@@ -25,10 +27,11 @@ const languageLabels = {
 export default function SettingsManager() {
   const [settings, setSettings] = useState<AppSettings>({
     language: 'es',
-    currency: 'MXN'
+    currency: 'MXN',
+    ingredientManagement: false
   });
 
-  const handleSettingChange = (key: keyof AppSettings, value: string) => {
+  const handleSettingChange = (key: keyof AppSettings, value: string | boolean) => {
     setSettings(prev => ({
       ...prev,
       [key]: value
@@ -43,7 +46,7 @@ export default function SettingsManager() {
       </div>
 
       <Tabs defaultValue="users" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="users" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             <span className="hidden sm:inline">Usuarios</span>
@@ -55,6 +58,10 @@ export default function SettingsManager() {
           <TabsTrigger value="currency" className="flex items-center gap-2">
             <DollarSign className="h-4 w-4" />
             <span className="hidden sm:inline">Moneda</span>
+          </TabsTrigger>
+          <TabsTrigger value="ingredients" className="flex items-center gap-2">
+            <ChefHat className="h-4 w-4" />
+            <span className="hidden sm:inline">Ingredientes</span>
           </TabsTrigger>
         </TabsList>
 
@@ -152,6 +159,37 @@ export default function SettingsManager() {
                   Moneda actual: {settings.currency} ({currencySymbols[settings.currency]})
                 </p>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="ingredients" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Gestión de Ingredientes</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <Label htmlFor="ingredient-management">Activar gestión de ingredientes</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Permite personalizar ingredientes en los productos del menú
+                  </p>
+                </div>
+                <Switch
+                  id="ingredient-management"
+                  checked={settings.ingredientManagement}
+                  onCheckedChange={(checked) => handleSettingChange('ingredientManagement', checked)}
+                />
+              </div>
+              {settings.ingredientManagement && (
+                <div className="p-4 bg-muted rounded-lg">
+                  <p className="text-sm text-muted-foreground">
+                    La gestión de ingredientes está activa. Los productos del menú ahora incluyen 
+                    opciones para personalizar ingredientes durante la creación de órdenes.
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
