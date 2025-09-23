@@ -477,60 +477,41 @@ export default function OrderManager() {
           </TabsList>
 
           <TabsContent value="resumen" className="space-y-6">
-            <div className="grid gap-4">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Preparando</CardTitle>
-                  <span className="text-2xl">{statusConfig.preparando.symbol}</span>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-yellow-600">{summary.preparandoCount}</div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Entregando</CardTitle>
-                  <span className="text-2xl">{statusConfig.entregando.symbol}</span>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-blue-600">{summary.entregandoCount}</div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Cobrando</CardTitle>
-                  <span className="text-2xl">{statusConfig.cobrando.symbol}</span>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-green-600">{summary.cobrandoCount}</div>
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold">Órdenes Activas</h3>
-              <div className="grid gap-4">
-                {orders.filter(order => ['preparando', 'entregando', 'cobrando'].includes(order.status)).map(order => (
-                  <OrderCard key={order.id} order={order} currentTab="resumen" />
-                ))}
-                {orders.filter(order => ['preparando', 'entregando', 'cobrando'].includes(order.status)).length === 0 && (
-                  <div className="text-center text-muted-foreground py-8">
-                    No hay órdenes activas
-                  </div>
-                )}
+            {/* Status count boxes at the top */}
+            <div className="grid grid-cols-3 gap-4">
+              <div className="border border-border rounded-lg p-4 text-center">
+                <div className="font-semibold text-foreground">Preparando</div>
+                <div className="text-2xl font-bold mt-2">{summary.preparandoCount}</div>
               </div>
+              <div className="border border-border rounded-lg p-4 text-center">
+                <div className="font-semibold text-foreground">Entregando</div>
+                <div className="text-2xl font-bold mt-2">{summary.entregandoCount}</div>
+              </div>
+              <div className="border border-border rounded-lg p-4 text-center">
+                <div className="font-semibold text-foreground">Cobrando</div>
+                <div className="text-2xl font-bold mt-2">{summary.cobrandoCount}</div>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {orders.filter(order => ['preparando', 'entregando', 'cobrando'].includes(order.status)).map(order => (
+                <OrderCard key={order.id} order={order} currentTab="resumen" />
+              ))}
+              {orders.filter(order => ['preparando', 'entregando', 'cobrando'].includes(order.status)).length === 0 && (
+                <div className="col-span-full text-center text-muted-foreground py-8">
+                  No hay órdenes activas
+                </div>
+              )}
             </div>
           </TabsContent>
 
           <TabsContent value="preparando" className="space-y-4">
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {getOrdersForTab('preparando').map(order => (
                 <OrderCard key={order.id} order={order} currentTab="preparando" />
               ))}
               {getOrdersForTab('preparando').length === 0 && (
-                <div className="text-center text-muted-foreground py-8">
+                <div className="col-span-full text-center text-muted-foreground py-8">
                   No hay órdenes en preparación
                 </div>
               )}
@@ -538,12 +519,12 @@ export default function OrderManager() {
           </TabsContent>
 
           <TabsContent value="entregando" className="space-y-4">
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {getOrdersForTab('entregando').map(order => (
                 <OrderCard key={order.id} order={order} currentTab="entregando" />
               ))}
               {getOrdersForTab('entregando').length === 0 && (
-                <div className="text-center text-muted-foreground py-8">
+                <div className="col-span-full text-center text-muted-foreground py-8">
                   No hay órdenes para entregar
                 </div>
               )}
@@ -551,12 +532,12 @@ export default function OrderManager() {
           </TabsContent>
 
           <TabsContent value="cobrando" className="space-y-4">
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {orders.filter(o => o.status === 'cobrando').map(order => (
                 <OrderCard key={order.id} order={order} currentTab="cobrando" />
               ))}
               {orders.filter(o => o.status === 'cobrando').length === 0 && (
-                <div className="text-center text-muted-foreground py-8">
+                <div className="col-span-full text-center text-muted-foreground py-8">
                   No hay órdenes para cobrar
                 </div>
               )}
@@ -587,12 +568,12 @@ export default function OrderManager() {
               </div>
             </div>
             
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {getFilteredPaidOrders().map(order => (
                 <OrderCard key={order.id} order={order} currentTab="pagado" />
               ))}
               {getFilteredPaidOrders().length === 0 && (
-                <div className="text-center text-muted-foreground py-8">
+                <div className="col-span-full text-center text-muted-foreground py-8">
                   No hay órdenes pagadas en el rango seleccionado
                 </div>
               )}
