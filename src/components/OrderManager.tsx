@@ -232,8 +232,8 @@ export default function OrderManager() {
         return activeItems.some(item => item.status === 'preparando');
       }
       if (tab === 'entregando') {
-        // Show orders that have items in 'entregando' status, even if some items are already 'cobrando'
-        return activeItems.some(item => item.status === 'entregando') && 
+        // Show orders that have at least one item in 'entregando' or 'cobrando' but not ALL items are in 'cobrando'
+        return (activeItems.some(item => item.status === 'entregando' || item.status === 'cobrando')) && 
                !activeItems.every(item => item.status === 'cobrando');
       }
       return false;
@@ -525,7 +525,7 @@ export default function OrderManager() {
           </TabsContent>
 
           <TabsContent value="preparando" className="space-y-4">
-            <div className="grid gap-4">
+            <div className="space-y-4">
               {getOrdersForTab('preparando').map(order => (
                 <OrderCard key={order.id} order={order} currentTab="preparando" />
               ))}
@@ -538,12 +538,12 @@ export default function OrderManager() {
           </TabsContent>
 
           <TabsContent value="entregando" className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-4">
               {getOrdersForTab('entregando').map(order => (
                 <OrderCard key={order.id} order={order} currentTab="entregando" />
               ))}
               {getOrdersForTab('entregando').length === 0 && (
-                <div className="col-span-full text-center text-muted-foreground py-8">
+                <div className="text-center text-muted-foreground py-8">
                   No hay órdenes para entregar
                 </div>
               )}
@@ -551,7 +551,7 @@ export default function OrderManager() {
           </TabsContent>
 
           <TabsContent value="cobrando" className="space-y-4">
-            <div className="grid gap-4">
+            <div className="space-y-4">
               {orders.filter(o => o.status === 'cobrando').map(order => (
                 <OrderCard key={order.id} order={order} currentTab="cobrando" />
               ))}
@@ -587,7 +587,7 @@ export default function OrderManager() {
               </div>
             </div>
             
-            <div className="grid gap-4">
+            <div className="space-y-4">
               {getFilteredPaidOrders().map(order => (
                 <OrderCard key={order.id} order={order} currentTab="pagado" />
               ))}
