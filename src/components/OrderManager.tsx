@@ -232,7 +232,9 @@ export default function OrderManager() {
         return activeItems.some(item => item.status === 'preparando');
       }
       if (tab === 'entregando') {
-        return activeItems.some(item => item.status === 'entregando');
+        // Show orders that have items in 'entregando' status, even if some items are already 'cobrando'
+        return activeItems.some(item => item.status === 'entregando') && 
+               !activeItems.every(item => item.status === 'cobrando');
       }
       return false;
     });
@@ -536,12 +538,12 @@ export default function OrderManager() {
           </TabsContent>
 
           <TabsContent value="entregando" className="space-y-4">
-            <div className="grid gap-4">
+            <div className="grid gap-4 md:grid-cols-2">
               {getOrdersForTab('entregando').map(order => (
                 <OrderCard key={order.id} order={order} currentTab="entregando" />
               ))}
               {getOrdersForTab('entregando').length === 0 && (
-                <div className="text-center text-muted-foreground py-8">
+                <div className="col-span-full text-center text-muted-foreground py-8">
                   No hay órdenes para entregar
                 </div>
               )}
