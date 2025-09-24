@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -8,8 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Plus, Clock, Truck, DollarSign, Edit2, X, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 import PaymentDialog from './PaymentDialog';
 import NewOrderDialog from './NewOrderDialog';
+import EditOrderDialog from './EditOrderDialog';
 
 interface OrderItem {
   id: string;
@@ -45,59 +47,68 @@ const menuItems = [
 
 export default function OrderManager() {
   const { toast } = useToast();
-  const [orders, setOrders] = useState<Order[]>([
-    {
-      id: '1',
-      number: '#001',
-      customerName: 'Juan Pérez',
-      items: [
-        { id: '1-1', name: 'Pizza Margherita', price: 15.00, quantity: 1, status: 'entregando' },
-        { id: '1-2', name: 'Pizza Margherita', price: 15.00, quantity: 1, status: 'preparando' },
-        { id: '2-1', name: 'Hamburguesa Clásica', price: 12.50, quantity: 1, status: 'preparando' }
-      ],
-      total: 42.50,
-      status: 'preparando',
-      createdAt: new Date(Date.now() - 300000),
-      serviceType: 'puesto',
-      diners: 2
-    },
-    {
-      id: '2',
-      number: '#002',
-      customerName: 'María García',
-      items: [
-        { id: '3-1', name: 'Pasta Carbonara', price: 14.00, quantity: 1, status: 'cobrando' },
-        { id: '3-2', name: 'Pasta Carbonara', price: 14.00, quantity: 1, status: 'cobrando' }
-      ],
-      total: 28.00,
-      status: 'cobrando',
-      createdAt: new Date(Date.now() - 600000),
-      serviceType: 'takeaway',
-      diners: 1
-    },
-    {
-      id: '3',
-      number: '#003',
-      customerName: 'Carlos López',
-      items: [
-        { id: '4-1', name: 'Ensalada César', price: 10.00, quantity: 1, status: 'cobrando' }
-      ],
-      total: 70.00,
-      status: 'pagado',
-      createdAt: new Date(Date.now() - 86400000),
-      paymentMethod: 'efectivo',
-      serviceType: 'delivery',
-      diners: 2,
-      deliveryCharge: 60
-    }
-  ]);
-
+  const [orders, setOrders] = useState<Order[]>([]);
   const [isNewOrderOpen, setIsNewOrderOpen] = useState(false);
   const [paymentDialog, setPaymentDialog] = useState<string | null>(null);
+  const [editOrderDialog, setEditOrderDialog] = useState<string | null>(null);
   const [dateFilter, setDateFilter] = useState<{ start: string; end: string }>({
     start: new Date().toISOString().split('T')[0],
     end: new Date().toISOString().split('T')[0]
   });
+  const [loading, setLoading] = useState(true);
+
+  // Load orders from Supabase
+  useEffect(() => {
+    loadOrders();
+  }, []);
+
+  const loadOrders = async () => {
+    try {
+      const { data: ordersData, error: ordersError } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          order_items (*)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (ordersError) throw ordersError;
+
+      const formattedOrders: Order[] = ordersData.map(order => ({
+        id: order.id,
+        number: order.number,
+        customerName: order.customer_name,
+        total: parseFloat(order.total.toString()),
+        status: order.status as Order['status'],
+        createdAt: new Date(order.created_at),
+        paymentMethod: order.payment_method as Order['paymentMethod'],
+        serviceType: order.service_type as Order['serviceType'],
+        deliveryCharge: order.delivery_charge ? parseFloat(order.delivery_charge.toString()) : 0,
+        diners: order.diners,
+        items: order.order_items.map((item: any) => ({
+          id: item.id,
+          name: item.name,
+          price: parseFloat(item.price.toString()),
+          quantity: item.quantity,
+          status: item.status as OrderItem['status'],
+          cancelled: item.cancelled,
+          cancellationReason: item.cancellation_reason,
+          ingredients: item.ingredients
+        }))
+      }));
+
+      setOrders(formattedOrders);
+    } catch (error) {
+      console.error('Error loading orders:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar las órdenes",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const statusConfig = {
     preparando: { label: 'Preparando', color: 'bg-yellow-100 text-yellow-800', icon: Clock, symbol: '🔥' },
@@ -106,107 +117,241 @@ export default function OrderManager() {
     pagado: { label: 'Pagado', color: 'bg-purple-100 text-purple-800', icon: Check, symbol: '✅' },
   };
 
-  const handleNewOrder = (orderData: {
+  const handleNewOrder = async (orderData: {
     items: Array<{menuItem: any, quantity: number, customIngredients?: string[]}>;
     serviceType: 'puesto' | 'takeaway' | 'delivery';
     diners: number;
     customerName: string;
     deliveryCharge: number;
   }) => {
-    const newOrderItems: OrderItem[] = [];
-    
-    // Create individual items for each quantity
-    orderData.items.forEach((item, itemIndex) => {
-      for (let i = 0; i < item.quantity; i++) {
-        newOrderItems.push({
-          id: `${item.menuItem.id}-${itemIndex}-${i}`,
-          name: item.menuItem.name,
-          price: item.menuItem.price,
-          quantity: 1,
-          status: 'preparando' as const,
-          ingredients: item.customIngredients
-        });
-      }
-    });
+    try {
+      // Calculate total
+      const itemsTotal = orderData.items.reduce((sum, item) => sum + (item.menuItem.price * item.quantity), 0);
+      const total = itemsTotal + orderData.deliveryCharge;
 
-    const newOrder: Order = {
-      id: Date.now().toString(),
-      number: `#${String(orders.length + 1).padStart(3, '0')}`,
-      customerName: orderData.customerName,
-      items: newOrderItems,
-      total: orderData.items.reduce((sum, item) => sum + (item.menuItem.price * item.quantity), 0) + orderData.deliveryCharge,
-      status: 'preparando',
-      createdAt: new Date(),
-      serviceType: orderData.serviceType,
-      diners: orderData.diners,
-      deliveryCharge: orderData.deliveryCharge
-    };
+      // Create order in database
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          number: `#${String(orders.length + 1).padStart(3, '0')}`,
+          customer_name: orderData.customerName,
+          total,
+          status: 'preparando',
+          service_type: orderData.serviceType,
+          diners: orderData.diners,
+          delivery_charge: orderData.deliveryCharge
+        })
+        .select()
+        .single();
 
-    setOrders(orders => [newOrder, ...orders]);
-    
-    toast({
-      title: "Orden creada",
-      description: `Orden ${newOrder.number} creada exitosamente`
-    });
-  };
+      if (orderError) throw orderError;
 
-  const updateItemStatus = (orderId: string, itemId: string, newStatus: OrderItem['status']) => {
-    setOrders(orders => 
-      orders.map(order => {
-        if (order.id === orderId) {
-          const updatedItems = order.items.map(item =>
-            item.id === itemId ? { ...item, status: newStatus } : item
-          );
-          
-          // Determine order status based on item states
-          const getOrderStatus = (items: OrderItem[]): Order['status'] => {
-            const activeItems = items.filter(item => !item.cancelled);
-            if (activeItems.length === 0) return 'pagado';
-            
-            const hasPreparando = activeItems.some(item => item.status === 'preparando');
-            const hasEntregando = activeItems.some(item => item.status === 'entregando');
-            const hasCobrando = activeItems.some(item => item.status === 'cobrando');
-            
-            if (hasPreparando) return 'preparando';
-            if (hasEntregando) return 'entregando';
-            if (hasCobrando) return 'cobrando';
-            return 'pagado';
-          };
-          
-          const newOrderStatus = getOrderStatus(updatedItems);
-          
-          return { ...order, items: updatedItems, status: newOrderStatus };
+      // Create order items
+      const orderItems = [];
+      for (const item of orderData.items) {
+        for (let i = 0; i < item.quantity; i++) {
+          orderItems.push({
+            order_id: order.id,
+            name: item.menuItem.name,
+            price: item.menuItem.price,
+            quantity: 1,
+            status: 'preparando',
+            ingredients: item.customIngredients || null
+          });
         }
-        return order;
-      })
-    );
+      }
+
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(orderItems);
+
+      if (itemsError) throw itemsError;
+
+      // Reload orders
+      await loadOrders();
+      
+      toast({
+        title: "Orden creada",
+        description: `Orden ${order.number} creada exitosamente`
+      });
+    } catch (error) {
+      console.error('Error creating order:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo crear la orden",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const updateItemStatus = async (orderId: string, itemId: string, newStatus: OrderItem['status']) => {
+    try {
+      // Update item status in database
+      const { error: itemError } = await supabase
+        .from('order_items')
+        .update({ status: newStatus })
+        .eq('id', itemId);
+
+      if (itemError) throw itemError;
+
+      // Update local state
+      setOrders(orders => 
+        orders.map(order => {
+          if (order.id === orderId) {
+            const updatedItems = order.items.map(item =>
+              item.id === itemId ? { ...item, status: newStatus } : item
+            );
+            
+            // Determine order status based on item states
+            const getOrderStatus = (items: OrderItem[]): Order['status'] => {
+              const activeItems = items.filter(item => !item.cancelled);
+              if (activeItems.length === 0) return 'pagado';
+              
+              const hasPreparando = activeItems.some(item => item.status === 'preparando');
+              const hasEntregando = activeItems.some(item => item.status === 'entregando');
+              const hasCobrando = activeItems.some(item => item.status === 'cobrando');
+              
+              if (hasPreparando) return 'preparando';
+              if (hasEntregando) return 'entregando';
+              if (hasCobrando) return 'cobrando';
+              return 'pagado';
+            };
+            
+            const newOrderStatus = getOrderStatus(updatedItems);
+            
+            // Update order status in database
+            supabase
+              .from('orders')
+              .update({ status: newOrderStatus })
+              .eq('id', orderId)
+              .then();
+            
+            return { ...order, items: updatedItems, status: newOrderStatus };
+          }
+          return order;
+        })
+      );
+    } catch (error) {
+      console.error('Error updating item status:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar el estado del elemento",
+        variant: "destructive"
+      });
+    }
   };
 
 
-  const processPayment = (orderId: string, paymentMethod: 'efectivo' | 'tarjeta' | 'transferencia', removeDeliveryCharge: boolean = false) => {
-    setOrders(orders => 
-      orders.map(order => 
-        order.id === orderId 
-          ? { 
-              ...order, 
-              status: 'pagado', 
-              paymentMethod,
-              deliveryCharge: removeDeliveryCharge ? 0 : order.deliveryCharge,
-              total: removeDeliveryCharge && order.deliveryCharge 
-                ? order.total - order.deliveryCharge 
-                : order.total,
-              items: order.items.map(item => ({ ...item, status: 'cobrando' as const }))
-            }
-          : order
-      )
-    );
-    
-    const order = orders.find(o => o.id === orderId);
-    toast({
-      title: "Pago procesado",
-      description: `Orden ${order?.number} pagada con ${paymentMethod}`
-    });
-    setPaymentDialog(null);
+  const processPayment = async (orderId: string, paymentMethod: 'efectivo' | 'tarjeta' | 'transferencia', removeDeliveryCharge: boolean = false) => {
+    try {
+      const order = orders.find(o => o.id === orderId);
+      if (!order) return;
+
+      const newTotal = removeDeliveryCharge && order.deliveryCharge 
+        ? order.total - order.deliveryCharge 
+        : order.total;
+
+      // Update order in database
+      const { error: orderError } = await supabase
+        .from('orders')
+        .update({ 
+          status: 'pagado',
+          payment_method: paymentMethod,
+          delivery_charge: removeDeliveryCharge ? 0 : order.deliveryCharge,
+          total: newTotal
+        })
+        .eq('id', orderId);
+
+      if (orderError) throw orderError;
+
+      // Update all items to cobrando status
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .update({ status: 'cobrando' })
+        .eq('order_id', orderId);
+
+      if (itemsError) throw itemsError;
+
+      // Update local state
+      setOrders(orders => 
+        orders.map(o => 
+          o.id === orderId 
+            ? { 
+                ...o, 
+                status: 'pagado', 
+                paymentMethod,
+                deliveryCharge: removeDeliveryCharge ? 0 : o.deliveryCharge,
+                total: newTotal,
+                items: o.items.map(item => ({ ...item, status: 'cobrando' as const }))
+              }
+            : o
+        )
+      );
+      
+      toast({
+        title: "Pago procesado",
+        description: `Orden ${order?.number} pagada con ${paymentMethod}`
+      });
+      setPaymentDialog(null);
+    } catch (error) {
+      console.error('Error processing payment:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo procesar el pago",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleEditOrder = async (updatedOrder: Order) => {
+    try {
+      // Update order in database
+      const { error: orderError } = await supabase
+        .from('orders')
+        .update({
+          customer_name: updatedOrder.customerName,
+          total: updatedOrder.total
+        })
+        .eq('id', updatedOrder.id);
+
+      if (orderError) throw orderError;
+
+      // Delete existing items and recreate them
+      const { error: deleteError } = await supabase
+        .from('order_items')
+        .delete()
+        .eq('order_id', updatedOrder.id);
+
+      if (deleteError) throw deleteError;
+
+      // Insert updated items
+      const orderItems = updatedOrder.items.map(item => ({
+        order_id: updatedOrder.id,
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        status: item.status,
+        cancelled: item.cancelled || false,
+        cancellation_reason: item.cancellationReason,
+        ingredients: item.ingredients
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(orderItems);
+
+      if (itemsError) throw itemsError;
+
+      // Reload orders
+      await loadOrders();
+    } catch (error) {
+      console.error('Error updating order:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar la orden",
+        variant: "destructive"
+      });
+    }
   };
 
   const getOrderSummary = () => {
@@ -279,24 +424,44 @@ export default function OrderManager() {
     return (
       <div key={order.id} className="p-3 md:p-4 border border-border rounded-lg space-y-3">
         <div className="flex items-center justify-between">
-          <div>
-            <div className="font-semibold">{order.number}</div>
-            <div className="text-sm text-muted-foreground">{order.customerName}</div>
-            {order.serviceType && (
-              <div className="text-xs text-muted-foreground">
-                {order.serviceType === 'puesto' ? 'En Puesto' : 
-                 order.serviceType === 'takeaway' ? 'Take Away' : 'Delivery'}
-                {order.diners && ` • ${order.diners} comensales`}
+          <div className="flex-1">
+            {/* First Level - Order Info */}
+            <div className="flex items-center justify-between mb-2">
+              <div className="font-semibold text-lg">{order.number}</div>
+              {order.status !== 'pagado' && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setEditOrderDialog(order.id)}
+                  className="h-8 w-8 p-0"
+                >
+                  <Edit2 className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+            
+            {/* Second Level - Details */}
+            <div className="space-y-1">
+              <div className="text-sm font-medium">{order.customerName}</div>
+              <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                {order.serviceType && (
+                  <span>
+                    {order.serviceType === 'puesto' ? 'En Puesto' : 
+                     order.serviceType === 'takeaway' ? 'Take Away' : 'Delivery'}
+                  </span>
+                )}
+                {order.diners && <span>{order.diners} comensales</span>}
+                <span>{formatTime(order.createdAt)}</span>
               </div>
-            )}
-            {order.paymentMethod && currentTab === 'pagado' && (
-              <div className="text-xs text-muted-foreground">
-                Pago: {order.paymentMethod === 'efectivo' ? 'Efectivo' : 
-                       order.paymentMethod === 'tarjeta' ? 'Tarjeta' : 'Transferencia'}
-              </div>
-            )}
-            <div className="text-xs text-muted-foreground">{formatDateTime(order.createdAt)}</div>
+              {order.paymentMethod && currentTab === 'pagado' && (
+                <div className="text-xs text-muted-foreground">
+                  Pago: {order.paymentMethod === 'efectivo' ? 'Efectivo' : 
+                         order.paymentMethod === 'tarjeta' ? 'Tarjeta' : 'Transferencia'}
+                </div>
+              )}
+            </div>
           </div>
+          
           <div className="flex items-center gap-2">
             <Badge className={statusConfig[order.status].color}>
               <StatusIcon className="h-3 w-3 mr-1" />
@@ -325,9 +490,8 @@ export default function OrderManager() {
               isEnabled = item.status === 'entregando' && !item.cancelled;
               isChecked = item.status === 'cobrando';
             } else if (isCobrandoTab) {
-              // In cobrando tab, enable items that are cobrando
-              isEnabled = item.status === 'cobrando' && !item.cancelled;
-              isChecked = false;
+              // In cobrando tab, don't show checkboxes or X buttons
+              showCheckbox = false;
             } else if (currentTab === 'pagado' || currentTab === 'resumen') {
               // In these tabs, don't show checkboxes
               showCheckbox = false;
@@ -370,7 +534,7 @@ export default function OrderManager() {
                     className="h-4 w-4"
                   />
                 )}
-                {(currentTab === 'cobrando' || currentTab === 'pagado') && !item.cancelled && (
+                {(currentTab === 'pagado') && !item.cancelled && (
                   <Button
                     variant="ghost"
                     size="sm"
@@ -586,6 +750,13 @@ export default function OrderManager() {
         open={isNewOrderOpen}
         onOpenChange={setIsNewOrderOpen}
         onCreateOrder={handleNewOrder}
+      />
+
+      <EditOrderDialog
+        open={!!editOrderDialog}
+        onOpenChange={(open) => !open && setEditOrderDialog(null)}
+        order={editOrderDialog ? orders.find(o => o.id === editOrderDialog) || null : null}
+        onSave={handleEditOrder}
       />
 
       {/* Payment Dialog */}
