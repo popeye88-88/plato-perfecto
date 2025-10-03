@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { X } from 'lucide-react';
+import { Plus, Minus } from 'lucide-react';
 
 interface MenuItem {
   id: string;
@@ -77,6 +77,31 @@ export default function NewOrderDialog({ open, onOpenChange, onCreateOrder, ingr
         return [...prev, { menuItem, quantity: 1, customIngredients: menuItem.ingredients }];
       });
     }
+  };
+
+  const incrementQuantity = (menuItemId: string) => {
+    setOrderItems(prev =>
+      prev.map(item =>
+        item.menuItem.id === menuItemId
+          ? { ...item, quantity: item.quantity + 1 }
+          : item
+      )
+    );
+  };
+
+  const decrementQuantity = (menuItemId: string) => {
+    setOrderItems(prev =>
+      prev.map(item =>
+        item.menuItem.id === menuItemId && item.quantity > 1
+          ? { ...item, quantity: item.quantity - 1 }
+          : item
+      ).filter(item => item.quantity > 0)
+    );
+  };
+
+  const getItemQuantity = (menuItemId: string): number => {
+    const item = orderItems.find(item => item.menuItem.id === menuItemId);
+    return item ? item.quantity : 0;
   };
 
   const updateQuantity = (menuItemId: string, newQuantity: number) => {
@@ -253,79 +278,69 @@ export default function NewOrderDialog({ open, onOpenChange, onCreateOrder, ingr
 
           {/* Menu Items */}
           <div className="space-y-3 max-h-64 overflow-y-auto">
-            {filteredItems.map(item => (
-              <Card key={item.id} className="cursor-pointer hover:bg-muted/50" onClick={() => addItem(item)}>
-                <CardContent className="p-4">
-                  <div className="flex justify-between items-center">
-                    <div className="flex-1">
-                      <h4 className="font-medium">{item.name}</h4>
-                      {item.description && (
-                        <p className="text-sm text-muted-foreground">{item.description}</p>
-                      )}
+            {filteredItems.map(item => {
+              const quantity = getItemQuantity(item.id);
+              return (
+                <Card key={item.id} className="cursor-pointer hover:bg-muted/50">
+                  <CardContent className="p-4">
+                    <div className="flex justify-between items-center gap-4">
+                      <div className="flex-1" onClick={() => addItem(item)}>
+                        <h4 className="font-medium">{item.name}</h4>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-lg font-semibold">${item.price.toFixed(2)}</span>
+                        {quantity > 0 ? (
+                          <div className="flex items-center gap-2 bg-primary/10 rounded-lg px-2 py-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                decrementQuantity(item.id);
+                              }}
+                            >
+                              <Minus className="h-3 w-3" />
+                            </Button>
+                            <span className="font-semibold min-w-[20px] text-center">{quantity}</span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                incrementQuantity(item.id);
+                              }}
+                            >
+                              <Plus className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ) : null}
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <span className="text-lg font-semibold">${item.price.toFixed(2)}</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
 
-          {/* Order Items - Show each item individually */}
-          {orderItems.length > 0 && (
-            <div className="space-y-4">
-              <Label>Productos en la Orden</Label>
-              <div className="space-y-2 max-h-32 overflow-y-auto">
-                {orderItems.map((item, index) => {
-                  // Create individual entries for each quantity
-                  return Array.from({ length: item.quantity }, (_, qIndex) => (
-                    <div key={`${item.menuItem.id}-${index}-${qIndex}`} className="flex items-center justify-between p-2 bg-muted rounded text-sm">
-                      <div className="flex-1">
-                        <span className="font-medium">{item.menuItem.name}</span>
-                        {ingredientManagementEnabled && item.customIngredients && (
-                          <div className="text-xs text-muted-foreground mt-1">
-                            {item.customIngredients.join(', ')}
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span>${item.menuItem.price.toFixed(2)}</span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => updateQuantity(item.menuItem.id, item.quantity - 1)}
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </div>
-                  ));
-                })}
-              </div>
+        </div>
+
+        {/* Fixed footer with Total and Actions */}
+        <div className="sticky bottom-0 bg-card border-t pt-4 space-y-4 mt-6">
+          {deliveryCharge > 0 && (
+            <div className="flex justify-between text-sm">
+              <span>Cargo por entrega:</span>
+              <span>${deliveryCharge.toFixed(2)}</span>
             </div>
           )}
-
-          {/* Summary */}
-          <div className="space-y-2 pt-4 border-t">
-            <div className="flex justify-between text-sm">
-              <span>Subtotal:</span>
-              <span>${(total - deliveryCharge).toFixed(2)}</span>
-            </div>
-            {deliveryCharge > 0 && (
-              <div className="flex justify-between text-sm">
-                <span>Cargo por entrega:</span>
-                <span>${deliveryCharge.toFixed(2)}</span>
-              </div>
-            )}
-            <div className="flex justify-between font-semibold">
-              <span>Total:</span>
-              <span>${total.toFixed(2)}</span>
-            </div>
+          <div className="flex justify-between text-lg font-semibold">
+            <span>Total:</span>
+            <span>${total.toFixed(2)}</span>
           </div>
 
           {/* Actions */}
-          <div className="flex gap-2 pt-4">
+          <div className="flex gap-2">
             <Button 
               onClick={handleSubmit}
               disabled={!diners || !customerName || orderItems.length === 0}

@@ -6,12 +6,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, Clock, Truck, DollarSign, Edit2, X, Check } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Plus, Clock, Truck, DollarSign, Edit2, X, Check, History as HistoryIcon, Percent, CreditCard } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 import PaymentDialog from './PaymentDialog';
 import NewOrderDialog from './NewOrderDialog';
 import EditOrderDialog from './EditOrderDialog';
+import OrderEditHistoryDialog from './OrderEditHistoryDialog';
 
 interface OrderItem {
   id: string;
@@ -36,6 +41,9 @@ interface Order {
   serviceType?: 'puesto' | 'takeaway' | 'delivery';
   deliveryCharge?: number;
   diners?: number;
+  edited?: boolean;
+  discountAmount?: number;
+  discountReason?: string;
 }
 
 const menuItems = [
@@ -51,6 +59,11 @@ export default function OrderManager() {
   const [isNewOrderOpen, setIsNewOrderOpen] = useState(false);
   const [paymentDialog, setPaymentDialog] = useState<string | null>(null);
   const [editOrderDialog, setEditOrderDialog] = useState<string | null>(null);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isDiscountOpen, setIsDiscountOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [discountItems, setDiscountItems] = useState<Set<string>>(new Set());
+  const [discountReason, setDiscountReason] = useState('');
   const [dateFilter, setDateFilter] = useState<{ start: string; end: string }>({
     start: new Date().toISOString().split('T')[0],
     end: new Date().toISOString().split('T')[0]
@@ -305,12 +318,13 @@ export default function OrderManager() {
 
   const handleEditOrder = async (updatedOrder: Order) => {
     try {
-      // Update order in database
+      // Mark order as edited and update
       const { error: orderError } = await supabase
         .from('orders')
         .update({
           customer_name: updatedOrder.customerName,
-          total: updatedOrder.total
+          total: updatedOrder.total,
+          edited: true
         })
         .eq('id', updatedOrder.id);
 
@@ -342,6 +356,15 @@ export default function OrderManager() {
 
       if (itemsError) throw itemsError;
 
+      // Log edit history
+      await supabase
+        .from('order_edit_history')
+        .insert([{
+          order_id: updatedOrder.id,
+          edit_type: 'edit_items',
+          changes: JSON.stringify({ items: updatedOrder.items })
+        }]);
+
       // Reload orders
       await loadOrders();
     } catch (error) {
@@ -349,6 +372,69 @@ export default function OrderManager() {
       toast({
         title: "Error",
         description: "No se pudo actualizar la orden",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleApplyDiscount = async () => {
+    if (!selectedOrder || discountItems.size === 0 || !discountReason.trim()) {
+      toast({
+        title: "Error",
+        description: "Debes seleccionar items y proporcionar una razón para el descuento",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      // Calculate discount amount
+      const discountAmount = selectedOrder.items
+        .filter(item => discountItems.has(item.id))
+        .reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+      const newTotal = selectedOrder.total - discountAmount;
+
+      // Update order
+      const { error } = await supabase
+        .from('orders')
+        .update({
+          discount_amount: discountAmount,
+          discount_reason: discountReason,
+          total: newTotal,
+          edited: true
+        })
+        .eq('id', selectedOrder.id);
+
+      if (error) throw error;
+
+      // Log edit history
+      await supabase
+        .from('order_edit_history')
+        .insert([{
+          order_id: selectedOrder.id,
+          edit_type: 'apply_discount',
+          changes: JSON.stringify({
+            discounted_items: Array.from(discountItems),
+            discount_amount: discountAmount,
+            reason: discountReason
+          })
+        }]);
+
+      await loadOrders();
+      setIsDiscountOpen(false);
+      setDiscountItems(new Set());
+      setDiscountReason('');
+      
+      toast({
+        title: "Descuento aplicado",
+        description: `Se aplicó un descuento de $${discountAmount.toFixed(2)}`
+      });
+    } catch (error) {
+      console.error('Error applying discount:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo aplicar el descuento",
         variant: "destructive"
       });
     }
@@ -421,13 +507,49 @@ export default function OrderManager() {
     const entregandoCount = order.items.filter(item => !item.cancelled && item.status === 'entregando').length;
     const cobrandoCount = order.items.filter(item => !item.cancelled && item.status === 'cobrando').length;
     
+    const isCobrandoOrPagado = currentTab === 'cobrando' || currentTab === 'pagado';
+    
+    // Group items for Cobrando and Pagado tabs
+    const groupedItems = isCobrandoOrPagado
+      ? order.items.reduce((acc, item) => {
+          if (item.cancelled) return acc;
+          const key = item.name;
+          if (!acc[key]) {
+            acc[key] = { name: item.name, price: item.price, quantity: 0, totalPrice: 0 };
+          }
+          acc[key].quantity += item.quantity;
+          acc[key].totalPrice += item.price * item.quantity;
+          return acc;
+        }, {} as Record<string, { name: string; price: number; quantity: number; totalPrice: number }>)
+      : {};
+    
     return (
       <div key={order.id} className="p-3 md:p-4 border border-border rounded-lg space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex-1">
-            {/* First Level - Order Info */}
-            <div className="flex items-center justify-between mb-2">
-              <div className="font-semibold text-lg">{order.number}</div>
+        {/* Header - Two rows */}
+        <div className="space-y-2">
+          {/* First row: Number | Status | Edit button */}
+          <div className="grid grid-cols-3 items-center gap-2">
+            <div className="font-semibold text-lg">{order.number}</div>
+            <div className="flex justify-center">
+              <Badge className={statusConfig[order.status].color}>
+                {statusConfig[order.status].label}
+              </Badge>
+            </div>
+            <div className="flex justify-end gap-1">
+              {order.edited && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedOrder(order);
+                    setIsHistoryOpen(true);
+                  }}
+                  className="h-8 w-8 p-0"
+                  title="Ver historial"
+                >
+                  <HistoryIcon className="h-4 w-4" />
+                </Button>
+              )}
               {order.status !== 'pagado' && (
                 <Button
                   variant="ghost"
@@ -439,128 +561,88 @@ export default function OrderManager() {
                 </Button>
               )}
             </div>
-            
-            {/* Second Level - Details */}
-            <div className="space-y-1">
-              <div className="text-sm font-medium">{order.customerName}</div>
-              <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                {order.serviceType && (
-                  <span>
-                    {order.serviceType === 'puesto' ? 'En Puesto' : 
-                     order.serviceType === 'takeaway' ? 'Take Away' : 'Delivery'}
-                  </span>
-                )}
-                {order.diners && <span>{order.diners} comensales</span>}
-                <span>{formatTime(order.createdAt)}</span>
-              </div>
-              {order.paymentMethod && currentTab === 'pagado' && (
-                <div className="text-xs text-muted-foreground">
-                  Pago: {order.paymentMethod === 'efectivo' ? 'Efectivo' : 
-                         order.paymentMethod === 'tarjeta' ? 'Tarjeta' : 'Transferencia'}
-                </div>
-              )}
-            </div>
           </div>
           
-          <div className="flex items-center gap-2">
-            <Badge className={statusConfig[order.status].color}>
-              <StatusIcon className="h-3 w-3 mr-1" />
-              {statusConfig[order.status].label}
-            </Badge>
+          {/* Second row: Name-diners | Service type | Date and time */}
+          <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
+            <div>
+              {order.customerName}
+              {order.diners && ` - ${order.diners}`}
+            </div>
+            <div className="text-center">
+              {order.serviceType === 'puesto' ? 'En Puesto' : 
+               order.serviceType === 'takeaway' ? 'Take Away' : 'Delivery'}
+            </div>
+            <div className="text-right">
+              {format(order.createdAt, "dd/MM/yy HH:mm", { locale: es })}
+            </div>
           </div>
         </div>
         
+        {/* Items section */}
         <div className="space-y-1">
-          {order.items.map((item, itemIndex) => {
-            const isPreparandoTab = currentTab === 'preparando';
-            const isEntregandoTab = currentTab === 'entregando';
-            const isCobrandoTab = currentTab === 'cobrando';
-            
-            // Determine if checkbox should be enabled and checked for this item
-            let isEnabled = false;
-            let showCheckbox = true;
-            let isChecked = false;
-            
-            if (isPreparandoTab) {
-              // In preparando tab, enable items that are preparando
-              isEnabled = item.status === 'preparando' && !item.cancelled;
-              isChecked = item.status !== 'preparando';
-            } else if (isEntregandoTab) {
-              // In entregando tab, enable items that are entregando
-              isEnabled = item.status === 'entregando' && !item.cancelled;
-              isChecked = item.status === 'cobrando';
-            } else if (isCobrandoTab) {
-              // In cobrando tab, don't show checkboxes or X buttons
-              showCheckbox = false;
-            } else if (currentTab === 'pagado' || currentTab === 'resumen') {
-              // In these tabs, don't show checkboxes
-              showCheckbox = false;
-            }
-            
-            return (
-              <div key={`${item.id}-${itemIndex}`} className="flex items-center justify-between text-sm py-1">
-                <div className={`flex items-center gap-2 ${!isEnabled && showCheckbox ? 'text-muted-foreground' : ''}`}>
-                  <div className="flex items-center gap-1">
-                    <span className="text-lg">{statusConfig[item.status]?.symbol || '•'}</span>
+          {isCobrandoOrPagado ? (
+            // Grouped items for Cobrando and Pagado
+            Object.values(groupedItems).map((grouped, index) => (
+              <div key={index} className="grid grid-cols-3 gap-2 text-sm py-1">
+                <div>{grouped.quantity}x {grouped.name}</div>
+                <div className="text-center">${grouped.price.toFixed(2)}</div>
+                <div className="text-right font-semibold">${grouped.totalPrice.toFixed(2)}</div>
+              </div>
+            ))
+          ) : (
+            // Individual items for Preparando and Entregando
+            order.items.map((item, itemIndex) => {
+              const isPreparandoTab = currentTab === 'preparando';
+              const isEntregandoTab = currentTab === 'entregando';
+              
+              let isEnabled = false;
+              let showCheckbox = true;
+              let isChecked = false;
+              
+              if (isPreparandoTab) {
+                isEnabled = item.status === 'preparando' && !item.cancelled;
+                isChecked = item.status !== 'preparando';
+              } else if (isEntregandoTab) {
+                isEnabled = item.status === 'entregando' && !item.cancelled;
+                isChecked = item.status === 'cobrando';
+              } else if (currentTab === 'resumen') {
+                showCheckbox = false;
+              }
+              
+              return (
+                <div key={`${item.id}-${itemIndex}`} className="flex items-center justify-between text-sm py-1">
+                  <div className={`flex items-center gap-2 flex-1 ${!isEnabled && showCheckbox ? 'text-muted-foreground' : ''}`}>
+                    {!isCobrandoOrPagado && (
+                      <span className="text-lg">{statusConfig[item.status]?.symbol || '•'}</span>
+                    )}
                     <span className={item.cancelled ? 'line-through text-muted-foreground' : ''}>
                       {item.name}
                       {item.cancelled && item.cancellationReason && (
                         <span className="text-xs text-muted-foreground ml-2">({item.cancellationReason})</span>
                       )}
-                      {item.ingredients && item.ingredients.length > 0 && (
-                        <div className="text-xs text-muted-foreground">
-                          {item.ingredients.join(', ')}
-                        </div>
-                      )}
                     </span>
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    ${item.price.toFixed(2)}
-                  </div>
-                </div>
-                {showCheckbox && !item.cancelled && (
-                  <Checkbox
-                    checked={isChecked}
-                    disabled={!isEnabled}
-                    onCheckedChange={(checked) => {
-                      if (checked && isEnabled) {
-                        if (isPreparandoTab && item.status === 'preparando') {
-                          updateItemStatus(order.id, item.id, 'entregando');
-                        } else if (isEntregandoTab && item.status === 'entregando') {
-                          updateItemStatus(order.id, item.id, 'cobrando');
+                  {showCheckbox && !item.cancelled && (
+                    <Checkbox
+                      checked={isChecked}
+                      disabled={!isEnabled}
+                      onCheckedChange={(checked) => {
+                        if (checked && isEnabled) {
+                          if (isPreparandoTab && item.status === 'preparando') {
+                            updateItemStatus(order.id, item.id, 'entregando');
+                          } else if (isEntregandoTab && item.status === 'entregando') {
+                            updateItemStatus(order.id, item.id, 'cobrando');
+                          }
                         }
-                      }
-                    }}
-                    className="h-4 w-4"
-                  />
-                )}
-                {(currentTab === 'pagado') && !item.cancelled && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setOrders(orders => 
-                        orders.map(o => 
-                          o.id === order.id 
-                            ? {
-                                ...o,
-                                items: o.items.map(i => 
-                                  i.id === item.id 
-                                    ? { ...i, cancelled: true, cancellationReason: 'Cancelado' }
-                                    : i
-                                )
-                              }
-                            : o
-                        )
-                      );
-                    }}
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                )}
-              </div>
-            );
-          })}
+                      }}
+                      className="h-4 w-4"
+                    />
+                  )}
+                </div>
+              );
+            })
+          )}
           
           {currentTab === 'resumen' && (
             <div className="text-xs text-muted-foreground pt-2">
@@ -569,6 +651,7 @@ export default function OrderManager() {
           )}
         </div>
         
+        {/* Footer with total and actions */}
         <div className="flex items-center justify-between pt-2 border-t border-border">
           <div>
             <span className="font-semibold">Total: ${order.total.toFixed(2)}</span>
@@ -577,12 +660,31 @@ export default function OrderManager() {
                 (Inc. entrega: ${order.deliveryCharge.toFixed(2)})
               </div>
             )}
+            {order.discountAmount && order.discountAmount > 0 && (
+              <div className="text-xs text-success-foreground">
+                (Descuento: -${order.discountAmount.toFixed(2)})
+              </div>
+            )}
           </div>
           <div className="flex gap-1">
             {order.status === 'cobrando' && currentTab === 'cobrando' && (
-              <Button size="sm" onClick={() => setPaymentDialog(order.id)}>
-                Cobrar
-              </Button>
+              <>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => {
+                    setSelectedOrder(order);
+                    setIsDiscountOpen(true);
+                  }}
+                >
+                  <Percent className="h-4 w-4 mr-1" />
+                  Descuento
+                </Button>
+                <Button size="sm" onClick={() => setPaymentDialog(order.id)}>
+                  <CreditCard className="h-4 w-4 mr-1" />
+                  Cobrar
+                </Button>
+              </>
             )}
           </div>
         </div>

@@ -14,6 +14,41 @@ export type Database = {
   }
   public: {
     Tables: {
+      order_edit_history: {
+        Row: {
+          changes: Json
+          created_at: string | null
+          edit_type: string
+          edited_by: string | null
+          id: string
+          order_id: string
+        }
+        Insert: {
+          changes: Json
+          created_at?: string | null
+          edit_type: string
+          edited_by?: string | null
+          id?: string
+          order_id: string
+        }
+        Update: {
+          changes?: Json
+          created_at?: string | null
+          edit_type?: string
+          edited_by?: string | null
+          id?: string
+          order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_edit_history_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_items: {
         Row: {
           cancellation_reason: string | null
@@ -70,6 +105,9 @@ export type Database = {
           customer_name: string
           delivery_charge: number | null
           diners: number | null
+          discount_amount: number | null
+          discount_reason: string | null
+          edited: boolean | null
           id: string
           number: string
           payment_method: string | null
@@ -84,6 +122,9 @@ export type Database = {
           customer_name: string
           delivery_charge?: number | null
           diners?: number | null
+          discount_amount?: number | null
+          discount_reason?: string | null
+          edited?: boolean | null
           id?: string
           number: string
           payment_method?: string | null
@@ -98,6 +139,9 @@ export type Database = {
           customer_name?: string
           delivery_charge?: number | null
           diners?: number | null
+          discount_amount?: number | null
+          discount_reason?: string | null
+          edited?: boolean | null
           id?: string
           number?: string
           payment_method?: string | null
