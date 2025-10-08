@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { useBusinessContext } from '@/contexts/BusinessContext';
 import PaymentDialog from './PaymentDialog';
 import NewOrderDialog from './NewOrderDialog';
 import EditOrderDialog from './EditOrderDialog';
@@ -55,6 +56,7 @@ const menuItems = [
 
 export default function OrderManager() {
   const { toast } = useToast();
+  const { currentBusiness } = useBusinessContext();
   const [orders, setOrders] = useState<Order[]>([]);
   const [isNewOrderOpen, setIsNewOrderOpen] = useState(false);
   const [paymentDialog, setPaymentDialog] = useState<string | null>(null);
@@ -72,10 +74,17 @@ export default function OrderManager() {
 
   // Load orders from Supabase
   useEffect(() => {
-    loadOrders();
-  }, []);
+    if (currentBusiness) {
+      loadOrders();
+    }
+  }, [currentBusiness]);
 
   const loadOrders = async () => {
+    if (!currentBusiness) {
+      setLoading(false);
+      return;
+    }
+
     try {
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
@@ -83,6 +92,7 @@ export default function OrderManager() {
           *,
           order_items (*)
         `)
+        .eq('business_id', currentBusiness.id)
         .order('created_at', { ascending: false });
 
       if (ordersError) throw ordersError;
@@ -169,7 +179,8 @@ export default function OrderManager() {
             price: item.menuItem.price,
             quantity: 1,
             status: 'preparando',
-            ingredients: item.customIngredients || null
+            ingredients: item.customIngredients || null,
+            business_id: currentBusiness.id
           });
         }
       }
@@ -362,7 +373,8 @@ export default function OrderManager() {
         .insert([{
           order_id: updatedOrder.id,
           edit_type: 'edit_items',
-          changes: JSON.stringify({ items: updatedOrder.items })
+          changes: JSON.stringify({ items: updatedOrder.items }),
+          business_id: currentBusiness?.id
         }]);
 
       // Reload orders
@@ -418,7 +430,8 @@ export default function OrderManager() {
             discounted_items: Array.from(discountItems),
             discount_amount: discountAmount,
             reason: discountReason
-          })
+          }),
+          business_id: currentBusiness?.id
         }]);
 
       await loadOrders();

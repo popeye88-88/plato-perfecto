@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Settings, Users, Globe, DollarSign, UserPlus, ChefHat } from 'lucide-react';
+import { Users, Globe, DollarSign, ChefHat, Building2, Lock } from 'lucide-react';
+import BusinessSelector from './BusinessSelector';
+import BusinessUserManager from './BusinessUserManager';
+import PasswordChangeForm from './PasswordChangeForm';
 
 interface AppSettings {
   language: 'es' | 'en';
@@ -45,15 +47,19 @@ export default function SettingsManager() {
         <p className="text-muted-foreground">Configura las opciones de tu restaurante</p>
       </div>
 
-      <Tabs defaultValue="users" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+      <Tabs defaultValue="business" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-5">
+          <TabsTrigger value="business" className="flex items-center gap-2">
+            <Building2 className="h-4 w-4" />
+            <span className="hidden sm:inline">Negocio</span>
+          </TabsTrigger>
           <TabsTrigger value="users" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             <span className="hidden sm:inline">Usuarios</span>
           </TabsTrigger>
-          <TabsTrigger value="language" className="flex items-center gap-2">
-            <Globe className="h-4 w-4" />
-            <span className="hidden sm:inline">Idioma</span>
+          <TabsTrigger value="password" className="flex items-center gap-2">
+            <Lock className="h-4 w-4" />
+            <span className="hidden sm:inline">Contraseña</span>
           </TabsTrigger>
           <TabsTrigger value="currency" className="flex items-center gap-2">
             <DollarSign className="h-4 w-4" />
@@ -65,45 +71,23 @@ export default function SettingsManager() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="users" className="space-y-6">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div>
-              <h2 className="text-xl font-semibold text-foreground">Gestión de Usuarios</h2>
-              <p className="text-muted-foreground">Administra el equipo de tu restaurante</p>
-            </div>
-            
-            <Button className="bg-gradient-primary hover:opacity-90">
-              <UserPlus className="h-4 w-4 mr-2" />
-              Agregar Usuario
-            </Button>
-          </div>
-
+        <TabsContent value="business" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Settings className="h-5 w-5" />
-                Funcionalidad en Desarrollo
-              </CardTitle>
+              <CardTitle>Selector de Negocio</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-12">
-                <Users className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-foreground mb-2">
-                  Gestión de Usuarios
-                </h3>
-                <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                  Esta sección permitirá gestionar los usuarios del sistema, asignar roles 
-                  y permisos para el personal del restaurante.
-                </p>
-                <div className="space-y-2 text-sm text-muted-foreground">
-                  <div>• Agregar y gestionar empleados</div>
-                  <div>• Asignar roles (Administrador, Mesero, Chef)</div>
-                  <div>• Control de permisos por módulo</div>
-                  <div>• Horarios y turnos de trabajo</div>
-                </div>
-              </div>
+              <BusinessSelector />
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="users" className="space-y-6">
+          <BusinessUserManager />
+        </TabsContent>
+
+        <TabsContent value="password" className="space-y-6">
+          <PasswordChangeForm />
         </TabsContent>
 
         <TabsContent value="language" className="space-y-6">
