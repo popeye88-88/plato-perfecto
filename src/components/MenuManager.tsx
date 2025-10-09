@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,6 +8,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Edit2, Trash2, Settings } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { useBusinessContext } from '@/contexts/BusinessContext';
 import CategoryManager from './CategoryManager';
 
 interface MenuItem {
@@ -26,18 +28,9 @@ interface Category {
 
 export default function MenuManager() {
   const { toast } = useToast();
-  const [menuItems, setMenuItems] = useState<MenuItem[]>([
-    { id: '1', name: 'Pizza Margherita', price: 15.00, category: 'Pizzas', description: 'Tomate, mozzarella y albahaca fresca' },
-    { id: '2', name: 'Hamburguesa Clásica', price: 12.50, category: 'Hamburguesas', description: 'Carne, lechuga, tomate y queso' },
-    { id: '3', name: 'Pasta Carbonara', price: 14.00, category: 'Pastas', description: 'Pasta con panceta, huevo y parmesano' },
-  ]);
-  
-  const [categories, setCategories] = useState<Category[]>([
-    { id: '1', name: 'Pizzas', productCount: 1 },
-    { id: '2', name: 'Hamburguesas', productCount: 1 },
-    { id: '3', name: 'Pastas', productCount: 1 },
-  ]);
-  
+  const { currentBusiness } = useBusinessContext();
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
@@ -48,13 +41,66 @@ export default function MenuManager() {
     description: ''
   });
   const [newCategoryName, setNewCategoryName] = useState('');
+  const [loading, setLoading] = useState(true);
 
-  const updateCategories = (newCategories: Category[]) => {
-    const updatedCategories = newCategories.map(cat => ({
-      ...cat,
-      productCount: menuItems.filter(item => item.category === cat.name).length
-    }));
-    setCategories(updatedCategories);
+  // Load menu items and categories
+  useEffect(() => {
+    if (currentBusiness) {
+      loadMenuItems();
+      loadCategories();
+    }
+  }, [currentBusiness]);
+
+  const loadMenuItems = async () => {
+    if (!currentBusiness) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('menu_items')
+        .select('*')
+        .eq('business_id', currentBusiness.id)
+        .order('name');
+      
+      if (error) throw error;
+      setMenuItems(data || []);
+    } catch (error) {
+      console.error('Error loading menu items:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los productos",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadCategories = async () => {
+    if (!currentBusiness) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .eq('business_id', currentBusiness.id)
+        .order('name');
+      
+      if (error) throw error;
+      
+      const categoriesWithCount = data?.map(cat => ({
+        ...cat,
+        productCount: menuItems.filter(item => item.category === cat.name).length
+      })) || [];
+      
+      setCategories(categoriesWithCount);
+    } catch (error) {
+      console.error('Error loading categories:', error);
+    }
+  };
+
+  const updateCategories = async () => {
+    await loadCategories();
+    await loadMenuItems();
   };
 
   const handleCategoryChange = (value: string) => {
@@ -67,8 +113,10 @@ export default function MenuManager() {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!currentBusiness) return;
     
     const categoryName = newCategoryName || formData.category;
     
@@ -81,45 +129,66 @@ export default function MenuManager() {
       return;
     }
 
-    const newItem: MenuItem = {
-      id: editingItem?.id || Date.now().toString(),
-      name: formData.name,
-      price: parseFloat(formData.price),
-      category: categoryName,
-      description: formData.description
-    };
-
-    if (editingItem) {
-      setMenuItems(items => items.map(item => 
-        item.id === editingItem.id ? newItem : item
-      ));
-      toast({
-        title: "Producto actualizado",
-        description: "El producto ha sido actualizado correctamente"
-      });
-    } else {
-      setMenuItems(items => [...items, newItem]);
-      
+    try {
       // Add new category if it doesn't exist
       if (newCategoryName && !categories.find(cat => cat.name === newCategoryName)) {
-        const newCategory: Category = {
-          id: Date.now().toString(),
-          name: newCategoryName,
-          productCount: 1
-        };
-        setCategories(prev => [...prev, newCategory]);
+        const { error: catError } = await supabase
+          .from('categories')
+          .insert({
+            business_id: currentBusiness.id,
+            name: newCategoryName
+          });
+        
+        if (catError) throw catError;
+        await loadCategories();
       }
-      
+
+      const itemData = {
+        business_id: currentBusiness.id,
+        name: formData.name,
+        price: parseFloat(formData.price),
+        category: categoryName,
+        description: formData.description || null
+      };
+
+      if (editingItem) {
+        const { error } = await supabase
+          .from('menu_items')
+          .update(itemData)
+          .eq('id', editingItem.id);
+        
+        if (error) throw error;
+        
+        toast({
+          title: "Producto actualizado",
+          description: "El producto ha sido actualizado correctamente"
+        });
+      } else {
+        const { error } = await supabase
+          .from('menu_items')
+          .insert(itemData);
+        
+        if (error) throw error;
+        
+        toast({
+          title: "Producto agregado",
+          description: "El producto ha sido agregado al menú"
+        });
+      }
+
+      await loadMenuItems();
+      setFormData({ name: '', price: '', category: '', description: '' });
+      setNewCategoryName('');
+      setEditingItem(null);
+      setIsDialogOpen(false);
+    } catch (error) {
+      console.error('Error saving menu item:', error);
       toast({
-        title: "Producto agregado",
-        description: "El producto ha sido agregado al menú"
+        title: "Error",
+        description: "No se pudo guardar el producto",
+        variant: "destructive"
       });
     }
-
-    setFormData({ name: '', price: '', category: '', description: '' });
-    setNewCategoryName('');
-    setEditingItem(null);
-    setIsDialogOpen(false);
   };
 
   const handleEdit = (item: MenuItem) => {
@@ -134,12 +203,28 @@ export default function MenuManager() {
     setIsDialogOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    setMenuItems(items => items.filter(item => item.id !== id));
-    toast({
-      title: "Producto eliminado",
-      description: "El producto ha sido eliminado del menú"
-    });
+  const handleDelete = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('menu_items')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+      
+      await loadMenuItems();
+      toast({
+        title: "Producto eliminado",
+        description: "El producto ha sido eliminado del menú"
+      });
+    } catch (error) {
+      console.error('Error deleting menu item:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el producto",
+        variant: "destructive"
+      });
+    }
   };
 
   const openNewProductDialog = () => {
