@@ -242,19 +242,7 @@ export default function MenuManager() {
     return acc;
   }, {} as Record<string, MenuItem[]>);
 
-  if (!currentBusiness) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Card className="w-full max-w-md">
-          <CardContent className="pt-6 text-center">
-            <p className="text-muted-foreground">No se ha seleccionado ningún negocio. Por favor, selecciona un negocio en Ajustes.</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  if (loading) {
+  if (loading || !currentBusiness) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">

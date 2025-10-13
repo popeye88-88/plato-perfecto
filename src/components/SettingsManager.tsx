@@ -8,6 +8,7 @@ import { Users, Globe, DollarSign, ChefHat, Building2, Lock } from 'lucide-react
 import BusinessSelector from './BusinessSelector';
 import BusinessUserManager from './BusinessUserManager';
 import PasswordChangeForm from './PasswordChangeForm';
+import { useBusinessContext } from '@/contexts/BusinessContext';
 
 interface AppSettings {
   language: 'es' | 'en';
@@ -27,6 +28,7 @@ const languageLabels = {
 };
 
 export default function SettingsManager() {
+  const { loading } = useBusinessContext();
   const [settings, setSettings] = useState<AppSettings>({
     language: 'es',
     currency: 'MXN',
@@ -39,6 +41,17 @@ export default function SettingsManager() {
       [key]: value
     }));
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Cargando ajustes...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
