@@ -28,9 +28,9 @@ const languageLabels = {
 };
 
 export default function SettingsManager() {
-  const { loading: businessLoading, currentBusiness } = useBusinessContext();
+  const { loading: businessLoading, currentBusiness, businesses, userRole } = useBusinessContext();
   
-  console.log('SettingsManager render - businessLoading:', businessLoading, 'currentBusiness:', currentBusiness);
+  console.log('SettingsManager render - businessLoading:', businessLoading, 'currentBusiness:', currentBusiness, 'businesses:', businesses, 'userRole:', userRole);
   
   const [settings, setSettings] = useState<AppSettings>({
     language: 'es',
@@ -51,6 +51,29 @@ export default function SettingsManager() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
           <p className="mt-4 text-muted-foreground">Cargando ajustes...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Debug: Si no hay business pero tampoco está cargando, mostrar error
+  if (!businessLoading && !currentBusiness && businesses.length === 0) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="text-destructive text-6xl mb-4">⚠️</div>
+          <h2 className="text-xl font-semibold mb-2">Error de Acceso</h2>
+          <p className="text-muted-foreground mb-4">
+            No se pudo cargar la información del negocio. 
+            <br />
+            Usuario: {businesses.length} negocios encontrados
+          </p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+          >
+            Recargar Página
+          </button>
         </div>
       </div>
     );
