@@ -8,6 +8,7 @@ import { Users, Globe, DollarSign, ChefHat, Building2, Lock } from 'lucide-react
 import BusinessSelector from './BusinessSelector';
 import BusinessUserManager from './BusinessUserManager';
 import PasswordChangeForm from './PasswordChangeForm';
+import DebugSettings from './DebugSettings';
 import { useBusinessContext } from '@/contexts/BusinessContext';
 
 interface AppSettings {
@@ -81,6 +82,9 @@ export default function SettingsManager() {
 
   return (
     <div className="space-y-6">
+      {/* Debug Component - Remove this after fixing */}
+      <DebugSettings />
+      
       <div>
         <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Ajustes</h1>
         <p className="text-muted-foreground">Configura las opciones de tu restaurante</p>
