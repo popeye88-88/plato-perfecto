@@ -1,19 +1,5 @@
-import { useBusinessContext } from '@/contexts/BusinessContext';
-
 export default function SimpleSettingsManager() {
-  const { 
-    currentBusiness, 
-    businesses, 
-    userRole, 
-    loading 
-  } = useBusinessContext();
-
-  console.log('SimpleSettingsManager render:', {
-    currentBusiness,
-    businesses,
-    userRole,
-    loading
-  });
+  console.log('SimpleSettingsManager render: START');
 
   return (
     <div className="p-6">
