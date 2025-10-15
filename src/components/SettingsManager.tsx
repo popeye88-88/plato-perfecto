@@ -81,40 +81,60 @@ export default function SettingsManager() {
   }
 
   return (
-    <div style={{ 
-      padding: '20px', 
-      backgroundColor: 'red', 
-      color: 'white',
-      minHeight: '400px',
-      border: '5px solid blue'
-    }}>
-      <h1 style={{ fontSize: '32px', marginBottom: '20px' }}>
-        🎉 SETTINGS FUNCIONANDO - VERSIÓN ULTRA SIMPLE
-      </h1>
+    <div style={{ padding: '24px', backgroundColor: '#f8fafc' }}>
+      {/* Debug Component - Remove this after fixing */}
+      <DebugSettings />
       
-      <div style={{ 
-        backgroundColor: 'yellow', 
-        color: 'black', 
-        padding: '20px', 
-        marginBottom: '20px',
-        border: '3px solid green'
-      }}>
-        <h2>Estado del Negocio:</h2>
-        <p><strong>Loading:</strong> {businessLoading ? 'true' : 'false'}</p>
-        <p><strong>Current Business:</strong> {currentBusiness?.name || 'null'}</p>
-        <p><strong>Businesses Count:</strong> {businesses.length}</p>
-        <p><strong>User Role:</strong> {userRole || 'null'}</p>
+      <div style={{ marginBottom: '24px' }}>
+        <h1 style={{ fontSize: '32px', fontWeight: 'bold', marginBottom: '8px', color: '#1f2937' }}>
+          Ajustes
+        </h1>
+        <p style={{ color: '#6b7280', marginBottom: '8px' }}>
+          Configura las opciones de tu restaurante
+        </p>
+        {currentBusiness && (
+          <p style={{ fontSize: '14px', color: '#6b7280' }}>
+            Negocio actual: <span style={{ fontWeight: '600', color: '#1f2937' }}>{currentBusiness.name}</span>
+          </p>
+        )}
       </div>
 
       <div style={{ 
-        backgroundColor: 'lightblue', 
-        color: 'black', 
-        padding: '20px',
-        border: '3px solid purple'
+        backgroundColor: 'white', 
+        border: '1px solid #e5e7eb', 
+        borderRadius: '8px',
+        padding: '24px',
+        marginBottom: '24px'
       }}>
-        <h2>Si ves esto, el problema NO es de renderizado</h2>
-        <p>Los componentes se están ejecutando correctamente</p>
-        <p>El problema debe ser de CSS o estilos</p>
+        <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '16px', color: '#1f2937' }}>
+          Selector de Negocio
+        </h2>
+        <BusinessSelector />
+      </div>
+
+      <div style={{ 
+        backgroundColor: 'white', 
+        border: '1px solid #e5e7eb', 
+        borderRadius: '8px',
+        padding: '24px',
+        marginBottom: '24px'
+      }}>
+        <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '16px', color: '#1f2937' }}>
+          Gestión de Usuarios
+        </h2>
+        <BusinessUserManager />
+      </div>
+
+      <div style={{ 
+        backgroundColor: 'white', 
+        border: '1px solid #e5e7eb', 
+        borderRadius: '8px',
+        padding: '24px'
+      }}>
+        <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '16px', color: '#1f2937' }}>
+          Cambiar Contraseña
+        </h2>
+        <PasswordChangeForm />
       </div>
     </div>
   );
