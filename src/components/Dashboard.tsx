@@ -68,6 +68,9 @@ const mockOrderDetails: OrderDetail[] = [
 
 export default function Dashboard() {
   const { currentBusiness, loading: businessLoading } = useBusinessContext();
+  
+  console.log('Dashboard render - businessLoading:', businessLoading, 'currentBusiness:', currentBusiness);
+  
   const [filters, setFilters] = useState<DashboardFilters>({
     dateRange: {
       from: startOfWeek(new Date(), { weekStartsOn: 1 }),

@@ -28,7 +28,10 @@ const languageLabels = {
 };
 
 export default function SettingsManager() {
-  const { loading: businessLoading } = useBusinessContext();
+  const { loading: businessLoading, currentBusiness } = useBusinessContext();
+  
+  console.log('SettingsManager render - businessLoading:', businessLoading, 'currentBusiness:', currentBusiness);
+  
   const [settings, setSettings] = useState<AppSettings>({
     language: 'es',
     currency: 'MXN',
@@ -58,6 +61,11 @@ export default function SettingsManager() {
       <div>
         <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Ajustes</h1>
         <p className="text-muted-foreground">Configura las opciones de tu restaurante</p>
+        {currentBusiness && (
+          <p className="text-sm text-muted-foreground mt-2">
+            Negocio actual: <span className="font-semibold text-foreground">{currentBusiness.name}</span>
+          </p>
+        )}
       </div>
 
       <Tabs defaultValue="business" className="space-y-6">

@@ -6,8 +6,32 @@ import { Building2 } from 'lucide-react';
 export default function BusinessSelector() {
   const { currentBusiness, businesses, switchBusiness, loading } = useBusinessContext();
 
-  if (loading || businesses.length === 0) {
-    return null;
+  if (loading) {
+    return (
+      <div className="space-y-2">
+        <Label className="flex items-center gap-2">
+          <Building2 className="h-4 w-4" />
+          Negocio Actual
+        </Label>
+        <div className="p-3 bg-muted rounded-lg">
+          <p className="text-sm text-muted-foreground">Cargando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (businesses.length === 0) {
+    return (
+      <div className="space-y-2">
+        <Label className="flex items-center gap-2">
+          <Building2 className="h-4 w-4" />
+          Negocio Actual
+        </Label>
+        <div className="p-3 bg-muted rounded-lg">
+          <p className="text-sm text-muted-foreground">No tienes negocios asignados</p>
+        </div>
+      </div>
+    );
   }
 
   if (businesses.length === 1) {
@@ -18,7 +42,7 @@ export default function BusinessSelector() {
           Negocio Actual
         </Label>
         <div className="p-3 bg-muted rounded-lg">
-          <p className="font-medium">{currentBusiness?.name}</p>
+          <p className="font-medium">{currentBusiness?.name || businesses[0].name}</p>
         </div>
       </div>
     );
@@ -31,7 +55,7 @@ export default function BusinessSelector() {
         Cambiar de Negocio
       </Label>
       <Select 
-        value={currentBusiness?.id || ''} 
+        value={currentBusiness?.id || businesses[0]?.id || ''} 
         onValueChange={switchBusiness}
       >
         <SelectTrigger id="business-select">

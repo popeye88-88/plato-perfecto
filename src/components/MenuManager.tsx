@@ -29,6 +29,9 @@ interface Category {
 export default function MenuManager() {
   const { toast } = useToast();
   const { currentBusiness, loading: businessLoading } = useBusinessContext();
+  
+  console.log('MenuManager render - businessLoading:', businessLoading, 'currentBusiness:', currentBusiness);
+  
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
