@@ -1,13 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, Edit2, Trash2 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Plus, Edit2, Trash2, Settings } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useBusiness } from '@/lib/business-context';
+import { supabase } from '@/integrations/supabase/client';
+import { useBusinessContext } from '@/contexts/BusinessContext';
+import CategoryManager from './CategoryManager';
 
 interface MenuItem {
   id: string;
@@ -17,16 +20,22 @@ interface MenuItem {
   description?: string;
 }
 
+interface Category {
+  id: string;
+  name: string;
+  productCount: number;
+}
+
 export default function MenuManager() {
   const { toast } = useToast();
-  const { selectedBusiness } = useBusiness();
-  const [menuItems, setMenuItems] = useState<MenuItem[]>([
-    { id: '1', name: 'Pizza Margherita', price: 15.00, category: 'Pizzas', description: 'Tomate, mozzarella y albahaca fresca' },
-    { id: '2', name: 'Hamburguesa Clásica', price: 12.50, category: 'Hamburguesas', description: 'Carne, lechuga, tomate y queso' },
-    { id: '3', name: 'Pasta Carbonara', price: 14.00, category: 'Pastas', description: 'Pasta con panceta, huevo y parmesano' },
-  ]);
+  const { currentBusiness, loading: businessLoading } = useBusinessContext();
   
+  console.log('MenuManager render - businessLoading:', businessLoading, 'currentBusiness:', currentBusiness);
+  
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [formData, setFormData] = useState({
     name: '',
@@ -34,13 +43,84 @@ export default function MenuManager() {
     category: '',
     description: ''
   });
+  const [newCategoryName, setNewCategoryName] = useState('');
 
-  const categories = [...new Set(menuItems.map(item => item.category))];
+  // Load menu items and categories
+  useEffect(() => {
+    if (currentBusiness) {
+      loadMenuItems();
+      loadCategories();
+    }
+  }, [currentBusiness]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const loadMenuItems = async () => {
+    if (!currentBusiness) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('menu_items')
+        .select('*')
+        .eq('business_id', currentBusiness.id)
+        .order('name');
+      
+      if (error) throw error;
+      setMenuItems(data || []);
+    } catch (error) {
+      console.error('Error loading menu items:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los productos",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const loadCategories = async () => {
+    if (!currentBusiness) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .eq('business_id', currentBusiness.id)
+        .order('name');
+      
+      if (error) throw error;
+      
+      const categoriesWithCount = data?.map(cat => ({
+        ...cat,
+        productCount: menuItems.filter(item => item.category === cat.name).length
+      })) || [];
+      
+      setCategories(categoriesWithCount);
+    } catch (error) {
+      console.error('Error loading categories:', error);
+    }
+  };
+
+  const updateCategories = async () => {
+    await loadCategories();
+    await loadMenuItems();
+  };
+
+  const handleCategoryChange = (value: string) => {
+    if (value === 'nueva-categoria') {
+      setNewCategoryName('');
+      setFormData({...formData, category: ''});
+    } else {
+      setFormData({...formData, category: value});
+      setNewCategoryName('');
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.name || !formData.price || !formData.category) {
+    if (!currentBusiness) return;
+    
+    const categoryName = newCategoryName || formData.category;
+    
+    if (!formData.name || !formData.price || !categoryName) {
       toast({
         title: "Error",
         description: "Por favor completa todos los campos obligatorios",
@@ -49,33 +129,66 @@ export default function MenuManager() {
       return;
     }
 
-    const newItem: MenuItem = {
-      id: editingItem?.id || Date.now().toString(),
-      name: formData.name,
-      price: parseFloat(formData.price),
-      category: formData.category,
-      description: formData.description
-    };
+    try {
+      // Add new category if it doesn't exist
+      if (newCategoryName && !categories.find(cat => cat.name === newCategoryName)) {
+        const { error: catError } = await supabase
+          .from('categories')
+          .insert({
+            business_id: currentBusiness.id,
+            name: newCategoryName
+          });
+        
+        if (catError) throw catError;
+        await loadCategories();
+      }
 
-    if (editingItem) {
-      setMenuItems(items => items.map(item => 
-        item.id === editingItem.id ? newItem : item
-      ));
+      const itemData = {
+        business_id: currentBusiness.id,
+        name: formData.name,
+        price: parseFloat(formData.price),
+        category: categoryName,
+        description: formData.description || null
+      };
+
+      if (editingItem) {
+        const { error } = await supabase
+          .from('menu_items')
+          .update(itemData)
+          .eq('id', editingItem.id);
+        
+        if (error) throw error;
+        
+        toast({
+          title: "Producto actualizado",
+          description: "El producto ha sido actualizado correctamente"
+        });
+      } else {
+        const { error } = await supabase
+          .from('menu_items')
+          .insert(itemData);
+        
+        if (error) throw error;
+        
+        toast({
+          title: "Producto agregado",
+          description: "El producto ha sido agregado al menú"
+        });
+      }
+
+      await loadMenuItems();
+      setFormData({ name: '', price: '', category: '', description: '' });
+      setNewCategoryName('');
+      setEditingItem(null);
+      setIsDialogOpen(false);
+    } catch (error) {
+      console.error('Error saving menu item:', error);
       toast({
-        title: "Producto actualizado",
-        description: "El producto ha sido actualizado correctamente"
-      });
-    } else {
-      setMenuItems(items => [...items, newItem]);
-      toast({
-        title: "Producto agregado",
-        description: "El producto ha sido agregado al menú"
+        title: "Error",
+        description: "No se pudo guardar el producto",
+        variant: "destructive"
       });
     }
-
-    setFormData({ name: '', price: '', category: '', description: '' });
-    setEditingItem(null);
-    setIsDialogOpen(false);
   };
 
   const handleEdit = (item: MenuItem) => {
@@ -86,15 +199,39 @@ export default function MenuManager() {
       category: item.category,
       description: item.description || ''
     });
+    setNewCategoryName('');
     setIsDialogOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    setMenuItems(items => items.filter(item => item.id !== id));
-    toast({
-      title: "Producto eliminado",
-      description: "El producto ha sido eliminado del menú"
-    });
+  const handleDelete = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('menu_items')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+      
+      await loadMenuItems();
+      toast({
+        title: "Producto eliminado",
+        description: "El producto ha sido eliminado del menú"
+      });
+    } catch (error) {
+      console.error('Error deleting menu item:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el producto",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const openNewProductDialog = () => {
+    setEditingItem(null);
+    setFormData({ name: '', price: '', category: '', description: '' });
+    setNewCategoryName('');
+    setIsDialogOpen(true);
   };
 
   const groupedItems = menuItems.reduce((acc, item) => {
@@ -105,86 +242,147 @@ export default function MenuManager() {
     return acc;
   }, {} as Record<string, MenuItem[]>);
 
+  if (businessLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Cargando menú...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentBusiness) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <p className="text-muted-foreground">No hay negocio seleccionado</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-foreground mb-2">Gestión de Menú</h1>
-          <p className="text-muted-foreground">{selectedBusiness ? `Negocio: ${selectedBusiness.name}` : 'Selecciona un negocio'}</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Gestión de Menú</h1>
+          <p className="text-muted-foreground">Administra los productos de tu restaurante</p>
         </div>
         
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-gradient-primary hover:opacity-90">
-              <Plus className="h-4 w-4 mr-2" />
-              Agregar Producto
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>
-                {editingItem ? 'Editar Producto' : 'Agregar Nuevo Producto'}
-              </DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="name">Nombre del Producto *</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
-                  placeholder="Ej: Pizza Margherita"
-                />
-              </div>
-              <div>
-                <Label htmlFor="price">Precio *</Label>
-                <Input
-                  id="price"
-                  type="number"
-                  step="0.01"
-                  value={formData.price}
-                  onChange={(e) => setFormData({...formData, price: e.target.value})}
-                  placeholder="0.00"
-                />
-              </div>
-              <div>
-                <Label htmlFor="category">Categoría *</Label>
-                <Input
-                  id="category"
-                  value={formData.category}
-                  onChange={(e) => setFormData({...formData, category: e.target.value})}
-                  placeholder="Ej: Pizzas, Hamburguesas, Pastas"
-                />
-              </div>
-              <div>
-                <Label htmlFor="description">Descripción</Label>
-                <Input
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({...formData, description: e.target.value})}
-                  placeholder="Descripción del producto"
-                />
-              </div>
-              <div className="flex gap-2 pt-4">
-                <Button type="submit" className="bg-gradient-primary hover:opacity-90 flex-1">
-                  {editingItem ? 'Actualizar' : 'Agregar'}
-                </Button>
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={() => {
-                    setIsDialogOpen(false);
-                    setEditingItem(null);
-                    setFormData({ name: '', price: '', category: '', description: '' });
-                  }}
-                >
-                  Cancelar
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <div className="flex gap-2 flex-wrap">
+          <Button 
+            onClick={openNewProductDialog}
+            className="bg-gradient-primary hover:opacity-90"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            <span className="hidden sm:inline">Agregar Producto</span>
+            <span className="sm:hidden">Producto</span>
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={() => setIsCategoryManagerOpen(true)}
+            className="flex items-center gap-2"
+          >
+            <Settings className="h-4 w-4" />
+            <span className="hidden sm:inline">Editar Categorías</span>
+            <span className="sm:hidden">Categorías</span>
+          </Button>
+        </div>
       </div>
+        
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {editingItem ? 'Editar Producto' : 'Agregar Nuevo Producto'}
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <Label htmlFor="name">Nombre del Producto *</Label>
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={(e) => setFormData({...formData, name: e.target.value})}
+                placeholder="Ej: Pizza Margherita"
+              />
+            </div>
+            <div>
+              <Label htmlFor="price">Precio *</Label>
+              <Input
+                id="price"
+                type="number"
+                step="0.01"
+                value={formData.price}
+                onChange={(e) => setFormData({...formData, price: e.target.value})}
+                placeholder="0.00"
+              />
+            </div>
+            <div>
+              <Label htmlFor="category">Categoría *</Label>
+              <div className="space-y-2">
+                <Select 
+                  value={formData.category || (newCategoryName ? 'nueva-categoria' : '')} 
+                  onValueChange={handleCategoryChange}
+                >
+                  <SelectTrigger id="category">
+                    <SelectValue placeholder="Selecciona una categoría" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map(cat => (
+                      <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
+                    ))}
+                    <SelectItem value="nueva-categoria">+ Nueva categoría</SelectItem>
+                  </SelectContent>
+                </Select>
+                
+                {!formData.category && (
+                  <Input
+                    value={newCategoryName}
+                    onChange={(e) => setNewCategoryName(e.target.value)}
+                    placeholder="Nombre de la nueva categoría"
+                  />
+                )}
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="description">Descripción</Label>
+              <Input
+                id="description"
+                value={formData.description}
+                onChange={(e) => setFormData({...formData, description: e.target.value})}
+                placeholder="Descripción del producto"
+              />
+            </div>
+            <div className="flex gap-2 pt-4">
+              <Button type="submit" className="bg-gradient-primary hover:opacity-90 flex-1">
+                {editingItem ? 'Actualizar' : 'Agregar'}
+              </Button>
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => {
+                  setIsDialogOpen(false);
+                  setEditingItem(null);
+                  setFormData({ name: '', price: '', category: '', description: '' });
+                  setNewCategoryName('');
+                }}
+              >
+                Cancelar
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <CategoryManager
+        open={isCategoryManagerOpen}
+        onOpenChange={setIsCategoryManagerOpen}
+        categories={categories}
+        onUpdateCategories={updateCategories}
+      />
 
       {/* Menu Items by Category */}
       <div className="space-y-6">

@@ -3,7 +3,7 @@ import Layout from '@/components/Layout';
 import Dashboard from '@/components/Dashboard';
 import MenuManager from '@/components/MenuManager';
 import OrderManager from '@/components/OrderManager';
-import UserManager from '@/components/UserManager';
+import SettingsManager from '@/components/SettingsManager';
 
 const Index = () => {
   const [currentPage, setCurrentPage] = useState('dashboard');
@@ -16,8 +16,8 @@ const Index = () => {
         return <MenuManager />;
       case 'orders':
         return <OrderManager />;
-      case 'users':
-        return <UserManager />;
+      case 'settings':
+        return <SettingsManager />;
       default:
         return <Dashboard />;
     }

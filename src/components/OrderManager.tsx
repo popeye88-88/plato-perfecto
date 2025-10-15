@@ -1,25 +1,33 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, Clock, Truck, DollarSign, Edit2 } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Plus, Clock, Truck, DollarSign, Edit2, X, Check, History as HistoryIcon, Percent, CreditCard } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useBusiness } from '@/lib/business-context';
+import { supabase } from '@/integrations/supabase/client';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { useBusinessContext } from '@/contexts/BusinessContext';
+import PaymentDialog from './PaymentDialog';
+import NewOrderDialog from './NewOrderDialog';
+import EditOrderDialog from './EditOrderDialog';
+import OrderEditHistoryDialog from './OrderEditHistoryDialog';
 
 interface OrderItem {
   id: string;
   name: string;
   price: number;
   quantity: number;
-  status: 'preparando' | 'entregando' | 'pagando';
-  removed?: boolean;
-  removalReason?: string;
+  status: 'preparando' | 'entregando' | 'cobrando';
+  cancelled?: boolean;
+  cancellationReason?: string;
+  ingredients?: string[];
 }
 
 interface Order {
@@ -28,10 +36,15 @@ interface Order {
   customerName: string;
   items: OrderItem[];
   total: number;
-  status: 'preparando' | 'entregando' | 'pagando' | 'cobrando';
+  status: 'preparando' | 'entregando' | 'cobrando' | 'pagado';
   createdAt: Date;
-  table?: string;
-  paymentMethod?: 'efectivo' | 'tarjeta';
+  paymentMethod?: 'efectivo' | 'tarjeta' | 'transferencia';
+  serviceType?: 'puesto' | 'takeaway' | 'delivery';
+  deliveryCharge?: number;
+  diners?: number;
+  edited?: boolean;
+  discountAmount?: number;
+  discountReason?: string;
 }
 
 const menuItems = [
@@ -43,276 +56,440 @@ const menuItems = [
 
 export default function OrderManager() {
   const { toast } = useToast();
-  const { selectedBusiness } = useBusiness();
-  const [orders, setOrders] = useState<Order[]>([
-    {
-      id: '1',
-      number: '#001',
-      customerName: 'Juan Pérez',
-      items: [
-        { id: '1', name: 'Pizza Margherita', price: 15.00, quantity: 1, status: 'entregando' },
-        { id: '2', name: 'Hamburguesa Clásica', price: 12.50, quantity: 1, status: 'preparando' }
-      ],
-      total: 27.50,
-      status: 'preparando',
-      createdAt: new Date(Date.now() - 300000),
-      table: 'Mesa 5'
-    },
-    {
-      id: '2',
-      number: '#002',
-      customerName: 'María García',
-      items: [
-        { id: '3', name: 'Pasta Carbonara', price: 14.00, quantity: 2, status: 'pagando' }
-      ],
-      total: 28.00,
-      status: 'entregando',
-      createdAt: new Date(Date.now() - 600000),
-      table: 'Mesa 3'
-    }
-  ]);
-
+  const { currentBusiness, loading: businessLoading } = useBusinessContext();
+  const [orders, setOrders] = useState<Order[]>([]);
   const [isNewOrderOpen, setIsNewOrderOpen] = useState(false);
-  const [selectedItems, setSelectedItems] = useState<OrderItem[]>([]);
-  const [selectedTable, setSelectedTable] = useState<string>('');
-  const [customerName, setCustomerName] = useState<string>('');
-  const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [paymentDialog, setPaymentDialog] = useState<string | null>(null);
+  const [editOrderDialog, setEditOrderDialog] = useState<string | null>(null);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isDiscountOpen, setIsDiscountOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [discountItems, setDiscountItems] = useState<Set<string>>(new Set());
+  const [discountReason, setDiscountReason] = useState('');
+  const [dateFilter, setDateFilter] = useState<{ start: string; end: string }>({
+    start: new Date().toISOString().split('T')[0],
+    end: new Date().toISOString().split('T')[0]
+  });
+
+  // Load orders from Supabase
+  useEffect(() => {
+    if (currentBusiness) {
+      loadOrders();
+    }
+  }, [currentBusiness]);
+
+  const loadOrders = async () => {
+    if (!currentBusiness) return;
+
+    try {
+      const { data: ordersData, error: ordersError } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          order_items (*)
+        `)
+        .eq('business_id', currentBusiness.id)
+        .order('created_at', { ascending: false });
+
+      if (ordersError) throw ordersError;
+
+      const formattedOrders: Order[] = ordersData.map(order => ({
+        id: order.id,
+        number: order.number,
+        customerName: order.customer_name,
+        total: parseFloat(order.total.toString()),
+        status: order.status as Order['status'],
+        createdAt: new Date(order.created_at),
+        paymentMethod: order.payment_method as Order['paymentMethod'],
+        serviceType: order.service_type as Order['serviceType'],
+        deliveryCharge: order.delivery_charge ? parseFloat(order.delivery_charge.toString()) : 0,
+        diners: order.diners,
+        items: order.order_items.map((item: any) => ({
+          id: item.id,
+          name: item.name,
+          price: parseFloat(item.price.toString()),
+          quantity: item.quantity,
+          status: item.status as OrderItem['status'],
+          cancelled: item.cancelled,
+          cancellationReason: item.cancellation_reason,
+          ingredients: item.ingredients
+        }))
+      }));
+
+      setOrders(formattedOrders);
+    } catch (error) {
+      console.error('Error loading orders:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar las órdenes",
+        variant: "destructive"
+      });
+    }
+  };
 
   const statusConfig = {
-    preparando: { label: 'Preparando', color: 'bg-warning/10 text-warning', icon: Clock },
-    entregando: { label: 'Entregando', color: 'bg-info/10 text-info', icon: Truck },
-    pagando: { label: 'Pagando', color: 'bg-success/10 text-success', icon: DollarSign },
-    cobrando: { label: 'Cobrando', color: 'bg-primary/10 text-primary', icon: DollarSign },
+    preparando: { label: 'Preparando', color: 'bg-yellow-100 text-yellow-800', icon: Clock, symbol: '🔥' },
+    entregando: { label: 'Entregando', color: 'bg-blue-100 text-blue-800', icon: Truck, symbol: '📦' },
+    cobrando: { label: 'Cobrando', color: 'bg-green-100 text-green-800', icon: DollarSign, symbol: '💰' },
+    pagado: { label: 'Pagado', color: 'bg-purple-100 text-purple-800', icon: Check, symbol: '✅' },
   };
 
-  const addItemToOrder = (menuItem: typeof menuItems[0]) => {
-    const existingItem = selectedItems.find(item => item.id === menuItem.id && !item.removed);
-    
-    if (existingItem) {
-      setSelectedItems(items => 
-        items.map(item => 
-          item.id === menuItem.id && !item.removed
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        )
-      );
-    } else {
-      setSelectedItems(items => [...items, {
-        id: menuItem.id,
-        name: menuItem.name,
-        price: menuItem.price,
-        quantity: 1,
-        status: 'preparando'
-      }]);
-    }
-  };
+  const handleNewOrder = async (orderData: {
+    items: Array<{menuItem: any, quantity: number, customIngredients?: string[]}>;
+    serviceType: 'puesto' | 'takeaway' | 'delivery';
+    diners: number;
+    customerName: string;
+    deliveryCharge: number;
+  }) => {
+    try {
+      // Calculate total
+      const itemsTotal = orderData.items.reduce((sum, item) => sum + (item.menuItem.price * item.quantity), 0);
+      const total = itemsTotal + orderData.deliveryCharge;
 
-  const removeItemFromOrder = (itemId: string, reason?: string) => {
-    setSelectedItems(items => 
-      items.map(item => 
-        item.id === itemId 
-          ? { ...item, removed: true, removalReason: reason }
-          : item
-      )
-    );
-  };
+      // Create order in database
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          number: `#${String(orders.length + 1).padStart(3, '0')}`,
+          customer_name: orderData.customerName,
+          total,
+          status: 'preparando',
+          service_type: orderData.serviceType,
+          diners: orderData.diners,
+          delivery_charge: orderData.deliveryCharge
+        })
+        .select()
+        .single();
 
-  const updateItemQuantity = (itemId: string, quantity: number) => {
-    if (quantity <= 0) {
-      removeItemFromOrder(itemId);
-      return;
-    }
-    
-    setSelectedItems(items => 
-      items.map(item => 
-        item.id === itemId ? { ...item, quantity } : item
-      )
-    );
-  };
+      if (orderError) throw orderError;
 
-  const calculateTotal = () => {
-    return selectedItems.reduce((total, item) => 
-      total + (item.removed ? 0 : item.price * item.quantity), 0);
-  };
-
-  const updateItemStatus = (orderId: string, itemId: string, newStatus: OrderItem['status']) => {
-    setOrders(orders => 
-      orders.map(order => {
-        if (order.id === orderId) {
-          const updatedItems = order.items.map(item =>
-            item.id === itemId ? { ...item, status: newStatus } : item
-          );
-          
-          // Update order status based on item statuses
-          const allPrepared = updatedItems.every(item => 
-            item.removed || item.status === 'entregando' || item.status === 'pagando'
-          );
-          const allDelivered = updatedItems.every(item => 
-            item.removed || item.status === 'pagando'
-          );
-          const allPaid = updatedItems.every(item => 
-            item.removed || item.status === 'pagando'
-          );
-          
-          let newOrderStatus = order.status;
-          if (order.status === 'preparando' && allPrepared) {
-            newOrderStatus = 'entregando';
-          } else if (order.status === 'entregando' && allDelivered) {
-            newOrderStatus = 'pagando';
-          } else if (order.status === 'pagando' && allPaid) {
-            newOrderStatus = 'cobrando';
-          }
-          
-          return { ...order, items: updatedItems, status: newOrderStatus };
+      // Create order items
+      const orderItems = [];
+      for (const item of orderData.items) {
+        for (let i = 0; i < item.quantity; i++) {
+          orderItems.push({
+            order_id: order.id,
+            name: item.menuItem.name,
+            price: item.menuItem.price,
+            quantity: 1,
+            status: 'preparando',
+            ingredients: item.customIngredients || null,
+            business_id: currentBusiness.id
+          });
         }
-        return order;
-      })
-    );
-  };
+      }
 
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(orderItems);
 
-  const editOrder = (orderId: string) => {
-    const order = orders.find(o => o.id === orderId);
-    if (order) {
-      setSelectedItems([...order.items]);
-      setSelectedTable(order.table || '');
-      setCustomerName(order.customerName);
-      setEditingOrderId(orderId);
-      setIsNewOrderOpen(true);
-    }
-  };
+      if (itemsError) throw itemsError;
 
-  const createOrder = () => {
-    if (selectedItems.length === 0) {
-      toast({
-        title: "Error",
-        description: "Agrega al menos un producto a la orden",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (!customerName.trim()) {
-      toast({
-        title: "Error",
-        description: "El nombre del cliente es obligatorio",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (editingOrderId) {
-      // Update existing order
-      setOrders(orders => 
-        orders.map(order => 
-          order.id === editingOrderId 
-            ? { 
-                ...order, 
-                customerName,
-                items: [...selectedItems], 
-                total: calculateTotal(),
-                table: selectedTable || undefined
-              }
-            : order
-        )
-      );
-      
-      toast({
-        title: "Orden actualizada",
-        description: "La orden ha sido modificada exitosamente"
-      });
-    } else {
-      // Create new order
-      const newOrder: Order = {
-        id: Date.now().toString(),
-        number: `#${String(orders.length + 1).padStart(3, '0')}`,
-        customerName,
-        items: [...selectedItems],
-        total: calculateTotal(),
-        status: 'preparando',
-        createdAt: new Date(),
-        table: selectedTable || undefined
-      };
-
-      setOrders(orders => [newOrder, ...orders]);
+      // Reload orders
+      await loadOrders();
       
       toast({
         title: "Orden creada",
-        description: `Orden ${newOrder.number} creada exitosamente`
+        description: `Orden ${order.number} creada exitosamente`
+      });
+    } catch (error) {
+      console.error('Error creating order:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo crear la orden",
+        variant: "destructive"
       });
     }
-
-    setSelectedItems([]);
-    setSelectedTable('');
-    setCustomerName('');
-    setEditingOrderId(null);
-    setIsNewOrderOpen(false);
   };
 
-  const updateOrderStatus = (orderId: string, status: Order['status']) => {
-    setOrders(orders => 
-      orders.map(order => 
-        order.id === orderId ? { ...order, status } : order
-      )
-    );
-    
-    const order = orders.find(o => o.id === orderId);
-    toast({
-      title: "Estado actualizado",
-      description: `Orden ${order?.number} marcada como ${statusConfig[status].label.toLowerCase()}`
-    });
-  };
+  const updateItemStatus = async (orderId: string, itemId: string, newStatus: OrderItem['status']) => {
+    try {
+      // Update item status in database
+      const { error: itemError } = await supabase
+        .from('order_items')
+        .update({ status: newStatus })
+        .eq('id', itemId);
 
-  const getOrdersByStatus = (statuses: Order['status'][]) => {
-    return orders.filter(order => statuses.includes(order.status));
-  };
+      if (itemError) throw itemError;
 
-  const getCategories = () => {
-    return ['all', ...new Set(menuItems.map(item => item.category))];
-  };
-
-  const getFilteredMenuItems = () => {
-    if (selectedCategory === 'all') {
-      return menuItems;
+      // Update local state
+      setOrders(orders => 
+        orders.map(order => {
+          if (order.id === orderId) {
+            const updatedItems = order.items.map(item =>
+              item.id === itemId ? { ...item, status: newStatus } : item
+            );
+            
+            // Determine order status based on item states
+            const getOrderStatus = (items: OrderItem[]): Order['status'] => {
+              const activeItems = items.filter(item => !item.cancelled);
+              if (activeItems.length === 0) return 'pagado';
+              
+              const hasPreparando = activeItems.some(item => item.status === 'preparando');
+              const hasEntregando = activeItems.some(item => item.status === 'entregando');
+              const hasCobrando = activeItems.some(item => item.status === 'cobrando');
+              
+              if (hasPreparando) return 'preparando';
+              if (hasEntregando) return 'entregando';
+              if (hasCobrando) return 'cobrando';
+              return 'pagado';
+            };
+            
+            const newOrderStatus = getOrderStatus(updatedItems);
+            
+            // Update order status in database
+            supabase
+              .from('orders')
+              .update({ status: newOrderStatus })
+              .eq('id', orderId)
+              .then();
+            
+            return { ...order, items: updatedItems, status: newOrderStatus };
+          }
+          return order;
+        })
+      );
+    } catch (error) {
+      console.error('Error updating item status:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar el estado del elemento",
+        variant: "destructive"
+      });
     }
-    return menuItems.filter(item => item.category === selectedCategory);
   };
 
-  const processPayment = (orderId: string, paymentMethod: 'efectivo' | 'tarjeta') => {
-    setOrders(orders => 
-      orders.map(order => 
-        order.id === orderId 
-          ? { ...order, status: 'cobrando', paymentMethod }
-          : order
-      )
-    );
-    
-    const order = orders.find(o => o.id === orderId);
-    toast({
-      title: "Pago procesado",
-      description: `Orden ${order?.number} pagada con ${paymentMethod}`
-    });
+
+  const processPayment = async (orderId: string, paymentMethod: 'efectivo' | 'tarjeta' | 'transferencia', removeDeliveryCharge: boolean = false) => {
+    try {
+      const order = orders.find(o => o.id === orderId);
+      if (!order) return;
+
+      const newTotal = removeDeliveryCharge && order.deliveryCharge 
+        ? order.total - order.deliveryCharge 
+        : order.total;
+
+      // Update order in database
+      const { error: orderError } = await supabase
+        .from('orders')
+        .update({ 
+          status: 'pagado',
+          payment_method: paymentMethod,
+          delivery_charge: removeDeliveryCharge ? 0 : order.deliveryCharge,
+          total: newTotal
+        })
+        .eq('id', orderId);
+
+      if (orderError) throw orderError;
+
+      // Update all items to cobrando status
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .update({ status: 'cobrando' })
+        .eq('order_id', orderId);
+
+      if (itemsError) throw itemsError;
+
+      // Update local state
+      setOrders(orders => 
+        orders.map(o => 
+          o.id === orderId 
+            ? { 
+                ...o, 
+                status: 'pagado', 
+                paymentMethod,
+                deliveryCharge: removeDeliveryCharge ? 0 : o.deliveryCharge,
+                total: newTotal,
+                items: o.items.map(item => ({ ...item, status: 'cobrando' as const }))
+              }
+            : o
+        )
+      );
+      
+      toast({
+        title: "Pago procesado",
+        description: `Orden ${order?.number} pagada con ${paymentMethod}`
+      });
+      setPaymentDialog(null);
+    } catch (error) {
+      console.error('Error processing payment:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo procesar el pago",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleEditOrder = async (updatedOrder: Order) => {
+    try {
+      // Mark order as edited and update
+      const { error: orderError } = await supabase
+        .from('orders')
+        .update({
+          customer_name: updatedOrder.customerName,
+          total: updatedOrder.total,
+          edited: true
+        })
+        .eq('id', updatedOrder.id);
+
+      if (orderError) throw orderError;
+
+      // Delete existing items and recreate them
+      const { error: deleteError } = await supabase
+        .from('order_items')
+        .delete()
+        .eq('order_id', updatedOrder.id);
+
+      if (deleteError) throw deleteError;
+
+      // Insert updated items
+      const orderItems = updatedOrder.items.map(item => ({
+        order_id: updatedOrder.id,
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        status: item.status,
+        cancelled: item.cancelled || false,
+        cancellation_reason: item.cancellationReason,
+        ingredients: item.ingredients
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(orderItems);
+
+      if (itemsError) throw itemsError;
+
+      // Log edit history
+      await supabase
+        .from('order_edit_history')
+        .insert([{
+          order_id: updatedOrder.id,
+          edit_type: 'edit_items',
+          changes: JSON.stringify({ items: updatedOrder.items }),
+          business_id: currentBusiness?.id
+        }]);
+
+      // Reload orders
+      await loadOrders();
+    } catch (error) {
+      console.error('Error updating order:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar la orden",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleApplyDiscount = async () => {
+    if (!selectedOrder || discountItems.size === 0 || !discountReason.trim()) {
+      toast({
+        title: "Error",
+        description: "Debes seleccionar items y proporcionar una razón para el descuento",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      // Calculate discount amount
+      const discountAmount = selectedOrder.items
+        .filter(item => discountItems.has(item.id))
+        .reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+      const newTotal = selectedOrder.total - discountAmount;
+
+      // Update order
+      const { error } = await supabase
+        .from('orders')
+        .update({
+          discount_amount: discountAmount,
+          discount_reason: discountReason,
+          total: newTotal,
+          edited: true
+        })
+        .eq('id', selectedOrder.id);
+
+      if (error) throw error;
+
+      // Log edit history
+      await supabase
+        .from('order_edit_history')
+        .insert([{
+          order_id: selectedOrder.id,
+          edit_type: 'apply_discount',
+          changes: JSON.stringify({
+            discounted_items: Array.from(discountItems),
+            discount_amount: discountAmount,
+            reason: discountReason
+          }),
+          business_id: currentBusiness?.id
+        }]);
+
+      await loadOrders();
+      setIsDiscountOpen(false);
+      setDiscountItems(new Set());
+      setDiscountReason('');
+      
+      toast({
+        title: "Descuento aplicado",
+        description: `Se aplicó un descuento de $${discountAmount.toFixed(2)}`
+      });
+    } catch (error) {
+      console.error('Error applying discount:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo aplicar el descuento",
+        variant: "destructive"
+      });
+    }
   };
 
   const getOrderSummary = () => {
     const totalOrders = orders.length;
-    const preparandoCount = orders.filter(o => o.status === 'preparando').length;
-    const entregandoCount = orders.filter(o => o.status === 'entregando').length;
-    const pagandoCount = orders.filter(o => o.status === 'pagando').length;
+    const preparandoCount = getOrdersForTab('preparando').length;
+    const entregandoCount = getOrdersForTab('entregando').length;
     const cobrandoCount = orders.filter(o => o.status === 'cobrando').length;
-    
-    const totalRevenue = orders.reduce((sum, order) => sum + order.total, 0);
+    const pagadoCount = getFilteredPaidOrders().length;
     
     return {
       totalOrders,
       preparandoCount,
       entregandoCount,
-      pagandoCount,
       cobrandoCount,
-      totalRevenue
+      pagadoCount
     };
   };
+  
+  const getOrdersForTab = (tab: 'preparando' | 'entregando') => {
+    return orders.filter(order => {
+      const activeItems = order.items.filter(item => !item.cancelled);
+      if (tab === 'preparando') {
+        return activeItems.some(item => item.status === 'preparando');
+      }
+      if (tab === 'entregando') {
+        // Show orders that have at least one item in 'entregando' or 'cobrando' but not ALL items are in 'cobrando'
+        return (activeItems.some(item => item.status === 'entregando' || item.status === 'cobrando')) && 
+               !activeItems.every(item => item.status === 'cobrando');
+      }
+      return false;
+    });
+  };
+  
+  const getFilteredPaidOrders = () => {
+    const startDate = new Date(dateFilter.start);
+    const endDate = new Date(dateFilter.end);
+    endDate.setHours(23, 59, 59, 999);
+    
+    return orders.filter(order => 
+      order.status === 'pagado' && 
+      order.createdAt >= startDate && 
+      order.createdAt <= endDate
+    );
+  };
+
 
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString('es-ES', { 
@@ -321,82 +498,200 @@ export default function OrderManager() {
     });
   };
 
-  const OrderCard = ({ order }: { order: Order }) => {
+  const formatDateTime = (date: Date) => {
+    return date.toLocaleString('es-ES', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const OrderCard = ({ order, currentTab }: { order: Order; currentTab: string }) => {
     const StatusIcon = statusConfig[order.status].icon;
-    const preparandoCount = order.items.filter(item => !item.removed && item.status === 'preparando').length;
-    const entregandoCount = order.items.filter(item => !item.removed && item.status === 'entregando').length;
-    const pagandoCount = order.items.filter(item => !item.removed && item.status === 'pagando').length;
-    const totalItems = order.items.filter(item => !item.removed).length;
+    const preparandoCount = order.items.filter(item => !item.cancelled && item.status === 'preparando').length;
+    const entregandoCount = order.items.filter(item => !item.cancelled && item.status === 'entregando').length;
+    const cobrandoCount = order.items.filter(item => !item.cancelled && item.status === 'cobrando').length;
+    
+    const isCobrandoOrPagado = currentTab === 'cobrando' || currentTab === 'pagado';
+    
+    // Group items for Cobrando and Pagado tabs
+    const groupedItems = isCobrandoOrPagado
+      ? order.items.reduce((acc, item) => {
+          if (item.cancelled) return acc;
+          const key = item.name;
+          if (!acc[key]) {
+            acc[key] = { name: item.name, price: item.price, quantity: 0, totalPrice: 0 };
+          }
+          acc[key].quantity += item.quantity;
+          acc[key].totalPrice += item.price * item.quantity;
+          return acc;
+        }, {} as Record<string, { name: string; price: number; quantity: number; totalPrice: number }>)
+      : {};
     
     return (
-      <div key={order.id} className="p-4 border border-border rounded-lg space-y-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="font-semibold">{order.number}</div>
-            <div className="text-sm text-muted-foreground">{order.customerName}</div>
-            {order.table && <div className="text-sm text-muted-foreground">{order.table}</div>}
-            <div className="text-xs text-muted-foreground">{formatTime(order.createdAt)}</div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge className={statusConfig[order.status].color}>
-              <StatusIcon className="h-3 w-3 mr-1" />
-              {statusConfig[order.status].label}
-            </Badge>
-            <Button 
-              size="sm" 
-              variant="ghost" 
-              onClick={() => editOrder(order.id)}
-              className="h-8 w-8 p-0"
-            >
-              <Edit2 className="h-3 w-3" />
-            </Button>
-          </div>
-        </div>
-        
+      <div key={order.id} className="p-3 md:p-4 border border-border rounded-lg space-y-3">
+        {/* Header - Two rows */}
         <div className="space-y-2">
-          {order.items.map(item => (
-            <div key={item.id} className="flex items-center justify-between text-sm">
-              <div className="flex items-center gap-2">
-                {!item.removed && (
-                  <Checkbox
-                    checked={item.status === 'entregando' || item.status === 'pagando'}
-                    onCheckedChange={(checked) => {
-                      if (checked && item.status === 'preparando') {
-                        updateItemStatus(order.id, item.id, 'entregando');
-                      } else if (checked && item.status === 'entregando') {
-                        updateItemStatus(order.id, item.id, 'pagando');
-                      }
-                    }}
-                    className="h-4 w-4"
-                  />
-                )}
-                <span className={item.removed ? 'line-through text-muted-foreground' : ''}>
-                  {item.quantity}x {item.name}
-                  {item.removed && item.removalReason && (
-                    <span className="text-xs text-muted-foreground ml-2">({item.removalReason})</span>
-                  )}
-                </span>
-              </div>
+          {/* First row: Number | Status | Edit button */}
+          <div className="grid grid-cols-3 items-center gap-2">
+            <div className="font-semibold text-lg">{order.number}</div>
+            <div className="flex justify-center">
+              <Badge className={statusConfig[order.status].color}>
+                {statusConfig[order.status].label}
+              </Badge>
             </div>
-          ))}
+            <div className="flex justify-end gap-1">
+              {order.edited && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedOrder(order);
+                    setIsHistoryOpen(true);
+                  }}
+                  className="h-8 w-8 p-0"
+                  title="Ver historial"
+                >
+                  <HistoryIcon className="h-4 w-4" />
+                </Button>
+              )}
+              {order.status !== 'pagado' && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setEditOrderDialog(order.id)}
+                  className="h-8 w-8 p-0"
+                >
+                  <Edit2 className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          </div>
           
-          <div className="text-xs text-muted-foreground">
-            Preparando: {preparandoCount} | Entregando: {entregandoCount} | Pagando: {pagandoCount}
+          {/* Second row: Name-diners | Service type | Date and time */}
+          <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
+            <div>
+              {order.customerName}
+              {order.diners && ` - ${order.diners}`}
+            </div>
+            <div className="text-center">
+              {order.serviceType === 'puesto' ? 'En Puesto' : 
+               order.serviceType === 'takeaway' ? 'Take Away' : 'Delivery'}
+            </div>
+            <div className="text-right">
+              {format(order.createdAt, "dd/MM/yy HH:mm", { locale: es })}
+            </div>
           </div>
         </div>
         
-        <div className="flex items-center justify-between pt-2 border-t border-border">
-          <span className="font-semibold">Total: ${order.total.toFixed(2)}</span>
-          <div className="flex gap-1">
-            {order.status === 'pagando' && (
-              <div className="flex gap-1">
-                <Button size="sm" onClick={() => processPayment(order.id, 'efectivo')}>
-                  Efectivo
-                </Button>
-                <Button size="sm" onClick={() => processPayment(order.id, 'tarjeta')}>
-                  Tarjeta
-                </Button>
+        {/* Items section */}
+        <div className="space-y-1">
+          {isCobrandoOrPagado ? (
+            // Grouped items for Cobrando and Pagado
+            Object.values(groupedItems).map((grouped, index) => (
+              <div key={index} className="grid grid-cols-3 gap-2 text-sm py-1">
+                <div>{grouped.quantity}x {grouped.name}</div>
+                <div className="text-center">${grouped.price.toFixed(2)}</div>
+                <div className="text-right font-semibold">${grouped.totalPrice.toFixed(2)}</div>
               </div>
+            ))
+          ) : (
+            // Individual items for Preparando and Entregando
+            order.items.map((item, itemIndex) => {
+              const isPreparandoTab = currentTab === 'preparando';
+              const isEntregandoTab = currentTab === 'entregando';
+              
+              let isEnabled = false;
+              let showCheckbox = true;
+              let isChecked = false;
+              
+              if (isPreparandoTab) {
+                isEnabled = item.status === 'preparando' && !item.cancelled;
+                isChecked = item.status !== 'preparando';
+              } else if (isEntregandoTab) {
+                isEnabled = item.status === 'entregando' && !item.cancelled;
+                isChecked = item.status === 'cobrando';
+              } else if (currentTab === 'resumen') {
+                showCheckbox = false;
+              }
+              
+              return (
+                <div key={`${item.id}-${itemIndex}`} className="flex items-center justify-between text-sm py-1">
+                  <div className={`flex items-center gap-2 flex-1 ${!isEnabled && showCheckbox ? 'text-muted-foreground' : ''}`}>
+                    {!isCobrandoOrPagado && (
+                      <span className="text-lg">{statusConfig[item.status]?.symbol || '•'}</span>
+                    )}
+                    <span className={item.cancelled ? 'line-through text-muted-foreground' : ''}>
+                      {item.name}
+                      {item.cancelled && item.cancellationReason && (
+                        <span className="text-xs text-muted-foreground ml-2">({item.cancellationReason})</span>
+                      )}
+                    </span>
+                  </div>
+                  {showCheckbox && !item.cancelled && (
+                    <Checkbox
+                      checked={isChecked}
+                      disabled={!isEnabled}
+                      onCheckedChange={(checked) => {
+                        if (checked && isEnabled) {
+                          if (isPreparandoTab && item.status === 'preparando') {
+                            updateItemStatus(order.id, item.id, 'entregando');
+                          } else if (isEntregandoTab && item.status === 'entregando') {
+                            updateItemStatus(order.id, item.id, 'cobrando');
+                          }
+                        }
+                      }}
+                      className="h-4 w-4"
+                    />
+                  )}
+                </div>
+              );
+            })
+          )}
+          
+          {currentTab === 'resumen' && (
+            <div className="text-xs text-muted-foreground pt-2">
+              Preparando: {preparandoCount} | Entregando: {entregandoCount} | Cobrando: {cobrandoCount}
+            </div>
+          )}
+        </div>
+        
+        {/* Footer with total and actions */}
+        <div className="flex items-center justify-between pt-2 border-t border-border">
+          <div>
+            <span className="font-semibold">Total: ${order.total.toFixed(2)}</span>
+            {order.deliveryCharge && order.deliveryCharge > 0 && (
+              <div className="text-xs text-muted-foreground">
+                (Inc. entrega: ${order.deliveryCharge.toFixed(2)})
+              </div>
+            )}
+            {order.discountAmount && order.discountAmount > 0 && (
+              <div className="text-xs text-success-foreground">
+                (Descuento: -${order.discountAmount.toFixed(2)})
+              </div>
+            )}
+          </div>
+          <div className="flex gap-1">
+            {order.status === 'cobrando' && currentTab === 'cobrando' && (
+              <>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => {
+                    setSelectedOrder(order);
+                    setIsDiscountOpen(true);
+                  }}
+                >
+                  <Percent className="h-4 w-4 mr-1" />
+                  Descuento
+                </Button>
+                <Button size="sm" onClick={() => setPaymentDialog(order.id)}>
+                  <CreditCard className="h-4 w-4 mr-1" />
+                  Cobrar
+                </Button>
+              </>
             )}
           </div>
         </div>
@@ -404,282 +699,214 @@ export default function OrderManager() {
     );
   };
 
+  const summary = getOrderSummary();
+
+  if (businessLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Cargando órdenes...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentBusiness) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <p className="text-muted-foreground">No hay negocio seleccionado</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground mb-2">Gestión de Comandas</h1>
-          <p className="text-muted-foreground">{selectedBusiness ? `Negocio: ${selectedBusiness.name}` : 'Selecciona un negocio'}</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Gestión de Comandas</h1>
+          <p className="text-muted-foreground">Administra las órdenes de tu restaurante</p>
         </div>
         
-        <Dialog open={isNewOrderOpen} onOpenChange={setIsNewOrderOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-gradient-primary hover:opacity-90">
-              <Plus className="h-4 w-4 mr-2" />
-              Nueva Orden
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>
-                {editingOrderId ? 'Editar Orden' : 'Crear Nueva Orden'}
-              </DialogTitle>
-            </DialogHeader>
-            
-            <div className="grid gap-6 md:grid-cols-2">
-              {/* Menu Items */}
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold">Menú</h3>
-                  <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                    <SelectTrigger className="w-40">
-                      <SelectValue placeholder="Categoría" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {getCategories().map(category => (
-                        <SelectItem key={category} value={category}>
-                          {category === 'all' ? 'Todas' : category}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {getFilteredMenuItems().map(item => (
-                    <div key={item.id} className="flex items-center justify-between p-3 border border-border rounded-lg">
-                      <div>
-                        <div className="font-medium">{item.name}</div>
-                        <div className="text-sm text-muted-foreground">${item.price.toFixed(2)} - {item.category}</div>
-                      </div>
-                      <Button size="sm" onClick={() => addItemToOrder(item)}>
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Order Summary */}
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold">Orden Actual</h3>
-                  <Select value={selectedTable} onValueChange={setSelectedTable}>
-                    <SelectTrigger className="w-32">
-                      <SelectValue placeholder="Mesa" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Array.from({ length: 10 }, (_, i) => (
-                        <SelectItem key={i + 1} value={`Mesa ${i + 1}`}>
-                          Mesa {i + 1}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="mb-4">
-                  <Label htmlFor="customerName">Nombre del Cliente *</Label>
-                  <Input
-                    id="customerName"
-                    value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    placeholder="Ej: Juan Pérez"
-                    className="mt-1"
-                  />
-                </div>
-                
-                <div className="space-y-2 mb-4 max-h-64 overflow-y-auto">
-                  {selectedItems.map(item => (
-                    <div key={item.id} className={`flex items-center justify-between p-2 border border-border rounded ${item.removed ? 'opacity-50' : ''}`}>
-                      <div className="flex-1">
-                        <div className={`font-medium text-sm ${item.removed ? 'line-through' : ''}`}>
-                          {item.name}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          Cant: {item.quantity}
-                          {item.removed && item.removalReason && (
-                            <span className="ml-2">({item.removalReason})</span>
-                          )}
-                        </div>
-                      </div>
-                      {!item.removed && (
-                        <div className="flex items-center gap-2">
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                            onClick={() => updateItemQuantity(item.id, item.quantity - 1)}
-                          >
-                            -
-                          </Button>
-                          <span className="text-sm font-medium w-8 text-center">{item.quantity}</span>
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                            onClick={() => updateItemQuantity(item.id, item.quantity + 1)}
-                          >
-                            +
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="ghost"
-                            onClick={() => {
-                              if (item.status === 'preparando') {
-                                if (confirm('¿Estás seguro de que quieres quitar este producto?')) {
-                                  removeItemFromOrder(item.id, 'Cancelado por cliente');
-                                }
-                              } else {
-                                const reason = prompt('Motivo de la eliminación:');
-                                if (reason) {
-                                  removeItemFromOrder(item.id, reason);
-                                }
-                              }
-                            }}
-                            className="text-destructive"
-                          >
-                            ×
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                
-                <div className="border-t border-border pt-4">
-                  <div className="flex items-center justify-between text-lg font-semibold mb-4">
-                    <span>Total:</span>
-                    <span>${calculateTotal().toFixed(2)}</span>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button onClick={createOrder} className="bg-gradient-primary hover:opacity-90 flex-1">
-                      {editingOrderId ? 'Actualizar' : 'Crear'} Orden
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      onClick={() => {
-                        setIsNewOrderOpen(false);
-                        setEditingOrderId(null);
-                        setSelectedItems([]);
-                        setSelectedTable('');
-                        setCustomerName('');
-                        setSelectedCategory('all');
-                      }}
-                    >
-                      Cancelar
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <Button 
+          onClick={() => setIsNewOrderOpen(true)}
+          className="bg-gradient-primary hover:opacity-90"
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          <span className="hidden sm:inline">Nueva Orden</span>
+          <span className="sm:hidden">Nueva</span>
+        </Button>
       </div>
 
-      {/* Orders Tabs */}
-      <Tabs defaultValue="resumen" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="resumen">
-            Resumen
-          </TabsTrigger>
-          <TabsTrigger value="preparando">
-            Preparando ({getOrdersByStatus(['preparando']).length})
-          </TabsTrigger>
-          <TabsTrigger value="entregando">
-            Entregando ({getOrdersByStatus(['entregando']).length})
-          </TabsTrigger>
-          <TabsTrigger value="pagando">
-            Pagando ({getOrdersByStatus(['pagando']).length})
-          </TabsTrigger>
-        </TabsList>
+      <div>
+        <Tabs defaultValue="resumen" className="w-full">
+          <TabsList className="grid w-full grid-cols-5 text-xs sm:text-sm">
+            <TabsTrigger value="resumen" className="px-2">
+              <span className="hidden sm:inline">Resumen</span>
+              <span className="sm:hidden">Res</span>
+              <span className="ml-1">({orders.filter(o => ['preparando', 'entregando', 'cobrando'].includes(o.status)).length})</span>
+            </TabsTrigger>
+            <TabsTrigger value="preparando" className="px-2">
+              <span className="hidden sm:inline">Preparando</span>
+              <span className="sm:hidden">Prep</span>
+              <span className="ml-1">({summary.preparandoCount})</span>
+            </TabsTrigger>
+            <TabsTrigger value="entregando" className="px-2">
+              <span className="hidden sm:inline">Entregando</span>
+              <span className="sm:hidden">Entr</span>
+              <span className="ml-1">({summary.entregandoCount})</span>
+            </TabsTrigger>
+            <TabsTrigger value="cobrando" className="px-2">
+              <span className="hidden sm:inline">Cobrando</span>
+              <span className="sm:hidden">Cobr</span>
+              <span className="ml-1">({summary.cobrandoCount})</span>
+            </TabsTrigger>
+            <TabsTrigger value="pagado" className="px-2">
+              <span className="hidden sm:inline">Pagado</span>
+              <span className="sm:hidden">Pag</span>
+              <span className="ml-1">({summary.pagadoCount})</span>
+            </TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="resumen" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5" />
-                Resumen de Comandas
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <div className="p-4 border border-border rounded-lg">
-                  <div className="text-2xl font-bold text-primary">{getOrderSummary().totalOrders}</div>
-                  <div className="text-sm text-muted-foreground">Total Órdenes</div>
-                </div>
-                <div className="p-4 border border-border rounded-lg">
-                  <div className="text-2xl font-bold text-warning">{getOrderSummary().preparandoCount}</div>
-                  <div className="text-sm text-muted-foreground">Preparando</div>
-                </div>
-                <div className="p-4 border border-border rounded-lg">
-                  <div className="text-2xl font-bold text-info">{getOrderSummary().entregandoCount}</div>
-                  <div className="text-sm text-muted-foreground">Entregando</div>
-                </div>
-                <div className="p-4 border border-border rounded-lg">
-                  <div className="text-2xl font-bold text-success">{getOrderSummary().pagandoCount}</div>
-                  <div className="text-sm text-muted-foreground">Pagando</div>
-                </div>
+          <TabsContent value="resumen" className="space-y-6">
+            {/* Status count boxes at the top */}
+            <div className="grid grid-cols-3 gap-4">
+              <div className="border border-border rounded-lg p-4 text-center">
+                <div className="font-semibold text-foreground">Preparando</div>
+                <div className="text-2xl font-bold mt-2">{summary.preparandoCount}</div>
               </div>
-              <div className="mt-6 p-4 border border-border rounded-lg">
-                <div className="text-2xl font-bold text-primary">${getOrderSummary().totalRevenue.toFixed(2)}</div>
-                <div className="text-sm text-muted-foreground">Ingresos Totales</div>
+              <div className="border border-border rounded-lg p-4 text-center">
+                <div className="font-semibold text-foreground">Entregando</div>
+                <div className="text-2xl font-bold mt-2">{summary.entregandoCount}</div>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+              <div className="border border-border rounded-lg p-4 text-center">
+                <div className="font-semibold text-foreground">Cobrando</div>
+                <div className="text-2xl font-bold mt-2">{summary.cobrandoCount}</div>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {orders.filter(order => ['preparando', 'entregando', 'cobrando'].includes(order.status)).map(order => (
+                <OrderCard key={order.id} order={order} currentTab="resumen" />
+              ))}
+              {orders.filter(order => ['preparando', 'entregando', 'cobrando'].includes(order.status)).length === 0 && (
+                <div className="col-span-full text-center text-muted-foreground py-8">
+                  No hay órdenes activas
+                </div>
+              )}
+            </div>
+          </TabsContent>
 
-        <TabsContent value="preparando" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Clock className="h-5 w-5" />
-                Preparando
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 md:grid-cols-2">
-                {getOrdersByStatus(['preparando']).map(order => (
-                  <OrderCard key={order.id} order={order} />
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+          <TabsContent value="preparando" className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {getOrdersForTab('preparando').map(order => (
+                <OrderCard key={order.id} order={order} currentTab="preparando" />
+              ))}
+              {getOrdersForTab('preparando').length === 0 && (
+                <div className="col-span-full text-center text-muted-foreground py-8">
+                  No hay órdenes en preparación
+                </div>
+              )}
+            </div>
+          </TabsContent>
 
-        <TabsContent value="entregando" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Truck className="h-5 w-5" />
-                Entregando
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 md:grid-cols-2">
-                {getOrdersByStatus(['entregando']).map(order => (
-                  <OrderCard key={order.id} order={order} />
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+          <TabsContent value="entregando" className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {getOrdersForTab('entregando').map(order => (
+                <OrderCard key={order.id} order={order} currentTab="entregando" />
+              ))}
+              {getOrdersForTab('entregando').length === 0 && (
+                <div className="col-span-full text-center text-muted-foreground py-8">
+                  No hay órdenes para entregar
+                </div>
+              )}
+            </div>
+          </TabsContent>
 
-        <TabsContent value="pagando" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5" />
-                Pagando
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {getOrdersByStatus(['pagando']).map(order => (
-                  <OrderCard key={order.id} order={order} />
-                ))}
+          <TabsContent value="cobrando" className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {orders.filter(o => o.status === 'cobrando').map(order => (
+                <OrderCard key={order.id} order={order} currentTab="cobrando" />
+              ))}
+              {orders.filter(o => o.status === 'cobrando').length === 0 && (
+                <div className="col-span-full text-center text-muted-foreground py-8">
+                  No hay órdenes para cobrar
+                </div>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="pagado" className="space-y-4">
+            <div className="flex gap-4 items-end mb-4">
+              <div className="flex-1">
+                <Label htmlFor="startDate">Fecha Inicio</Label>
+                <Input
+                  id="startDate"
+                  type="date"
+                  value={dateFilter.start}
+                  onChange={(e) => setDateFilter(prev => ({ ...prev, start: e.target.value }))}
+                  className="mt-1"
+                />
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+              <div className="flex-1">
+                <Label htmlFor="endDate">Fecha Fin</Label>
+                <Input
+                  id="endDate"
+                  type="date"
+                  value={dateFilter.end}
+                  onChange={(e) => setDateFilter(prev => ({ ...prev, end: e.target.value }))}
+                  className="mt-1"
+                />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {getFilteredPaidOrders().map(order => (
+                <OrderCard key={order.id} order={order} currentTab="pagado" />
+              ))}
+              {getFilteredPaidOrders().length === 0 && (
+                <div className="col-span-full text-center text-muted-foreground py-8">
+                  No hay órdenes pagadas en el rango seleccionado
+                </div>
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
+
+      <NewOrderDialog
+        open={isNewOrderOpen}
+        onOpenChange={setIsNewOrderOpen}
+        onCreateOrder={handleNewOrder}
+      />
+
+      <EditOrderDialog
+        open={!!editOrderDialog}
+        onOpenChange={(open) => !open && setEditOrderDialog(null)}
+        order={editOrderDialog ? orders.find(o => o.id === editOrderDialog) || null : null}
+        onSave={handleEditOrder}
+      />
+
+      {/* Payment Dialog */}
+      {paymentDialog && (
+        <PaymentDialog
+          open={!!paymentDialog}
+          onOpenChange={() => setPaymentDialog(null)}
+          onConfirmPayment={(paymentMethod, removeDeliveryCharge) => {
+            if (paymentDialog) {
+              processPayment(paymentDialog, paymentMethod, removeDeliveryCharge);
+            }
+          }}
+          hasDeliveryCharge={
+            paymentDialog ? (orders.find(o => o.id === paymentDialog)?.deliveryCharge || 0) > 0 : false
+          }
+          deliveryAmount={
+            paymentDialog ? (orders.find(o => o.id === paymentDialog)?.deliveryCharge || 0) : 0
+          }
+        />
+      )}
     </div>
   );
 }

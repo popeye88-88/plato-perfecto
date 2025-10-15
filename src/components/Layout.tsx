@@ -1,9 +1,12 @@
 import { ReactNode, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Menu, Users, ClipboardList, BarChart3, ChefHat } from 'lucide-react';
+import { Menu, Settings, ClipboardList, BarChart3, ChefHat, LogOut } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useBusiness } from '@/lib/business-context';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { useBusinessContext } from '@/contexts/BusinessContext';
 
 interface LayoutProps {
   children: ReactNode;
@@ -15,19 +18,31 @@ const navigation = [
   { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
   { id: 'menu', label: 'Menú', icon: ChefHat },
   { id: 'orders', label: 'Comandas', icon: ClipboardList },
-  { id: 'users', label: 'Usuarios', icon: Users },
+  { id: 'settings', label: 'Ajustes', icon: Settings },
 ];
 
 export default function Layout({ children, currentPage, onPageChange }: LayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const { businesses, selectedBusinessId, setSelectedBusinessId } = useBusiness();
+  const navigate = useNavigate();
+  const { currentBusiness, businesses, switchBusiness } = useBusinessContext();
+
+  const handleLogout = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      toast.error('Error al cerrar sesión');
+    } else {
+      toast.success('Sesión cerrada correctamente');
+      navigate('/auth');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-subtle">
       {/* Sidebar */}
       <div className={cn(
         "fixed inset-y-0 left-0 z-50 bg-card border-r border-border transition-all duration-300",
-        isSidebarOpen ? "w-64" : "w-16"
+        isSidebarOpen ? "w-64" : "w-16",
+        "md:relative md:inset-auto" // Make sidebar responsive
       )}>
         <div className="flex h-16 items-center justify-between px-4">
           <div className="flex items-center space-x-2">
@@ -39,8 +54,8 @@ export default function Layout({ children, currentPage, onPageChange }: LayoutPr
             )}
           </div>
           <div className="flex items-center gap-3">
-            {isSidebarOpen && (
-              <Select value={selectedBusinessId ?? undefined} onValueChange={setSelectedBusinessId}>
+            {isSidebarOpen && businesses.length > 0 && (
+              <Select value={currentBusiness?.id ?? undefined} onValueChange={switchBusiness}>
                 <SelectTrigger className="w-48">
                   <SelectValue placeholder="Seleccionar negocio" />
                 </SelectTrigger>
@@ -61,33 +76,51 @@ export default function Layout({ children, currentPage, onPageChange }: LayoutPr
           </div>
         </div>
         
-        <nav className="mt-8 px-4 space-y-2">
-          {navigation.map((item) => {
-            const Icon = item.icon;
-            return (
-              <Button
-                key={item.id}
-                variant={currentPage === item.id ? "default" : "ghost"}
-                className={cn(
-                  "w-full justify-start",
-                  !isSidebarOpen && "justify-center px-2"
-                )}
-                onClick={() => onPageChange(item.id)}
-              >
-                <Icon className={cn("h-5 w-5", isSidebarOpen && "mr-3")} />
-                {isSidebarOpen && item.label}
-              </Button>
-            );
-          })}
+        <nav className="mt-8 px-4 space-y-2 flex flex-col h-[calc(100vh-8rem)]">
+          <div className="space-y-2">
+            {navigation.map((item) => {
+              const Icon = item.icon;
+              return (
+                <Button
+                  key={item.id}
+                  variant={currentPage === item.id ? "default" : "ghost"}
+                  className={cn(
+                    "w-full justify-start",
+                    !isSidebarOpen && "justify-center px-2"
+                  )}
+                  onClick={() => onPageChange(item.id)}
+                >
+                  <Icon className={cn("h-5 w-5", isSidebarOpen && "mr-3")} />
+                  {isSidebarOpen && item.label}
+                </Button>
+              );
+            })}
+          </div>
+          
+          {/* Logout button at bottom */}
+          <div className="mt-auto">
+            <Button
+              variant="ghost"
+              className={cn(
+                "w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10",
+                !isSidebarOpen && "justify-center px-2"
+              )}
+              onClick={handleLogout}
+            >
+              <LogOut className={cn("h-5 w-5", isSidebarOpen && "mr-3")} />
+              {isSidebarOpen && "Cerrar Sesión"}
+            </Button>
+          </div>
         </nav>
       </div>
 
       {/* Main content */}
       <div className={cn(
         "transition-all duration-300",
-        isSidebarOpen ? "ml-64" : "ml-16"
+        isSidebarOpen ? "md:ml-64" : "md:ml-16",
+        "ml-0" // Remove margin on mobile
       )}>
-        <main className="p-6">
+        <main className="p-4 md:p-6">
           {children}
         </main>
       </div>
