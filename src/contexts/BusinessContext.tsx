@@ -173,10 +173,11 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
+    console.log('BusinessContext: useEffect - initial load');
     loadBusinesses();
 
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      console.log('BusinessContext: Auth state change:', event);
       if (event === 'SIGNED_IN') {
         loadBusinesses();
       } else if (event === 'SIGNED_OUT') {
@@ -187,8 +188,11 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
       }
     });
 
-    return () => subscription.unsubscribe();
-  }, []);
+    return () => {
+      console.log('BusinessContext: useEffect cleanup');
+      subscription.unsubscribe();
+    };
+  }, []); // Empty dependency array to prevent infinite loops
 
   const switchBusiness = (businessId: string) => {
     const business = businesses.find(b => b.id === businessId);
