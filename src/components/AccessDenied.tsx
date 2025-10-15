@@ -11,6 +11,13 @@ interface AccessDeniedProps {
 export default function AccessDenied({ children }: AccessDeniedProps) {
   const { currentBusiness, businesses, loading, refreshBusinesses } = useBusinessContext();
 
+  console.log('AccessDenied render:', {
+    currentBusiness,
+    businesses,
+    loading,
+    businessesLength: businesses.length
+  });
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
