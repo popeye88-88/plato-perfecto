@@ -81,19 +81,43 @@ export default function SettingsManager() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Debug Component - Remove this after fixing */}
-      <DebugSettings />
+    <div style={{ 
+      padding: '20px', 
+      backgroundColor: 'red', 
+      color: 'white',
+      minHeight: '400px',
+      border: '5px solid blue'
+    }}>
+      <h1 style={{ fontSize: '32px', marginBottom: '20px' }}>
+        🎉 SETTINGS FUNCIONANDO - VERSIÓN ULTRA SIMPLE
+      </h1>
       
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Ajustes</h1>
-        <p className="text-muted-foreground">Configura las opciones de tu restaurante</p>
-        {currentBusiness && (
-          <p className="text-sm text-muted-foreground mt-2">
-            Negocio actual: <span className="font-semibold text-foreground">{currentBusiness.name}</span>
-          </p>
-        )}
+      <div style={{ 
+        backgroundColor: 'yellow', 
+        color: 'black', 
+        padding: '20px', 
+        marginBottom: '20px',
+        border: '3px solid green'
+      }}>
+        <h2>Estado del Negocio:</h2>
+        <p><strong>Loading:</strong> {businessLoading ? 'true' : 'false'}</p>
+        <p><strong>Current Business:</strong> {currentBusiness?.name || 'null'}</p>
+        <p><strong>Businesses Count:</strong> {businesses.length}</p>
+        <p><strong>User Role:</strong> {userRole || 'null'}</p>
       </div>
+
+      <div style={{ 
+        backgroundColor: 'lightblue', 
+        color: 'black', 
+        padding: '20px',
+        border: '3px solid purple'
+      }}>
+        <h2>Si ves esto, el problema NO es de renderizado</h2>
+        <p>Los componentes se están ejecutando correctamente</p>
+        <p>El problema debe ser de CSS o estilos</p>
+      </div>
+    </div>
+  );
 
       <Tabs defaultValue="business" className="space-y-6">
         <TabsList className="grid w-full grid-cols-2 lg:grid-cols-5">
