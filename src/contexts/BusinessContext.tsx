@@ -43,11 +43,21 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
 
   const loadBusinesses = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError) {
+        console.error('Error getting user:', userError);
         setLoading(false);
         return;
       }
+      
+      if (!user) {
+        console.log('No user found');
+        setLoading(false);
+        return;
+      }
+
+      console.log('Loading businesses for user:', user.id);
 
       // Get all businesses the user is a member of
       const { data: memberships, error } = await supabase
@@ -65,9 +75,17 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
         `)
         .eq('user_id', user.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching business members:', error);
+        throw error;
+      }
 
-      const businessList = memberships?.map((m: any) => m.businesses) || [];
+      console.log('Memberships data:', memberships);
+
+      // Extract businesses from memberships
+      const businessList = memberships?.map((m: any) => m.businesses).filter(Boolean) || [];
+      console.log('Business list:', businessList);
+      
       setBusinesses(businessList);
 
       // Set current business from localStorage or first business
@@ -80,18 +98,26 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
         selectedBusiness = businessList[0];
       }
 
+      console.log('Selected business:', selectedBusiness);
+
       if (selectedBusiness) {
         setCurrentBusiness(selectedBusiness);
         localStorage.setItem('currentBusinessId', selectedBusiness.id);
 
         // Get user role for current business
         const membership = memberships?.find((m: any) => m.business_id === selectedBusiness.id);
+        console.log('User role:', membership?.role);
         setUserRole(membership?.role || null);
+      } else {
+        console.warn('No business found for user');
+        setCurrentBusiness(null);
+        setUserRole(null);
       }
     } catch (error) {
       console.error('Error loading businesses:', error);
       toast.error('Error al cargar los negocios');
     } finally {
+      console.log('Finished loading businesses');
       setLoading(false);
     }
   };
