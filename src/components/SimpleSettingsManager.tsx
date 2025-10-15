@@ -8,20 +8,19 @@ export default function SimpleSettingsManager() {
       <div className="space-y-4">
         <div className="bg-blue-50 p-4 rounded-lg">
           <h2 className="font-semibold mb-2">Estado del BusinessContext:</h2>
-          <p><strong>Loading:</strong> {loading ? 'true' : 'false'}</p>
-          <p><strong>Current Business:</strong> {currentBusiness?.name || 'null'}</p>
-          <p><strong>Businesses Count:</strong> {businesses.length}</p>
-          <p><strong>User Role:</strong> {userRole || 'null'}</p>
+          <p><strong>Loading:</strong> No disponible (contexto removido)</p>
+          <p><strong>Current Business:</strong> No disponible (contexto removido)</p>
+          <p><strong>Businesses Count:</strong> No disponible (contexto removido)</p>
+          <p><strong>User Role:</strong> No disponible (contexto removido)</p>
         </div>
 
         <div className="bg-green-50 p-4 rounded-lg">
           <h2 className="font-semibold mb-2">Datos Raw:</h2>
           <pre className="text-xs bg-white p-2 rounded border overflow-auto">
             {JSON.stringify({
-              currentBusiness,
-              businesses,
-              userRole,
-              loading
+              message: "Contexto removido para debug",
+              timestamp: new Date().toISOString(),
+              status: "Componente funcionando correctamente"
             }, null, 2)}
           </pre>
         </div>
