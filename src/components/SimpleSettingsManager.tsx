@@ -1,39 +1,47 @@
 export default function SimpleSettingsManager() {
-  console.log('SimpleSettingsManager render: START');
+  console.log('SimpleSettingsManager render: START - ULTRA SIMPLE');
 
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-4">🔍 Debug Ajustes</h1>
+    <div style={{ padding: '24px', backgroundColor: '#f0f0f0' }}>
+      <h1 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>
+        🔍 Debug Ajustes - ULTRA SIMPLE
+      </h1>
       
-      <div className="space-y-4">
-        <div className="bg-blue-50 p-4 rounded-lg">
-          <h2 className="font-semibold mb-2">Estado del BusinessContext:</h2>
-          <p><strong>Loading:</strong> No disponible (contexto removido)</p>
-          <p><strong>Current Business:</strong> No disponible (contexto removido)</p>
-          <p><strong>Businesses Count:</strong> No disponible (contexto removido)</p>
-          <p><strong>User Role:</strong> No disponible (contexto removido)</p>
-        </div>
+      <div style={{ backgroundColor: '#e3f2fd', padding: '16px', borderRadius: '8px', marginBottom: '16px' }}>
+        <h2 style={{ fontWeight: 'bold', marginBottom: '8px' }}>Estado del BusinessContext:</h2>
+        <p><strong>Loading:</strong> No disponible (contexto removido)</p>
+        <p><strong>Current Business:</strong> No disponible (contexto removido)</p>
+        <p><strong>Businesses Count:</strong> No disponible (contexto removido)</p>
+        <p><strong>User Role:</strong> No disponible (contexto removido)</p>
+      </div>
 
-        <div className="bg-green-50 p-4 rounded-lg">
-          <h2 className="font-semibold mb-2">Datos Raw:</h2>
-          <pre className="text-xs bg-white p-2 rounded border overflow-auto">
-            {JSON.stringify({
-              message: "Contexto removido para debug",
-              timestamp: new Date().toISOString(),
-              status: "Componente funcionando correctamente"
-            }, null, 2)}
-          </pre>
-        </div>
+      <div style={{ backgroundColor: '#e8f5e8', padding: '16px', borderRadius: '8px', marginBottom: '16px' }}>
+        <h2 style={{ fontWeight: 'bold', marginBottom: '8px' }}>Datos Raw:</h2>
+        <pre style={{ fontSize: '12px', backgroundColor: 'white', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', overflow: 'auto' }}>
+          {JSON.stringify({
+            message: "Contexto removido para debug",
+            timestamp: new Date().toISOString(),
+            status: "Componente funcionando correctamente",
+            version: "ULTRA SIMPLE"
+          }, null, 2)}
+        </pre>
+      </div>
 
-        <div className="bg-yellow-50 p-4 rounded-lg">
-          <h2 className="font-semibold mb-2">Acciones:</h2>
-          <button 
-            onClick={() => window.location.reload()}
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-          >
-            Recargar Página
-          </button>
-        </div>
+      <div style={{ backgroundColor: '#fff3cd', padding: '16px', borderRadius: '8px' }}>
+        <h2 style={{ fontWeight: 'bold', marginBottom: '8px' }}>Acciones:</h2>
+        <button 
+          onClick={() => window.location.reload()}
+          style={{ 
+            padding: '8px 16px', 
+            backgroundColor: '#007bff', 
+            color: 'white', 
+            border: 'none', 
+            borderRadius: '4px',
+            cursor: 'pointer'
+          }}
+        >
+          Recargar Página
+        </button>
       </div>
     </div>
   );
