@@ -1,46 +1,93 @@
 export default function SimpleSettingsManager() {
-  console.log('SimpleSettingsManager render: START - ULTRA SIMPLE');
+  console.log('SimpleSettingsManager render: START - COMPLETELY NEW VERSION');
 
   return (
-    <div style={{ padding: '24px', backgroundColor: '#f0f0f0' }}>
-      <h1 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>
-        🔍 Debug Ajustes - ULTRA SIMPLE
+    <div style={{ 
+      padding: '24px', 
+      backgroundColor: '#ff6b6b', 
+      minHeight: '100vh',
+      color: 'white'
+    }}>
+      <h1 style={{ 
+        fontSize: '32px', 
+        fontWeight: 'bold', 
+        marginBottom: '24px',
+        textAlign: 'center'
+      }}>
+        🚀 DEBUG COMPLETELY NEW VERSION
       </h1>
       
-      <div style={{ backgroundColor: '#e3f2fd', padding: '16px', borderRadius: '8px', marginBottom: '16px' }}>
-        <h2 style={{ fontWeight: 'bold', marginBottom: '8px' }}>Estado del BusinessContext:</h2>
-        <p><strong>Loading:</strong> No disponible (contexto removido)</p>
-        <p><strong>Current Business:</strong> No disponible (contexto removido)</p>
-        <p><strong>Businesses Count:</strong> No disponible (contexto removido)</p>
-        <p><strong>User Role:</strong> No disponible (contexto removido)</p>
+      <div style={{ 
+        backgroundColor: '#4ecdc4', 
+        padding: '24px', 
+        borderRadius: '12px', 
+        marginBottom: '24px',
+        textAlign: 'center'
+      }}>
+        <h2 style={{ fontWeight: 'bold', marginBottom: '16px', fontSize: '20px' }}>
+          ✅ COMPONENTE FUNCIONANDO CORRECTAMENTE
+        </h2>
+        <p style={{ fontSize: '18px' }}>
+          Si ves esto, el problema NO está en el renderizado
+        </p>
+        <p style={{ fontSize: '18px' }}>
+          El problema está en el BusinessContext
+        </p>
       </div>
 
-      <div style={{ backgroundColor: '#e8f5e8', padding: '16px', borderRadius: '8px', marginBottom: '16px' }}>
-        <h2 style={{ fontWeight: 'bold', marginBottom: '8px' }}>Datos Raw:</h2>
-        <pre style={{ fontSize: '12px', backgroundColor: 'white', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', overflow: 'auto' }}>
+      <div style={{ 
+        backgroundColor: '#45b7d1', 
+        padding: '24px', 
+        borderRadius: '12px', 
+        marginBottom: '24px',
+        textAlign: 'center'
+      }}>
+        <h2 style={{ fontWeight: 'bold', marginBottom: '16px', fontSize: '20px' }}>
+          📊 DATOS DE DEBUG
+        </h2>
+        <pre style={{ 
+          fontSize: '14px', 
+          backgroundColor: 'white', 
+          color: 'black',
+          padding: '16px', 
+          borderRadius: '8px', 
+          border: '2px solid #333',
+          overflow: 'auto',
+          textAlign: 'left'
+        }}>
           {JSON.stringify({
-            message: "Contexto removido para debug",
+            message: "Componente completamente nuevo",
             timestamp: new Date().toISOString(),
-            status: "Componente funcionando correctamente",
-            version: "ULTRA SIMPLE"
+            status: "FUNCIONANDO PERFECTAMENTE",
+            version: "COMPLETELY NEW VERSION",
+            cache_busted: true
           }, null, 2)}
         </pre>
       </div>
 
-      <div style={{ backgroundColor: '#fff3cd', padding: '16px', borderRadius: '8px' }}>
-        <h2 style={{ fontWeight: 'bold', marginBottom: '8px' }}>Acciones:</h2>
+      <div style={{ 
+        backgroundColor: '#f9ca24', 
+        padding: '24px', 
+        borderRadius: '12px',
+        textAlign: 'center'
+      }}>
+        <h2 style={{ fontWeight: 'bold', marginBottom: '16px', fontSize: '20px' }}>
+          🔄 ACCIONES
+        </h2>
         <button 
           onClick={() => window.location.reload()}
           style={{ 
-            padding: '8px 16px', 
-            backgroundColor: '#007bff', 
+            padding: '12px 24px', 
+            backgroundColor: '#6c5ce7', 
             color: 'white', 
             border: 'none', 
-            borderRadius: '4px',
-            cursor: 'pointer'
+            borderRadius: '8px',
+            cursor: 'pointer',
+            fontSize: '16px',
+            fontWeight: 'bold'
           }}
         >
-          Recargar Página
+          🔄 RECARGAR PÁGINA
         </button>
       </div>
     </div>
