@@ -67,7 +67,7 @@ const mockOrderDetails: OrderDetail[] = [
 ];
 
 export default function Dashboard() {
-  const { currentBusiness } = useBusinessContext();
+  const { currentBusiness, loading: businessLoading } = useBusinessContext();
   const [filters, setFilters] = useState<DashboardFilters>({
     dateRange: {
       from: startOfWeek(new Date(), { weekStartsOn: 1 }),
@@ -88,7 +88,6 @@ export default function Dashboard() {
   });
   const [topProducts, setTopProducts] = useState<Product[]>([]);
   const [chartData, setChartData] = useState<ChartData[]>([]);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (currentBusiness) {
@@ -100,7 +99,6 @@ export default function Dashboard() {
     if (!currentBusiness) return;
     
     try {
-      setLoading(true);
       
       // Load orders for the selected period
       let query = supabase
@@ -155,8 +153,6 @@ export default function Dashboard() {
       
     } catch (error) {
       console.error('Error loading dashboard data:', error);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -221,12 +217,22 @@ export default function Dashboard() {
     }
   };
 
-  if (loading || !currentBusiness) {
+  if (businessLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
           <p className="mt-4 text-muted-foreground">Cargando datos del dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentBusiness) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <p className="text-muted-foreground">No hay negocio seleccionado</p>
         </div>
       </div>
     );

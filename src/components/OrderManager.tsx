@@ -56,7 +56,7 @@ const menuItems = [
 
 export default function OrderManager() {
   const { toast } = useToast();
-  const { currentBusiness } = useBusinessContext();
+  const { currentBusiness, loading: businessLoading } = useBusinessContext();
   const [orders, setOrders] = useState<Order[]>([]);
   const [isNewOrderOpen, setIsNewOrderOpen] = useState(false);
   const [paymentDialog, setPaymentDialog] = useState<string | null>(null);
@@ -70,7 +70,6 @@ export default function OrderManager() {
     start: new Date().toISOString().split('T')[0],
     end: new Date().toISOString().split('T')[0]
   });
-  const [loading, setLoading] = useState(true);
 
   // Load orders from Supabase
   useEffect(() => {
@@ -80,10 +79,7 @@ export default function OrderManager() {
   }, [currentBusiness]);
 
   const loadOrders = async () => {
-    if (!currentBusiness) {
-      setLoading(false);
-      return;
-    }
+    if (!currentBusiness) return;
 
     try {
       const { data: ordersData, error: ordersError } = await supabase
@@ -128,8 +124,6 @@ export default function OrderManager() {
         description: "No se pudieron cargar las órdenes",
         variant: "destructive"
       });
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -707,12 +701,22 @@ export default function OrderManager() {
 
   const summary = getOrderSummary();
 
-  if (loading || !currentBusiness) {
+  if (businessLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
           <p className="mt-4 text-muted-foreground">Cargando órdenes...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentBusiness) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <p className="text-muted-foreground">No hay negocio seleccionado</p>
         </div>
       </div>
     );

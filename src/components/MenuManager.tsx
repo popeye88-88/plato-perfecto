@@ -28,7 +28,7 @@ interface Category {
 
 export default function MenuManager() {
   const { toast } = useToast();
-  const { currentBusiness } = useBusinessContext();
+  const { currentBusiness, loading: businessLoading } = useBusinessContext();
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -41,7 +41,6 @@ export default function MenuManager() {
     description: ''
   });
   const [newCategoryName, setNewCategoryName] = useState('');
-  const [loading, setLoading] = useState(true);
 
   // Load menu items and categories
   useEffect(() => {
@@ -70,8 +69,6 @@ export default function MenuManager() {
         description: "No se pudieron cargar los productos",
         variant: "destructive"
       });
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -242,12 +239,22 @@ export default function MenuManager() {
     return acc;
   }, {} as Record<string, MenuItem[]>);
 
-  if (loading || !currentBusiness) {
+  if (businessLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
           <p className="mt-4 text-muted-foreground">Cargando menú...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentBusiness) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <p className="text-muted-foreground">No hay negocio seleccionado</p>
         </div>
       </div>
     );

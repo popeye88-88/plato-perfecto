@@ -28,7 +28,7 @@ const languageLabels = {
 };
 
 export default function SettingsManager() {
-  const { loading } = useBusinessContext();
+  const { loading: businessLoading } = useBusinessContext();
   const [settings, setSettings] = useState<AppSettings>({
     language: 'es',
     currency: 'MXN',
@@ -42,7 +42,7 @@ export default function SettingsManager() {
     }));
   };
 
-  if (loading) {
+  if (businessLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
