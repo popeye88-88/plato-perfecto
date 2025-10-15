@@ -109,7 +109,57 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
         console.log('User role:', membership?.role);
         setUserRole(membership?.role || null);
       } else {
-        console.warn('No business found for user');
+        console.warn('No business found for user - this should not happen as new users get a business automatically');
+        // If no business found, this might be an existing user without a business
+        // We should create a default business for them
+        if (businessList.length === 0) {
+          console.log('Creating default business for user without any businesses');
+          try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+              const defaultBusinessName = `Negocio de ${user.email}`;
+              
+              // Create default business
+              const { data: newBusiness, error: businessError } = await supabase
+                .from('businesses')
+                .insert({ name: defaultBusinessName })
+                .select()
+                .single();
+
+              if (businessError) throw businessError;
+
+              // Add user as admin of the new business
+              const { error: memberError } = await supabase
+                .from('business_members')
+                .insert({
+                  business_id: newBusiness.id,
+                  user_id: user.id,
+                  role: 'admin'
+                });
+
+              if (memberError) throw memberError;
+
+              // Ensure user has staff role
+              const { error: roleError } = await supabase
+                .from('user_roles')
+                .insert({
+                  user_id: user.id,
+                  role: 'staff'
+                });
+
+              if (roleError && !roleError.message.includes('duplicate')) {
+                console.warn('Could not assign staff role:', roleError);
+              }
+
+              // Reload businesses
+              await loadBusinesses();
+              return;
+            }
+          } catch (error) {
+            console.error('Error creating default business:', error);
+            toast.error('Error al crear negocio por defecto');
+          }
+        }
         setCurrentBusiness(null);
         setUserRole(null);
       }

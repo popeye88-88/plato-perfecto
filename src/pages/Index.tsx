@@ -4,6 +4,7 @@ import Dashboard from '@/components/Dashboard';
 import MenuManager from '@/components/MenuManager';
 import OrderManager from '@/components/OrderManager';
 import SettingsManager from '@/components/SettingsManager';
+import AccessDenied from '@/components/AccessDenied';
 
 const Index = () => {
   const [currentPage, setCurrentPage] = useState('dashboard');
@@ -24,9 +25,11 @@ const Index = () => {
   };
 
   return (
-    <Layout currentPage={currentPage} onPageChange={setCurrentPage}>
-      {renderPage()}
-    </Layout>
+    <AccessDenied>
+      <Layout currentPage={currentPage} onPageChange={setCurrentPage}>
+        {renderPage()}
+      </Layout>
+    </AccessDenied>
   );
 };
 
