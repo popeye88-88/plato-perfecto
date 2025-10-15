@@ -426,21 +426,21 @@ export default function Dashboard() {
         </Card>
 
         <Card className="hover:shadow-lg transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
               Orden Promedio
-            </CardTitle>
+                </CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground mb-1">
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-foreground mb-1">
               ${stats.ordenPromedio.toFixed(2)}
-            </div>
-            <p className="text-xs text-success">
+                </div>
+                <p className="text-xs text-success">
               +5% desde el período anterior
-            </p>
-          </CardContent>
-        </Card>
+                </p>
+              </CardContent>
+            </Card>
       </div>
 
       {/* Combined Chart */}
@@ -494,7 +494,7 @@ export default function Dashboard() {
                     <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-semibold">
                       {index + 1}
                     </div>
-                    <div>
+                  <div>
                       <div className="font-medium text-foreground text-sm">{product.name}</div>
                       <div className="text-xs text-muted-foreground">{product.sold} vendidos</div>
                     </div>
@@ -540,14 +540,14 @@ export default function Dashboard() {
                 <div className="text-2xl font-bold text-primary">{detailData.puesto}</div>
                 <div className="text-sm text-muted-foreground">En Puesto</div>
               </div>
-              <div>
+                  <div>
                 <div className="text-2xl font-bold text-accent">{detailData.takeaway}</div>
                 <div className="text-sm text-muted-foreground">Take Away</div>
-              </div>
+                  </div>
               <div>
                 <div className="text-2xl font-bold text-muted-foreground">{detailData.delivery}</div>
                 <div className="text-sm text-muted-foreground">Delivery</div>
-              </div>
+                </div>
             </div>
           </CardContent>
         </Card>

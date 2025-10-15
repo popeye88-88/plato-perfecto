@@ -174,25 +174,29 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     console.log('BusinessContext: useEffect - initial load');
+    
+    // Initial load
     loadBusinesses();
 
+    // Listen for auth changes - but only for SIGNED_OUT
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       console.log('BusinessContext: Auth state change:', event);
-      if (event === 'SIGNED_IN') {
-        loadBusinesses();
-      } else if (event === 'SIGNED_OUT') {
+      if (event === 'SIGNED_OUT') {
+        console.log('BusinessContext: User signed out, clearing state');
         setCurrentBusiness(null);
         setBusinesses([]);
         setUserRole(null);
         localStorage.removeItem('currentBusinessId');
+        setLoading(false);
       }
+      // Don't reload on SIGNED_IN or INITIAL_SESSION to avoid loops
     });
 
     return () => {
       console.log('BusinessContext: useEffect cleanup');
       subscription.unsubscribe();
     };
-  }, []); // Empty dependency array to prevent infinite loops
+  }, []); // Empty dependency array
 
   const switchBusiness = (businessId: string) => {
     const business = businesses.find(b => b.id === businessId);

@@ -26,11 +26,9 @@ const Index = () => {
   };
 
   return (
-    <AccessDenied>
-      <Layout currentPage={currentPage} onPageChange={setCurrentPage}>
-        {renderPage()}
-      </Layout>
-    </AccessDenied>
+    <Layout currentPage={currentPage} onPageChange={setCurrentPage}>
+      {renderPage()}
+    </Layout>
   );
 };
 
