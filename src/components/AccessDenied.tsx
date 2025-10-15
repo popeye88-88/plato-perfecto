@@ -29,7 +29,9 @@ export default function AccessDenied({ children }: AccessDeniedProps) {
     );
   }
 
-  if (!currentBusiness && businesses.length === 0 && !loading) {
+  // Only show access denied if we're not loading AND we've confirmed there are no businesses
+  // This prevents the component from blocking during the initial loading phase
+  if (!loading && businesses.length === 0 && !currentBusiness) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
