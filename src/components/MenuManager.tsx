@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Plus, Edit2, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useBusiness } from '@/lib/business-context';
 
 interface MenuItem {
   id: string;
@@ -18,6 +19,7 @@ interface MenuItem {
 
 export default function MenuManager() {
   const { toast } = useToast();
+  const { selectedBusiness } = useBusiness();
   const [menuItems, setMenuItems] = useState<MenuItem[]>([
     { id: '1', name: 'Pizza Margherita', price: 15.00, category: 'Pizzas', description: 'Tomate, mozzarella y albahaca fresca' },
     { id: '2', name: 'Hamburguesa Clásica', price: 12.50, category: 'Hamburguesas', description: 'Carne, lechuga, tomate y queso' },
@@ -108,7 +110,7 @@ export default function MenuManager() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground mb-2">Gestión de Menú</h1>
-          <p className="text-muted-foreground">Administra los productos de tu restaurante</p>
+          <p className="text-muted-foreground">{selectedBusiness ? `Negocio: ${selectedBusiness.name}` : 'Selecciona un negocio'}</p>
         </div>
         
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

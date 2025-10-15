@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Plus, Clock, Truck, DollarSign, Edit2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useBusiness } from '@/lib/business-context';
 
 interface OrderItem {
   id: string;
@@ -42,6 +43,7 @@ const menuItems = [
 
 export default function OrderManager() {
   const { toast } = useToast();
+  const { selectedBusiness } = useBusiness();
   const [orders, setOrders] = useState<Order[]>([
     {
       id: '1',
@@ -407,7 +409,7 @@ export default function OrderManager() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground mb-2">Gestión de Comandas</h1>
-          <p className="text-muted-foreground">Administra las órdenes de tu restaurante</p>
+          <p className="text-muted-foreground">{selectedBusiness ? `Negocio: ${selectedBusiness.name}` : 'Selecciona un negocio'}</p>
         </div>
         
         <Dialog open={isNewOrderOpen} onOpenChange={setIsNewOrderOpen}>

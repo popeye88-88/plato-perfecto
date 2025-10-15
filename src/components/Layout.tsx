@@ -2,6 +2,8 @@ import { ReactNode, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Menu, Users, ClipboardList, BarChart3, ChefHat } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useBusiness } from '@/lib/business-context';
 
 interface LayoutProps {
   children: ReactNode;
@@ -18,6 +20,7 @@ const navigation = [
 
 export default function Layout({ children, currentPage, onPageChange }: LayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const { businesses, selectedBusinessId, setSelectedBusinessId } = useBusiness();
 
   return (
     <div className="min-h-screen bg-gradient-subtle">
@@ -35,13 +38,27 @@ export default function Layout({ children, currentPage, onPageChange }: LayoutPr
               <h1 className="text-xl font-bold text-foreground">RestauranteOS</h1>
             )}
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          >
-            <Menu className="h-4 w-4" />
-          </Button>
+          <div className="flex items-center gap-3">
+            {isSidebarOpen && (
+              <Select value={selectedBusinessId ?? undefined} onValueChange={setSelectedBusinessId}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Seleccionar negocio" />
+                </SelectTrigger>
+                <SelectContent>
+                  {businesses.map(b => (
+                    <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            >
+              <Menu className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
         
         <nav className="mt-8 px-4 space-y-2">
