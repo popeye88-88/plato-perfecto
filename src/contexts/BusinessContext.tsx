@@ -43,13 +43,16 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
 
   const loadBusinesses = async () => {
     try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      // Try to get the session first
+      const { data: { session } } = await supabase.auth.getSession();
       
-      if (userError) {
-        console.error('Error getting user:', userError);
+      if (!session) {
+        console.log('No session found');
         setLoading(false);
         return;
       }
+      
+      const user = session.user;
       
       if (!user) {
         console.log('No user found');
@@ -115,46 +118,44 @@ export const BusinessProvider = ({ children }: { children: ReactNode }) => {
         if (businessList.length === 0) {
           console.log('Creating default business for user without any businesses');
           try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-              const defaultBusinessName = `Negocio de ${user.email}`;
-              
-              // Create default business
-              const { data: newBusiness, error: businessError } = await supabase
-                .from('businesses')
-                .insert({ name: defaultBusinessName })
-                .select()
-                .single();
+            // Use the user we already have from the session
+            const defaultBusinessName = `Negocio de ${user.email}`;
+            
+            // Create default business
+            const { data: newBusiness, error: businessError } = await supabase
+              .from('businesses')
+              .insert({ name: defaultBusinessName })
+              .select()
+              .single();
 
-              if (businessError) throw businessError;
+            if (businessError) throw businessError;
 
-              // Add user as admin of the new business
-              const { error: memberError } = await supabase
-                .from('business_members')
-                .insert({
-                  business_id: newBusiness.id,
-                  user_id: user.id,
-                  role: 'admin'
-                });
+            // Add user as admin of the new business
+            const { error: memberError } = await supabase
+              .from('business_members')
+              .insert({
+                business_id: newBusiness.id,
+                user_id: user.id,
+                role: 'admin'
+              });
 
-              if (memberError) throw memberError;
+            if (memberError) throw memberError;
 
-              // Ensure user has staff role
-              const { error: roleError } = await supabase
-                .from('user_roles')
-                .insert({
-                  user_id: user.id,
-                  role: 'staff'
-                });
+            // Ensure user has staff role
+            const { error: roleError } = await supabase
+              .from('user_roles')
+              .insert({
+                user_id: user.id,
+                role: 'staff'
+              });
 
-              if (roleError && !roleError.message.includes('duplicate')) {
-                console.warn('Could not assign staff role:', roleError);
-              }
-
-              // Reload businesses
-              await loadBusinesses();
-              return;
+            if (roleError && !roleError.message.includes('duplicate')) {
+              console.warn('Could not assign staff role:', roleError);
             }
+
+            // Reload businesses
+            await loadBusinesses();
+            return;
           } catch (error) {
             console.error('Error creating default business:', error);
             toast.error('Error al crear negocio por defecto');
