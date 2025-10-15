@@ -4,6 +4,7 @@ import Dashboard from '@/components/Dashboard';
 import MenuManager from '@/components/MenuManager';
 import OrderManager from '@/components/OrderManager';
 import SettingsManager from '@/components/SettingsManager';
+import SimpleSettingsManager from '@/components/SimpleSettingsManager';
 import AccessDenied from '@/components/AccessDenied';
 
 const Index = () => {
@@ -18,7 +19,7 @@ const Index = () => {
       case 'orders':
         return <OrderManager />;
       case 'settings':
-        return <SettingsManager />;
+        return <SimpleSettingsManager />;
       default:
         return <Dashboard />;
     }
