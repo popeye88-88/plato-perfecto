@@ -69,20 +69,65 @@ export default function OrderManager() {
     end: new Date().toISOString().split('T')[0]
   });
   const [loading, setLoading] = useState(true);
+  const [currentBusinessId, setCurrentBusinessId] = useState<string | null>(null);
 
-  // Load orders from Supabase
+  // Load business ID and orders
   useEffect(() => {
-    loadOrders();
+    loadBusinessAndOrders();
   }, []);
 
-  const loadOrders = async () => {
+  const loadBusinessAndOrders = async () => {
     try {
-      const { data: ordersData, error: ordersError } = await supabase
+      // Get current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+      if (!user) {
+        toast({
+          title: "Error",
+          description: "Debes iniciar sesión",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Get user's business - using any to avoid type issues
+      const { data: membership, error: membershipError } = await (supabase as any)
+        .from('business_members')
+        .select('business_id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (membershipError) throw membershipError;
+      
+      if (membership) {
+        setCurrentBusinessId(membership.business_id);
+        // Now load orders
+        await loadOrders(membership.business_id);
+      }
+    } catch (error) {
+      console.error('Error loading business:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo cargar el negocio",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadOrders = async (businessId?: string) => {
+    try {
+      const idToUse = businessId || currentBusinessId;
+      if (!idToUse) return;
+
+      const { data: ordersData, error: ordersError } = await (supabase as any)
         .from('orders')
         .select(`
           *,
           order_items (*)
         `)
+        .eq('business_id', idToUse)
         .order('created_at', { ascending: false });
 
       if (ordersError) throw ordersError;
@@ -138,6 +183,15 @@ export default function OrderManager() {
     deliveryCharge: number;
   }) => {
     try {
+      if (!currentBusinessId) {
+        toast({
+          title: "Error",
+          description: "No se encontró el negocio actual",
+          variant: "destructive"
+        });
+        return;
+      }
+
       // Calculate total
       const itemsTotal = orderData.items.reduce((sum, item) => sum + (item.menuItem.price * item.quantity), 0);
       const total = itemsTotal + orderData.deliveryCharge;
@@ -146,6 +200,7 @@ export default function OrderManager() {
       const { data: order, error: orderError } = await supabase
         .from('orders')
         .insert({
+          business_id: currentBusinessId,
           number: `#${String(orders.length + 1).padStart(3, '0')}`,
           customer_name: orderData.customerName,
           total,
@@ -165,6 +220,7 @@ export default function OrderManager() {
         for (let i = 0; i < item.quantity; i++) {
           orderItems.push({
             order_id: order.id,
+            business_id: currentBusinessId,
             name: item.menuItem.name,
             price: item.menuItem.price,
             quantity: 1,
@@ -341,6 +397,7 @@ export default function OrderManager() {
       // Insert updated items
       const orderItems = updatedOrder.items.map(item => ({
         order_id: updatedOrder.id,
+        business_id: currentBusinessId,
         name: item.name,
         price: item.price,
         quantity: item.quantity,
@@ -361,6 +418,7 @@ export default function OrderManager() {
         .from('order_edit_history')
         .insert([{
           order_id: updatedOrder.id,
+          business_id: currentBusinessId,
           edit_type: 'edit_items',
           changes: JSON.stringify({ items: updatedOrder.items })
         }]);
@@ -413,6 +471,7 @@ export default function OrderManager() {
         .from('order_edit_history')
         .insert([{
           order_id: selectedOrder.id,
+          business_id: currentBusinessId,
           edit_type: 'apply_discount',
           changes: JSON.stringify({
             discounted_items: Array.from(discountItems),
