@@ -80,13 +80,15 @@ export default function OrderManager() {
     try {
       // Get current user
       const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError) throw userError;
-      if (!user) {
+      
+      if (userError || !user) {
+        // No authenticated user - show helpful message
         toast({
-          title: "Error",
-          description: "Debes iniciar sesión",
+          title: "Autenticación requerida",
+          description: "Debes iniciar sesión para gestionar órdenes. Contacta al administrador para configurar autenticación.",
           variant: "destructive"
         });
+        setLoading(false);
         return;
       }
 
@@ -97,13 +99,30 @@ export default function OrderManager() {
         .eq('user_id', user.id)
         .maybeSingle();
 
-      if (membershipError) throw membershipError;
-      
-      if (membership) {
-        setCurrentBusinessId(membership.business_id);
-        // Now load orders
-        await loadOrders(membership.business_id);
+      if (membershipError) {
+        console.error('Error loading membership:', membershipError);
+        toast({
+          title: "Error",
+          description: "Error al cargar la membresía del negocio",
+          variant: "destructive"
+        });
+        setLoading(false);
+        return;
       }
+      
+      if (!membership) {
+        toast({
+          title: "Sin negocio asignado",
+          description: "Tu usuario no está asignado a ningún negocio. Contacta al administrador.",
+          variant: "destructive"
+        });
+        setLoading(false);
+        return;
+      }
+
+      setCurrentBusinessId(membership.business_id);
+      // Now load orders
+      await loadOrders(membership.business_id);
     } catch (error) {
       console.error('Error loading business:', error);
       toast({
@@ -111,7 +130,6 @@ export default function OrderManager() {
         description: "No se pudo cargar el negocio",
         variant: "destructive"
       });
-    } finally {
       setLoading(false);
     }
   };
