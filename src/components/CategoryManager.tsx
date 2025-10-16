@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,8 +7,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Trash2, Plus, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { useBusinessContext } from '@/contexts/BusinessContext';
 
 interface Category {
   id: string;
@@ -20,71 +18,42 @@ interface CategoryManagerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   categories: Category[];
-  onUpdateCategories: () => void;
+  onUpdateCategories: (categories: Category[]) => void;
 }
 
 export default function CategoryManager({ open, onOpenChange, categories, onUpdateCategories }: CategoryManagerProps) {
   const { toast } = useToast();
-  const { currentBusiness } = useBusinessContext();
   const [newCategoryName, setNewCategoryName] = useState('');
   const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null);
 
-  const handleAddCategory = async () => {
-    if (!newCategoryName.trim() || !currentBusiness) return;
+  const handleAddCategory = () => {
+    if (!newCategoryName.trim()) return;
 
-    try {
-      const { error } = await supabase
-        .from('categories')
-        .insert({
-          business_id: currentBusiness.id,
-          name: newCategoryName.trim()
-        });
-      
-      if (error) throw error;
-      
-      setNewCategoryName('');
-      onUpdateCategories();
-      toast({
-        title: "Categoría agregada",
-        description: `La categoría "${newCategoryName}" ha sido agregada`
-      });
-    } catch (error) {
-      console.error('Error adding category:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo agregar la categoría",
-        variant: "destructive"
-      });
-    }
+    const newCategory: Category = {
+      id: Date.now().toString(),
+      name: newCategoryName.trim(),
+      productCount: 0
+    };
+
+    onUpdateCategories([...categories, newCategory]);
+    setNewCategoryName('');
+    toast({
+      title: "Categoría agregada",
+      description: `La categoría "${newCategory.name}" ha sido agregada`
+    });
   };
 
-  const handleDeleteCategory = async (category: Category) => {
+  const handleDeleteCategory = (category: Category) => {
     if (category.productCount > 0) {
       setCategoryToDelete(category);
       return;
     }
 
-    try {
-      const { error } = await supabase
-        .from('categories')
-        .delete()
-        .eq('id', category.id);
-      
-      if (error) throw error;
-      
-      onUpdateCategories();
-      toast({
-        title: "Categoría eliminada",
-        description: `La categoría "${category.name}" ha sido eliminada`
-      });
-    } catch (error) {
-      console.error('Error deleting category:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo eliminar la categoría",
-        variant: "destructive"
-      });
-    }
+    onUpdateCategories(categories.filter(cat => cat.id !== category.id));
+    toast({
+      title: "Categoría eliminada",
+      description: `La categoría "${category.name}" ha sido eliminada`
+    });
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {

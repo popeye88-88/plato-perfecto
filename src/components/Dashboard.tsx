@@ -1,16 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, DollarSign, ShoppingCart, Users, TrendingUp, Download } from 'lucide-react';
-import { format, startOfWeek, endOfWeek } from 'date-fns';
+import { CalendarIcon, DollarSign, ShoppingCart, Users, TrendingUp } from 'lucide-react';
+import { format, startOfWeek, endOfWeek, addDays } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart } from 'recharts';
-import { supabase } from '@/integrations/supabase/client';
-import { useBusinessContext } from '@/contexts/BusinessContext';
+import { Download } from 'lucide-react';
 
 interface DashboardFilters {
   dateRange: {
@@ -67,10 +67,6 @@ const mockOrderDetails: OrderDetail[] = [
 ];
 
 export default function Dashboard() {
-  const { currentBusiness, loading: businessLoading } = useBusinessContext();
-  
-  console.log('Dashboard render - businessLoading:', businessLoading, 'currentBusiness:', currentBusiness);
-  
   const [filters, setFilters] = useState<DashboardFilters>({
     dateRange: {
       from: startOfWeek(new Date(), { weekStartsOn: 1 }),
@@ -83,89 +79,30 @@ export default function Dashboard() {
 
   const [selectedPeriod, setSelectedPeriod] = useState<string | null>(null);
   const [detailData, setDetailData] = useState<ChartData | null>(null);
-  const [stats, setStats] = useState({
-    facturacion: 0,
-    pedidos: 0,
-    clientes: 0,
-    ordenPromedio: 0
-  });
-  const [topProducts, setTopProducts] = useState<Product[]>([]);
-  const [chartData, setChartData] = useState<ChartData[]>([]);
-
-  useEffect(() => {
-    if (currentBusiness) {
-      loadDashboardData();
-    }
-  }, [currentBusiness, filters]);
-
-  const loadDashboardData = async () => {
-    if (!currentBusiness) return;
-    
-    try {
-      
-      // Load orders for the selected period
-      let query = supabase
-        .from('orders')
-        .select('*, order_items(*)')
-        .eq('business_id', currentBusiness.id)
-        .gte('created_at', filters.dateRange.from.toISOString())
-        .lte('created_at', filters.dateRange.to.toISOString());
-      
-      if (filters.paymentMethod !== 'all') {
-        query = query.eq('payment_method', filters.paymentMethod);
-      }
-      
-      if (filters.serviceType !== 'all') {
-        query = query.eq('service_type', filters.serviceType);
-      }
-      
-      const { data: orders, error } = await query;
-      
-      if (error) throw error;
-      
-      // Calculate stats
-      const totalRevenue = orders?.reduce((sum, order) => sum + Number(order.total), 0) || 0;
-      const uniqueCustomers = new Set(orders?.map(o => o.customer_name)).size;
-      const avgOrder = orders && orders.length > 0 ? totalRevenue / orders.length : 0;
-      
-      setStats({
-        facturacion: totalRevenue,
-        pedidos: orders?.length || 0,
-        clientes: uniqueCustomers,
-        ordenPromedio: avgOrder
-      });
-      
-      // Calculate top products
-      const productSales: Record<string, { sold: number; revenue: number }> = {};
-      orders?.forEach(order => {
-        order.order_items?.forEach((item: any) => {
-          if (!productSales[item.name]) {
-            productSales[item.name] = { sold: 0, revenue: 0 };
-          }
-          productSales[item.name].sold += item.quantity;
-          productSales[item.name].revenue += Number(item.price) * item.quantity;
-        });
-      });
-      
-      const topProductsArray = Object.entries(productSales)
-        .map(([name, data]) => ({ name, ...data }))
-        .sort((a, b) => b.revenue - a.revenue)
-        .slice(0, 5);
-      
-      setTopProducts(topProductsArray);
-      
-    } catch (error) {
-      console.error('Error loading dashboard data:', error);
-    }
-  };
 
   const updateFilter = <K extends keyof DashboardFilters>(key: K, value: DashboardFilters[K]) => {
     setFilters(prev => ({ ...prev, [key]: value }));
   };
 
+  // Mock data - in real app this would be filtered based on the filters
+  const stats = {
+    facturacion: 4560,
+    pedidos: 204,
+    clientes: 187,
+    ordenPromedio: 22.35
+  };
+
+  const topProducts: Product[] = [
+    { name: 'Pizza Margherita', sold: 35, revenue: 525.00 },
+    { name: 'Hamburguesa Clásica', sold: 28, revenue: 350.00 },
+    { name: 'Pasta Carbonara', sold: 22, revenue: 308.00 },
+    { name: 'Ensalada César', sold: 18, revenue: 171.00 },
+    { name: 'Tacos de Pollo', sold: 15, revenue: 180.00 },
+  ];
+
   const handleChartClick = (data: any) => {
     if (data && data.activeLabel) {
-      const clickedData = chartData.find(item => item.name === data.activeLabel);
+      const clickedData = mockChartData.find(item => item.name === data.activeLabel);
       if (clickedData) {
         setSelectedPeriod(data.activeLabel);
         setDetailData(clickedData);
@@ -173,73 +110,33 @@ export default function Dashboard() {
     }
   };
 
-  const exportToCSV = async () => {
-    if (!currentBusiness) return;
-    
-    try {
-      const { data: orders, error } = await supabase
-        .from('orders')
-        .select('*, order_items(*)')
-        .eq('business_id', currentBusiness.id)
-        .gte('created_at', filters.dateRange.from.toISOString())
-        .lte('created_at', filters.dateRange.to.toISOString());
-      
-      if (error) throw error;
-      
-      const headers = ['Número Pedido', 'Fecha', 'Hora', 'Producto', 'Unidades', 'Cliente', 'Método Pago', 'Precio Unidad', 'Precio Total'];
-      const rows: string[][] = [];
-      
-      orders?.forEach(order => {
-        order.order_items?.forEach((item: any) => {
-          rows.push([
-            order.number,
-            format(new Date(order.created_at), 'yyyy-MM-dd'),
-            format(new Date(order.created_at), 'HH:mm'),
-            `"${item.name}"`,
-            item.quantity.toString(),
-            `"${order.customer_name}"`,
-            order.payment_method || '',
-            Number(item.price).toFixed(2),
-            (Number(item.price) * item.quantity).toFixed(2)
-          ]);
-        });
-      });
-      
-      const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', `orders_${format(new Date(), 'yyyy-MM-dd')}.csv`);
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    } catch (error) {
-      console.error('Error exporting CSV:', error);
-    }
+  const exportToCSV = () => {
+    const headers = ['Número Pedido', 'Fecha', 'Hora', 'Producto', 'Unidades', 'Cliente', 'Método Pago', 'Precio Unidad', 'Precio Total'];
+    const csvContent = [
+      headers.join(','),
+      ...mockOrderDetails.map(row => [
+        row.orderNumber,
+        row.date,
+        row.time,
+        `"${row.product}"`,
+        row.units,
+        `"${row.customerName}"`,
+        row.paymentMethod,
+        row.unitPrice.toFixed(2),
+        row.totalPrice.toFixed(2)
+      ].join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `orders_${format(new Date(), 'yyyy-MM-dd')}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
-
-  if (businessLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Cargando datos del dashboard...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!currentBusiness) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <p className="text-muted-foreground">No hay negocio seleccionado</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
@@ -426,21 +323,21 @@ export default function Dashboard() {
         </Card>
 
         <Card className="hover:shadow-lg transition-shadow">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
               Orden Promedio
-                </CardTitle>
+            </CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-foreground mb-1">
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-foreground mb-1">
               ${stats.ordenPromedio.toFixed(2)}
-                </div>
-                <p className="text-xs text-success">
+            </div>
+            <p className="text-xs text-success">
               +5% desde el período anterior
-                </p>
-              </CardContent>
-            </Card>
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Combined Chart */}
@@ -452,7 +349,7 @@ export default function Dashboard() {
           <CardContent>
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={chartData.length > 0 ? chartData : mockChartData} onClick={handleChartClick}>
+                <ComposedChart data={mockChartData} onClick={handleChartClick}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis dataKey="name" className="fill-muted-foreground" />
                   <YAxis yAxisId="left" className="fill-muted-foreground" />
@@ -494,7 +391,7 @@ export default function Dashboard() {
                     <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-semibold">
                       {index + 1}
                     </div>
-                  <div>
+                    <div>
                       <div className="font-medium text-foreground text-sm">{product.name}</div>
                       <div className="text-xs text-muted-foreground">{product.sold} vendidos</div>
                     </div>
@@ -540,14 +437,14 @@ export default function Dashboard() {
                 <div className="text-2xl font-bold text-primary">{detailData.puesto}</div>
                 <div className="text-sm text-muted-foreground">En Puesto</div>
               </div>
-                  <div>
+              <div>
                 <div className="text-2xl font-bold text-accent">{detailData.takeaway}</div>
                 <div className="text-sm text-muted-foreground">Take Away</div>
-                  </div>
+              </div>
               <div>
                 <div className="text-2xl font-bold text-muted-foreground">{detailData.delivery}</div>
                 <div className="text-sm text-muted-foreground">Delivery</div>
-                </div>
+              </div>
             </div>
           </CardContent>
         </Card>

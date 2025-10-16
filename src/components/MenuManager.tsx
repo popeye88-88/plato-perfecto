@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,8 +8,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Edit2, Trash2, Settings } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { useBusinessContext } from '@/contexts/BusinessContext';
 import CategoryManager from './CategoryManager';
 
 interface MenuItem {
@@ -28,12 +26,18 @@ interface Category {
 
 export default function MenuManager() {
   const { toast } = useToast();
-  const { currentBusiness, loading: businessLoading } = useBusinessContext();
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([
+    { id: '1', name: 'Pizza Margherita', price: 15.00, category: 'Pizzas', description: 'Tomate, mozzarella y albahaca fresca' },
+    { id: '2', name: 'Hamburguesa Clásica', price: 12.50, category: 'Hamburguesas', description: 'Carne, lechuga, tomate y queso' },
+    { id: '3', name: 'Pasta Carbonara', price: 14.00, category: 'Pastas', description: 'Pasta con panceta, huevo y parmesano' },
+  ]);
   
-  console.log('MenuManager render - businessLoading:', businessLoading, 'currentBusiness:', currentBusiness);
+  const [categories, setCategories] = useState<Category[]>([
+    { id: '1', name: 'Pizzas', productCount: 1 },
+    { id: '2', name: 'Hamburguesas', productCount: 1 },
+    { id: '3', name: 'Pastas', productCount: 1 },
+  ]);
   
-  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
@@ -45,62 +49,12 @@ export default function MenuManager() {
   });
   const [newCategoryName, setNewCategoryName] = useState('');
 
-  // Load menu items and categories
-  useEffect(() => {
-    if (currentBusiness) {
-      loadMenuItems();
-      loadCategories();
-    }
-  }, [currentBusiness]);
-
-  const loadMenuItems = async () => {
-    if (!currentBusiness) return;
-    
-    try {
-      const { data, error } = await supabase
-        .from('menu_items')
-        .select('*')
-        .eq('business_id', currentBusiness.id)
-        .order('name');
-      
-      if (error) throw error;
-      setMenuItems(data || []);
-    } catch (error) {
-      console.error('Error loading menu items:', error);
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar los productos",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const loadCategories = async () => {
-    if (!currentBusiness) return;
-    
-    try {
-      const { data, error } = await supabase
-        .from('categories')
-        .select('*')
-        .eq('business_id', currentBusiness.id)
-        .order('name');
-      
-      if (error) throw error;
-      
-      const categoriesWithCount = data?.map(cat => ({
-        ...cat,
-        productCount: menuItems.filter(item => item.category === cat.name).length
-      })) || [];
-      
-      setCategories(categoriesWithCount);
-    } catch (error) {
-      console.error('Error loading categories:', error);
-    }
-  };
-
-  const updateCategories = async () => {
-    await loadCategories();
-    await loadMenuItems();
+  const updateCategories = (newCategories: Category[]) => {
+    const updatedCategories = newCategories.map(cat => ({
+      ...cat,
+      productCount: menuItems.filter(item => item.category === cat.name).length
+    }));
+    setCategories(updatedCategories);
   };
 
   const handleCategoryChange = (value: string) => {
@@ -113,10 +67,8 @@ export default function MenuManager() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!currentBusiness) return;
     
     const categoryName = newCategoryName || formData.category;
     
@@ -129,66 +81,45 @@ export default function MenuManager() {
       return;
     }
 
-    try {
+    const newItem: MenuItem = {
+      id: editingItem?.id || Date.now().toString(),
+      name: formData.name,
+      price: parseFloat(formData.price),
+      category: categoryName,
+      description: formData.description
+    };
+
+    if (editingItem) {
+      setMenuItems(items => items.map(item => 
+        item.id === editingItem.id ? newItem : item
+      ));
+      toast({
+        title: "Producto actualizado",
+        description: "El producto ha sido actualizado correctamente"
+      });
+    } else {
+      setMenuItems(items => [...items, newItem]);
+      
       // Add new category if it doesn't exist
       if (newCategoryName && !categories.find(cat => cat.name === newCategoryName)) {
-        const { error: catError } = await supabase
-          .from('categories')
-          .insert({
-            business_id: currentBusiness.id,
-            name: newCategoryName
-          });
-        
-        if (catError) throw catError;
-        await loadCategories();
+        const newCategory: Category = {
+          id: Date.now().toString(),
+          name: newCategoryName,
+          productCount: 1
+        };
+        setCategories(prev => [...prev, newCategory]);
       }
-
-      const itemData = {
-        business_id: currentBusiness.id,
-        name: formData.name,
-        price: parseFloat(formData.price),
-        category: categoryName,
-        description: formData.description || null
-      };
-
-      if (editingItem) {
-        const { error } = await supabase
-          .from('menu_items')
-          .update(itemData)
-          .eq('id', editingItem.id);
-        
-        if (error) throw error;
-        
-        toast({
-          title: "Producto actualizado",
-          description: "El producto ha sido actualizado correctamente"
-        });
-      } else {
-        const { error } = await supabase
-          .from('menu_items')
-          .insert(itemData);
-        
-        if (error) throw error;
-        
-        toast({
-          title: "Producto agregado",
-          description: "El producto ha sido agregado al menú"
-        });
-      }
-
-      await loadMenuItems();
-      setFormData({ name: '', price: '', category: '', description: '' });
-      setNewCategoryName('');
-      setEditingItem(null);
-      setIsDialogOpen(false);
-    } catch (error) {
-      console.error('Error saving menu item:', error);
+      
       toast({
-        title: "Error",
-        description: "No se pudo guardar el producto",
-        variant: "destructive"
+        title: "Producto agregado",
+        description: "El producto ha sido agregado al menú"
       });
     }
+
+    setFormData({ name: '', price: '', category: '', description: '' });
+    setNewCategoryName('');
+    setEditingItem(null);
+    setIsDialogOpen(false);
   };
 
   const handleEdit = (item: MenuItem) => {
@@ -203,28 +134,12 @@ export default function MenuManager() {
     setIsDialogOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    try {
-      const { error } = await supabase
-        .from('menu_items')
-        .delete()
-        .eq('id', id);
-      
-      if (error) throw error;
-      
-      await loadMenuItems();
-      toast({
-        title: "Producto eliminado",
-        description: "El producto ha sido eliminado del menú"
-      });
-    } catch (error) {
-      console.error('Error deleting menu item:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo eliminar el producto",
-        variant: "destructive"
-      });
-    }
+  const handleDelete = (id: string) => {
+    setMenuItems(items => items.filter(item => item.id !== id));
+    toast({
+      title: "Producto eliminado",
+      description: "El producto ha sido eliminado del menú"
+    });
   };
 
   const openNewProductDialog = () => {
@@ -241,27 +156,6 @@ export default function MenuManager() {
     acc[item.category].push(item);
     return acc;
   }, {} as Record<string, MenuItem[]>);
-
-  if (businessLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Cargando menú...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!currentBusiness) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <p className="text-muted-foreground">No hay negocio seleccionado</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">

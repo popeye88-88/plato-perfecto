@@ -13,7 +13,6 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { useBusinessContext } from '@/contexts/BusinessContext';
 import PaymentDialog from './PaymentDialog';
 import NewOrderDialog from './NewOrderDialog';
 import EditOrderDialog from './EditOrderDialog';
@@ -56,7 +55,6 @@ const menuItems = [
 
 export default function OrderManager() {
   const { toast } = useToast();
-  const { currentBusiness, loading: businessLoading } = useBusinessContext();
   const [orders, setOrders] = useState<Order[]>([]);
   const [isNewOrderOpen, setIsNewOrderOpen] = useState(false);
   const [paymentDialog, setPaymentDialog] = useState<string | null>(null);
@@ -70,17 +68,14 @@ export default function OrderManager() {
     start: new Date().toISOString().split('T')[0],
     end: new Date().toISOString().split('T')[0]
   });
+  const [loading, setLoading] = useState(true);
 
   // Load orders from Supabase
   useEffect(() => {
-    if (currentBusiness) {
-      loadOrders();
-    }
-  }, [currentBusiness]);
+    loadOrders();
+  }, []);
 
   const loadOrders = async () => {
-    if (!currentBusiness) return;
-
     try {
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
@@ -88,7 +83,6 @@ export default function OrderManager() {
           *,
           order_items (*)
         `)
-        .eq('business_id', currentBusiness.id)
         .order('created_at', { ascending: false });
 
       if (ordersError) throw ordersError;
@@ -124,6 +118,8 @@ export default function OrderManager() {
         description: "No se pudieron cargar las órdenes",
         variant: "destructive"
       });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -173,8 +169,7 @@ export default function OrderManager() {
             price: item.menuItem.price,
             quantity: 1,
             status: 'preparando',
-            ingredients: item.customIngredients || null,
-            business_id: currentBusiness.id
+            ingredients: item.customIngredients || null
           });
         }
       }
@@ -213,13 +208,13 @@ export default function OrderManager() {
       if (itemError) throw itemError;
 
       // Update local state
-    setOrders(orders => 
-      orders.map(order => {
-        if (order.id === orderId) {
-          const updatedItems = order.items.map(item =>
-            item.id === itemId ? { ...item, status: newStatus } : item
-          );
-          
+      setOrders(orders => 
+        orders.map(order => {
+          if (order.id === orderId) {
+            const updatedItems = order.items.map(item =>
+              item.id === itemId ? { ...item, status: newStatus } : item
+            );
+            
             // Determine order status based on item states
             const getOrderStatus = (items: OrderItem[]): Order['status'] => {
               const activeItems = items.filter(item => !item.cancelled);
@@ -243,12 +238,12 @@ export default function OrderManager() {
               .update({ status: newOrderStatus })
               .eq('id', orderId)
               .then();
-          
-          return { ...order, items: updatedItems, status: newOrderStatus };
-        }
-        return order;
-      })
-    );
+            
+            return { ...order, items: updatedItems, status: newOrderStatus };
+          }
+          return order;
+        })
+      );
     } catch (error) {
       console.error('Error updating item status:', error);
       toast({
@@ -262,7 +257,7 @@ export default function OrderManager() {
 
   const processPayment = async (orderId: string, paymentMethod: 'efectivo' | 'tarjeta' | 'transferencia', removeDeliveryCharge: boolean = false) => {
     try {
-    const order = orders.find(o => o.id === orderId);
+      const order = orders.find(o => o.id === orderId);
       if (!order) return;
 
       const newTotal = removeDeliveryCharge && order.deliveryCharge 
@@ -367,8 +362,7 @@ export default function OrderManager() {
         .insert([{
           order_id: updatedOrder.id,
           edit_type: 'edit_items',
-          changes: JSON.stringify({ items: updatedOrder.items }),
-          business_id: currentBusiness?.id
+          changes: JSON.stringify({ items: updatedOrder.items })
         }]);
 
       // Reload orders
@@ -424,8 +418,7 @@ export default function OrderManager() {
             discounted_items: Array.from(discountItems),
             discount_amount: discountAmount,
             reason: discountReason
-          }),
-          business_id: currentBusiness?.id
+          })
         }]);
 
       await loadOrders();
@@ -538,15 +531,15 @@ export default function OrderManager() {
           <div className="grid grid-cols-3 items-center gap-2">
             <div className="font-semibold text-lg">{order.number}</div>
             <div className="flex justify-center">
-            <Badge className={statusConfig[order.status].color}>
-              {statusConfig[order.status].label}
-            </Badge>
+              <Badge className={statusConfig[order.status].color}>
+                {statusConfig[order.status].label}
+              </Badge>
             </div>
             <div className="flex justify-end gap-1">
               {order.edited && (
-            <Button 
+                <Button
                   variant="ghost"
-              size="sm" 
+                  size="sm"
                   onClick={() => {
                     setSelectedOrder(order);
                     setIsHistoryOpen(true);
@@ -559,13 +552,13 @@ export default function OrderManager() {
               )}
               {order.status !== 'pagado' && (
                 <Button
-              variant="ghost" 
+                  variant="ghost"
                   size="sm"
                   onClick={() => setEditOrderDialog(order.id)}
-              className="h-8 w-8 p-0"
-            >
+                  className="h-8 w-8 p-0"
+                >
                   <Edit2 className="h-4 w-4" />
-            </Button>
+                </Button>
               )}
             </div>
           </div>
@@ -631,21 +624,21 @@ export default function OrderManager() {
                     </span>
                   </div>
                   {showCheckbox && !item.cancelled && (
-                  <Checkbox
+                    <Checkbox
                       checked={isChecked}
                       disabled={!isEnabled}
-                    onCheckedChange={(checked) => {
+                      onCheckedChange={(checked) => {
                         if (checked && isEnabled) {
                           if (isPreparandoTab && item.status === 'preparando') {
-                        updateItemStatus(order.id, item.id, 'entregando');
+                            updateItemStatus(order.id, item.id, 'entregando');
                           } else if (isEntregandoTab && item.status === 'entregando') {
                             updateItemStatus(order.id, item.id, 'cobrando');
                           }
-                      }
-                    }}
-                    className="h-4 w-4"
-                  />
-                )}
+                        }
+                      }}
+                      className="h-4 w-4"
+                    />
+                  )}
                 </div>
               );
             })
@@ -654,14 +647,14 @@ export default function OrderManager() {
           {currentTab === 'resumen' && (
             <div className="text-xs text-muted-foreground pt-2">
               Preparando: {preparandoCount} | Entregando: {entregandoCount} | Cobrando: {cobrandoCount}
-          </div>
+            </div>
           )}
         </div>
         
         {/* Footer with total and actions */}
         <div className="flex items-center justify-between pt-2 border-t border-border">
           <div>
-          <span className="font-semibold">Total: ${order.total.toFixed(2)}</span>
+            <span className="font-semibold">Total: ${order.total.toFixed(2)}</span>
             {order.deliveryCharge && order.deliveryCharge > 0 && (
               <div className="text-xs text-muted-foreground">
                 (Inc. entrega: ${order.deliveryCharge.toFixed(2)})
@@ -701,27 +694,6 @@ export default function OrderManager() {
 
   const summary = getOrderSummary();
 
-  if (businessLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Cargando órdenes...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!currentBusiness) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <p className="text-muted-foreground">No hay negocio seleccionado</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -734,13 +706,13 @@ export default function OrderManager() {
           onClick={() => setIsNewOrderOpen(true)}
           className="bg-gradient-primary hover:opacity-90"
         >
-              <Plus className="h-4 w-4 mr-2" />
+          <Plus className="h-4 w-4 mr-2" />
           <span className="hidden sm:inline">Nueva Orden</span>
           <span className="sm:hidden">Nueva</span>
-            </Button>
+        </Button>
       </div>
 
-              <div>
+      <div>
         <Tabs defaultValue="resumen" className="w-full">
           <TabsList className="grid w-full grid-cols-5 text-xs sm:text-sm">
             <TabsTrigger value="resumen" className="px-2">
@@ -776,17 +748,17 @@ export default function OrderManager() {
               <div className="border border-border rounded-lg p-4 text-center">
                 <div className="font-semibold text-foreground">Preparando</div>
                 <div className="text-2xl font-bold mt-2">{summary.preparandoCount}</div>
-                </div>
+              </div>
               <div className="border border-border rounded-lg p-4 text-center">
                 <div className="font-semibold text-foreground">Entregando</div>
                 <div className="text-2xl font-bold mt-2">{summary.entregandoCount}</div>
-                      </div>
+              </div>
               <div className="border border-border rounded-lg p-4 text-center">
                 <div className="font-semibold text-foreground">Cobrando</div>
                 <div className="text-2xl font-bold mt-2">{summary.cobrandoCount}</div>
               </div>
-                </div>
-                
+            </div>
+            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {orders.filter(order => ['preparando', 'entregando', 'cobrando'].includes(order.status)).map(order => (
                 <OrderCard key={order.id} order={order} currentTab="resumen" />
@@ -795,8 +767,8 @@ export default function OrderManager() {
                 <div className="col-span-full text-center text-muted-foreground py-8">
                   No hay órdenes activas
                 </div>
-                          )}
-                        </div>
+              )}
+            </div>
           </TabsContent>
 
           <TabsContent value="preparando" className="space-y-4">
@@ -835,8 +807,8 @@ export default function OrderManager() {
                   No hay órdenes para cobrar
                 </div>
               )}
-              </div>
-        </TabsContent>
+            </div>
+          </TabsContent>
 
           <TabsContent value="pagado" className="space-y-4">
             <div className="flex gap-4 items-end mb-4">
@@ -871,9 +843,9 @@ export default function OrderManager() {
                   No hay órdenes pagadas en el rango seleccionado
                 </div>
               )}
-              </div>
-        </TabsContent>
-      </Tabs>
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
 
       <NewOrderDialog
