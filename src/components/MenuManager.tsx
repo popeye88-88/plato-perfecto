@@ -3,12 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Edit2, Trash2, Settings } from 'lucide-react';
+import { Plus, Edit2, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import CategoryManager from './CategoryManager';
 
 interface MenuItem {
   id: string;
@@ -18,28 +16,18 @@ interface MenuItem {
   description?: string;
 }
 
-interface Category {
-  id: string;
-  name: string;
-  productCount: number;
-}
-
 export default function MenuManager() {
   const { toast } = useToast();
   const [menuItems, setMenuItems] = useState<MenuItem[]>([
     { id: '1', name: 'Pizza Margherita', price: 15.00, category: 'Pizzas', description: 'Tomate, mozzarella y albahaca fresca' },
     { id: '2', name: 'Hamburguesa Clásica', price: 12.50, category: 'Hamburguesas', description: 'Carne, lechuga, tomate y queso' },
     { id: '3', name: 'Pasta Carbonara', price: 14.00, category: 'Pastas', description: 'Pasta con panceta, huevo y parmesano' },
+    { id: '4', name: 'Ensalada César', price: 10.00, category: 'Ensaladas', description: 'Lechuga, pollo, crutones y aderezo césar' },
   ]);
   
-  const [categories, setCategories] = useState<Category[]>([
-    { id: '1', name: 'Pizzas', productCount: 1 },
-    { id: '2', name: 'Hamburguesas', productCount: 1 },
-    { id: '3', name: 'Pastas', productCount: 1 },
-  ]);
+  const categories = ['Pizzas', 'Hamburguesas', 'Pastas', 'Ensaladas', 'Bebidas'];
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [formData, setFormData] = useState({
     name: '',
@@ -47,77 +35,58 @@ export default function MenuManager() {
     category: '',
     description: ''
   });
-  const [newCategoryName, setNewCategoryName] = useState('');
-
-  const updateCategories = (newCategories: Category[]) => {
-    const updatedCategories = newCategories.map(cat => ({
-      ...cat,
-      productCount: menuItems.filter(item => item.category === cat.name).length
-    }));
-    setCategories(updatedCategories);
-  };
-
-  const handleCategoryChange = (value: string) => {
-    if (value === 'nueva-categoria') {
-      setNewCategoryName('');
-      setFormData({...formData, category: ''});
-    } else {
-      setFormData({...formData, category: value});
-      setNewCategoryName('');
-    }
-  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    const categoryName = newCategoryName || formData.category;
-    
-    if (!formData.name || !formData.price || !categoryName) {
+    if (!formData.name || !formData.price || !formData.category) {
       toast({
         title: "Error",
         description: "Por favor completa todos los campos obligatorios",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
 
-    const newItem: MenuItem = {
-      id: editingItem?.id || Date.now().toString(),
-      name: formData.name,
-      price: parseFloat(formData.price),
-      category: categoryName,
-      description: formData.description
-    };
+    const price = parseFloat(formData.price);
+    if (isNaN(price) || price <= 0) {
+      toast({
+        title: "Error",
+        description: "El precio debe ser un número válido mayor a 0",
+        variant: "destructive",
+      });
+      return;
+    }
 
     if (editingItem) {
+      // Edit existing item
       setMenuItems(items => items.map(item => 
-        item.id === editingItem.id ? newItem : item
+        item.id === editingItem.id 
+          ? { ...item, ...formData, price }
+          : item
       ));
       toast({
         title: "Producto actualizado",
-        description: "El producto ha sido actualizado correctamente"
+        description: `${formData.name} ha sido actualizado exitosamente`,
       });
     } else {
+      // Add new item
+      const newItem: MenuItem = {
+        id: Date.now().toString(),
+        name: formData.name,
+        price,
+        category: formData.category,
+        description: formData.description
+      };
       setMenuItems(items => [...items, newItem]);
-      
-      // Add new category if it doesn't exist
-      if (newCategoryName && !categories.find(cat => cat.name === newCategoryName)) {
-        const newCategory: Category = {
-          id: Date.now().toString(),
-          name: newCategoryName,
-          productCount: 1
-        };
-        setCategories(prev => [...prev, newCategory]);
-      }
-      
       toast({
         title: "Producto agregado",
-        description: "El producto ha sido agregado al menú"
+        description: `${formData.name} ha sido agregado al menú`,
       });
     }
 
+    // Reset form
     setFormData({ name: '', price: '', category: '', description: '' });
-    setNewCategoryName('');
     setEditingItem(null);
     setIsDialogOpen(false);
   };
@@ -130,205 +99,182 @@ export default function MenuManager() {
       category: item.category,
       description: item.description || ''
     });
-    setNewCategoryName('');
     setIsDialogOpen(true);
   };
 
   const handleDelete = (id: string) => {
+    const item = menuItems.find(item => item.id === id);
     setMenuItems(items => items.filter(item => item.id !== id));
     toast({
       title: "Producto eliminado",
-      description: "El producto ha sido eliminado del menú"
+      description: `${item?.name} ha sido eliminado del menú`,
     });
   };
 
-  const openNewProductDialog = () => {
+  const handleAddNew = () => {
     setEditingItem(null);
     setFormData({ name: '', price: '', category: '', description: '' });
-    setNewCategoryName('');
     setIsDialogOpen(true);
   };
 
-  const groupedItems = menuItems.reduce((acc, item) => {
-    if (!acc[item.category]) {
-      acc[item.category] = [];
-    }
-    acc[item.category].push(item);
+  const groupedItems = categories.reduce((acc, category) => {
+    acc[category] = menuItems.filter(item => item.category === category);
     return acc;
   }, {} as Record<string, MenuItem[]>);
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-4">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Gestión de Menú</h1>
-          <p className="text-muted-foreground">Administra los productos de tu restaurante</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">
+            Gestión de Menú
+          </h1>
+          <p className="text-muted-foreground">
+            Administra los productos de tu restaurante
+          </p>
         </div>
         
-        <div className="flex gap-2 flex-wrap">
-          <Button 
-            onClick={openNewProductDialog}
-            className="bg-gradient-primary hover:opacity-90"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            <span className="hidden sm:inline">Agregar Producto</span>
-            <span className="sm:hidden">Producto</span>
-          </Button>
-          <Button 
-            variant="outline" 
-            onClick={() => setIsCategoryManagerOpen(true)}
-            className="flex items-center gap-2"
-          >
-            <Settings className="h-4 w-4" />
-            <span className="hidden sm:inline">Editar Categorías</span>
-            <span className="sm:hidden">Categorías</span>
-          </Button>
-        </div>
-      </div>
-        
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>
-              {editingItem ? 'Editar Producto' : 'Agregar Nuevo Producto'}
-            </DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <Label htmlFor="name">Nombre del Producto *</Label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) => setFormData({...formData, name: e.target.value})}
-                placeholder="Ej: Pizza Margherita"
-              />
-            </div>
-            <div>
-              <Label htmlFor="price">Precio *</Label>
-              <Input
-                id="price"
-                type="number"
-                step="0.01"
-                value={formData.price}
-                onChange={(e) => setFormData({...formData, price: e.target.value})}
-                placeholder="0.00"
-              />
-            </div>
-            <div>
-              <Label htmlFor="category">Categoría *</Label>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogTrigger asChild>
+            <Button onClick={handleAddNew} className="bg-gradient-primary hover:opacity-90">
+              <Plus className="h-4 w-4 mr-2" />
+              Agregar Producto
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>
+                {editingItem ? 'Editar Producto' : 'Agregar Producto'}
+              </DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Select 
-                  value={formData.category || (newCategoryName ? 'nueva-categoria' : '')} 
-                  onValueChange={handleCategoryChange}
-                >
-                  <SelectTrigger id="category">
+                <Label htmlFor="name">Nombre del Producto *</Label>
+                <Input
+                  id="name"
+                  value={formData.name}
+                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="Ej: Pizza Margherita"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="price">Precio *</Label>
+                <Input
+                  id="price"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.price}
+                  onChange={(e) => setFormData(prev => ({ ...prev, price: e.target.value }))}
+                  placeholder="Ej: 15.00"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="category">Categoría *</Label>
+                <Select value={formData.category} onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}>
+                  <SelectTrigger>
                     <SelectValue placeholder="Selecciona una categoría" />
                   </SelectTrigger>
                   <SelectContent>
-                    {categories.map(cat => (
-                      <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
+                    {categories.map(category => (
+                      <SelectItem key={category} value={category}>
+                        {category}
+                      </SelectItem>
                     ))}
-                    <SelectItem value="nueva-categoria">+ Nueva categoría</SelectItem>
                   </SelectContent>
                 </Select>
-                
-                {!formData.category && (
-                  <Input
-                    value={newCategoryName}
-                    onChange={(e) => setNewCategoryName(e.target.value)}
-                    placeholder="Nombre de la nueva categoría"
-                  />
-                )}
               </div>
-            </div>
-            <div>
-              <Label htmlFor="description">Descripción</Label>
-              <Input
-                id="description"
-                value={formData.description}
-                onChange={(e) => setFormData({...formData, description: e.target.value})}
-                placeholder="Descripción del producto"
-              />
-            </div>
-            <div className="flex gap-2 pt-4">
-              <Button type="submit" className="bg-gradient-primary hover:opacity-90 flex-1">
-                {editingItem ? 'Actualizar' : 'Agregar'}
-              </Button>
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={() => {
-                  setIsDialogOpen(false);
-                  setEditingItem(null);
-                  setFormData({ name: '', price: '', category: '', description: '' });
-                  setNewCategoryName('');
-                }}
-              >
-                Cancelar
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      <CategoryManager
-        open={isCategoryManagerOpen}
-        onOpenChange={setIsCategoryManagerOpen}
-        categories={categories}
-        onUpdateCategories={updateCategories}
-      />
+              
+              <div className="space-y-2">
+                <Label htmlFor="description">Descripción</Label>
+                <Input
+                  id="description"
+                  value={formData.description}
+                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Descripción del producto (opcional)"
+                />
+              </div>
+              
+              <div className="flex justify-end space-x-2">
+                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button type="submit">
+                  {editingItem ? 'Actualizar' : 'Agregar'}
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </div>
 
       {/* Menu Items by Category */}
       <div className="space-y-6">
-        {Object.entries(groupedItems).map(([category, items]) => (
-          <Card key={category}>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                {category}
-                <Badge variant="secondary">{items.length}</Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {items.map((item) => (
-                  <div key={item.id} className="flex items-center justify-between p-3 border border-border rounded-lg hover:shadow-md transition-shadow">
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between">
+        {categories.map(category => {
+          const items = groupedItems[category];
+          if (items.length === 0) return null;
+          
+          return (
+            <Card key={category}>
+              <CardHeader>
+                <CardTitle className="text-lg">{category}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {items.map(item => (
+                    <div key={item.id} className="border rounded-lg p-4 space-y-2">
+                      <div className="flex justify-between items-start">
                         <div>
-                          <h3 className="font-semibold text-foreground">{item.name}</h3>
-                          {item.description && (
-                            <p className="text-sm text-muted-foreground">{item.description}</p>
-                          )}
+                          <h3 className="font-medium">{item.name}</h3>
+                          <p className="text-sm text-muted-foreground">${item.price.toFixed(2)}</p>
                         </div>
-                        <div className="text-right">
-                          <p className="text-lg font-bold text-primary">${item.price.toFixed(2)}</p>
+                        <div className="flex space-x-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleEdit(item)}
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleDelete(item.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
+                      {item.description && (
+                        <p className="text-sm text-muted-foreground">{item.description}</p>
+                      )}
                     </div>
-                    <div className="flex gap-1 ml-4">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEdit(item)}
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDelete(item.id)}
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
+
+      {menuItems.length === 0 && (
+        <Card>
+          <CardContent className="text-center py-12">
+            <h3 className="text-lg font-semibold text-foreground mb-2">
+              No hay productos en el menú
+            </h3>
+            <p className="text-muted-foreground mb-6">
+              Agrega tu primer producto para comenzar
+            </p>
+            <Button onClick={handleAddNew}>
+              <Plus className="h-4 w-4 mr-2" />
+              Agregar Producto
+            </Button>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
