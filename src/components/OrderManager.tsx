@@ -391,65 +391,89 @@ export default function OrderManager() {
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {getOrdersByStatus('resumen').map((order) => (
-              <Card key={order.id}>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle className="text-lg">{order.number}</CardTitle>
-                      <p className="text-sm text-muted-foreground">
-                        Cliente: {order.customerName}
-                      </p>
+              <div key={order.id} className="p-3 md:p-4 border border-border rounded-lg space-y-3">
+                {/* Header */}
+                <div className="space-y-2">
+                  <div className="grid grid-cols-3 items-center gap-2">
+                    <div className="font-semibold text-lg">{order.number}</div>
+                    <div className="flex justify-center">
+                      <Badge className={getStatusColor(order.status)}>
+                        {order.status}
+                      </Badge>
                     </div>
-                    <Badge className={getStatusColor(order.status)}>
-                      {order.status}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {order.items.map((item) => (
-                      <div key={item.id} className="flex justify-between">
-                        <span>{item.name} x{item.quantity}</span>
-                        <span>${(item.price * item.quantity).toFixed(2)}</span>
-                      </div>
-                    ))}
-                    <div className="border-t pt-2 font-semibold">
-                      Total: ${order.total.toFixed(2)}
+                    <div className="text-right text-xs text-muted-foreground">
+                      {order.createdAt.toLocaleTimeString('es-ES', { 
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                      })}
                     </div>
                   </div>
-
-                  <div className="flex gap-2 mt-4">
+                  
+                  <div className="text-sm text-muted-foreground">
+                    Cliente: {order.customerName}
+                  </div>
+                </div>
+                
+                {/* Items */}
+                <div className="space-y-1">
+                  {order.items.map((item) => (
+                    <div key={item.id} className="flex justify-between text-sm py-1">
+                      <span>{item.name} x{item.quantity}</span>
+                      <span>${(item.price * item.quantity).toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Footer */}
+                <div className="flex items-center justify-between pt-2 border-t border-border">
+                  <div>
+                    <span className="font-semibold">Total: ${order.total.toFixed(2)}</span>
+                  </div>
+                  <div className="flex gap-2">
                     {order.status === 'preparando' && (
                       <Button 
                         size="sm" 
                         onClick={() => updateOrderStatus(order.id, 'entregando')}
+                        className="bg-gradient-primary hover:opacity-90"
                       >
-                        Marcar para Entregar
+                        Entregar
                       </Button>
                     )}
                     {order.status === 'entregando' && (
                       <Button 
                         size="sm" 
                         onClick={() => updateOrderStatus(order.id, 'cobrando')}
+                        className="bg-gradient-primary hover:opacity-90"
                       >
-                        Marcar para Cobrar
+                        Cobrar
                       </Button>
                     )}
                     {order.status === 'cobrando' && (
                       <Button 
                         size="sm" 
                         onClick={() => updateOrderStatus(order.id, 'pagado')}
+                        className="bg-gradient-primary hover:opacity-90"
                       >
-                        Marcar como Pagado
+                        Pagado
                       </Button>
                     )}
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             ))}
             {getOrdersByStatus('resumen').length === 0 && (
               <div className="col-span-full text-center text-muted-foreground py-8">
-                No hay órdenes activas
+                <Clock className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-foreground mb-2">
+                  No hay órdenes activas
+                </h3>
+                <p className="text-muted-foreground mb-6">
+                  Crea tu primera orden para comenzar
+                </p>
+                <Button onClick={() => setIsNewOrderDialogOpen(true)} className="bg-gradient-primary hover:opacity-90">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Crear Orden
+                </Button>
               </div>
             )}
           </div>
@@ -459,65 +483,87 @@ export default function OrderManager() {
           <TabsContent key={status} value={status} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {getOrdersByStatus(status).map((order) => (
-                <Card key={order.id}>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle className="text-lg">{order.number}</CardTitle>
-                        <p className="text-sm text-muted-foreground">
-                          Cliente: {order.customerName}
-                        </p>
+                <div key={order.id} className="p-3 md:p-4 border border-border rounded-lg space-y-3">
+                  {/* Header */}
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-3 items-center gap-2">
+                      <div className="font-semibold text-lg">{order.number}</div>
+                      <div className="flex justify-center">
+                        <Badge className={getStatusColor(order.status)}>
+                          {order.status}
+                        </Badge>
                       </div>
-                      <Badge className={getStatusColor(order.status)}>
-                        {order.status}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      {order.items.map((item) => (
-                        <div key={item.id} className="flex justify-between">
-                          <span>{item.name} x{item.quantity}</span>
-                          <span>${(item.price * item.quantity).toFixed(2)}</span>
-                        </div>
-                      ))}
-                      <div className="border-t pt-2 font-semibold">
-                        Total: ${order.total.toFixed(2)}
+                      <div className="text-right text-xs text-muted-foreground">
+                        {order.createdAt.toLocaleTimeString('es-ES', { 
+                          hour: '2-digit', 
+                          minute: '2-digit' 
+                        })}
                       </div>
                     </div>
                     
-                    <div className="flex gap-2 mt-4">
+                    <div className="text-sm text-muted-foreground">
+                      Cliente: {order.customerName}
+                    </div>
+                  </div>
+                  
+                  {/* Items */}
+                  <div className="space-y-1">
+                    {order.items.map((item) => (
+                      <div key={item.id} className="flex justify-between text-sm py-1">
+                        <span>{item.name} x{item.quantity}</span>
+                        <span>${(item.price * item.quantity).toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  {/* Footer */}
+                  <div className="flex items-center justify-between pt-2 border-t border-border">
+                    <div>
+                      <span className="font-semibold">Total: ${order.total.toFixed(2)}</span>
+                    </div>
+                    <div className="flex gap-2">
                       {order.status === 'preparando' && (
                         <Button 
                           size="sm" 
                           onClick={() => updateOrderStatus(order.id, 'entregando')}
+                          className="bg-gradient-primary hover:opacity-90"
                         >
-                          Marcar para Entregar
+                          Entregar
                         </Button>
                       )}
                       {order.status === 'entregando' && (
                         <Button 
                           size="sm" 
                           onClick={() => updateOrderStatus(order.id, 'cobrando')}
+                          className="bg-gradient-primary hover:opacity-90"
                         >
-                          Marcar para Cobrar
+                          Cobrar
                         </Button>
                       )}
                       {order.status === 'cobrando' && (
                         <Button 
                           size="sm" 
                           onClick={() => updateOrderStatus(order.id, 'pagado')}
+                          className="bg-gradient-primary hover:opacity-90"
                         >
-                          Marcar como Pagado
+                          Pagado
                         </Button>
                       )}
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               ))}
               {getOrdersByStatus(status).length === 0 && (
                 <div className="col-span-full text-center text-muted-foreground py-8">
-                  No hay órdenes {status}
+                  <div className="flex flex-col items-center">
+                    {getStatusIcon(status)}
+                    <h3 className="text-lg font-semibold text-foreground mb-2 mt-4">
+                      No hay órdenes {status}
+                    </h3>
+                    <p className="text-muted-foreground">
+                      Las órdenes aparecerán aquí cuando cambien a este estado
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
