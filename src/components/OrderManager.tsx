@@ -150,23 +150,23 @@ export default function OrderManager() {
 
     if (newOrderForm.selectedItems.length === 0) {
       toast({
-        title: "Error", 
+        title: "Error",
         description: "Por favor selecciona al menos un producto",
         variant: "destructive"
       });
       return;
     }
 
-    const newOrder: Order = {
-      id: Date.now().toString(),
+      const newOrder: Order = {
+        id: Date.now().toString(),
       number: `ORD-${orders.length + 1}`,
       customerName: newOrderForm.customerName,
       items: newOrderForm.selectedItems.map(item => ({
         ...item,
         status: 'preparando' as const
       })),
-      total: calculateTotal(),
-      status: 'preparando',
+        total: calculateTotal(),
+        status: 'preparando',
       createdAt: new Date()
     };
 
@@ -225,44 +225,45 @@ export default function OrderManager() {
               Nueva Orden
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Crear Nueva Orden</DialogTitle>
+              <DialogTitle className="text-xl font-bold text-foreground">Crear Nueva Orden</DialogTitle>
             </DialogHeader>
             
             <div className="space-y-6">
               {/* Customer Name */}
-              <div className="space-y-2">
-                <Label htmlFor="customerName">Nombre del Cliente</Label>
+              <div className="p-4 border border-border rounded-lg bg-card">
+                <Label htmlFor="customerName" className="text-sm font-medium text-foreground">Nombre del Cliente</Label>
                 <Input
                   id="customerName"
                   value={newOrderForm.customerName}
                   onChange={(e) => setNewOrderForm(prev => ({ ...prev, customerName: e.target.value }))}
                   placeholder="Ingresa el nombre del cliente"
+                  className="mt-2"
                 />
               </div>
 
               {/* Menu Items Selection */}
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Seleccionar Productos</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <h3 className="text-lg font-semibold text-foreground">Seleccionar Productos</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {menuItems.map((item) => (
-                    <Card key={item.id} className="p-4">
+                    <div key={item.id} className="p-3 border border-border rounded-lg bg-card hover:bg-muted/50 transition-colors">
                       <div className="flex justify-between items-center">
-                        <div>
-                          <h4 className="font-medium">{item.name}</h4>
-                          <p className="text-sm text-muted-foreground">{item.category}</p>
-                          <p className="font-semibold text-primary">${item.price.toFixed(2)}</p>
-                        </div>
+                        <div className="flex-1">
+                          <h4 className="font-medium text-foreground">{item.name}</h4>
+                          <p className="text-xs text-muted-foreground">{item.category}</p>
+                          <p className="font-semibold text-primary text-sm">${item.price.toFixed(2)}</p>
+                </div>
                         <Button
                           size="sm"
                           onClick={() => addItemToOrder(item)}
-                          className="bg-gradient-primary hover:opacity-90"
+                          className="bg-gradient-primary hover:opacity-90 h-8 w-8 p-0"
                         >
                           <Plus className="h-4 w-4" />
                         </Button>
                       </div>
-                    </Card>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -270,63 +271,68 @@ export default function OrderManager() {
               {/* Selected Items */}
               {newOrderForm.selectedItems.length > 0 && (
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Productos Seleccionados</h3>
+                  <h3 className="text-lg font-semibold text-foreground">Productos Seleccionados</h3>
                   <div className="space-y-2">
                     {newOrderForm.selectedItems.map((item) => (
-                      <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg">
-                        <div className="flex-1">
-                          <p className="font-medium">{item.name}</p>
-                          <p className="text-sm text-muted-foreground">${item.price.toFixed(2)} c/u</p>
+                      <div key={item.id} className="p-3 border border-border rounded-lg bg-card">
+                        <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                            <p className="font-medium text-foreground">{item.name}</p>
+                            <p className="text-xs text-muted-foreground">${item.price.toFixed(2)} c/u</p>
                         </div>
-                        <div className="flex items-center space-x-2">
-                          <Button
-                            size="sm"
+                          <div className="flex items-center space-x-2">
+                          <Button 
+                            size="sm" 
                             variant="outline"
                             onClick={() => updateItemQuantity(item.id, item.quantity - 1)}
+                              className="h-8 w-8 p-0"
                           >
                             -
                           </Button>
-                          <span className="w-8 text-center">{item.quantity}</span>
-                          <Button
-                            size="sm"
+                            <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
+                          <Button 
+                            size="sm" 
                             variant="outline"
                             onClick={() => updateItemQuantity(item.id, item.quantity + 1)}
+                              className="h-8 w-8 p-0"
                           >
                             +
                           </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => removeItemFromOrder(item.id)}
-                          >
-                            <X className="h-4 w-4" />
+                          <Button 
+                            size="sm" 
+                              variant="destructive"
+                              onClick={() => removeItemFromOrder(item.id)}
+                              className="h-8 w-8 p-0"
+                            >
+                              <X className="h-4 w-4" />
                           </Button>
+                          </div>
+                          <div className="ml-4 font-semibold text-foreground">
+                            ${(item.price * item.quantity).toFixed(2)}
+                          </div>
                         </div>
-                        <div className="ml-4 font-semibold">
-                          ${(item.price * item.quantity).toFixed(2)}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  
-                  {/* Total */}
-                  <div className="border-t pt-4">
-                    <div className="flex justify-between items-center text-lg font-semibold">
-                      <span>Total:</span>
-                      <span>${calculateTotal().toFixed(2)}</span>
                     </div>
+                  ))}
+                </div>
+                
+                  {/* Total */}
+                  <div className="p-4 border-t border-border bg-muted/30 rounded-lg">
+                    <div className="flex justify-between items-center text-lg font-semibold text-foreground">
+                    <span>Total:</span>
+                      <span className="text-primary">${calculateTotal().toFixed(2)}</span>
+                  </div>
                   </div>
                 </div>
               )}
 
               {/* Action Buttons */}
-              <div className="flex justify-end space-x-2">
-                <Button variant="outline" onClick={resetNewOrderForm}>
+              <div className="flex justify-end space-x-3 pt-4 border-t border-border">
+                <Button variant="outline" onClick={resetNewOrderForm} className="px-6">
                   Cancelar
                 </Button>
                 <Button 
                   onClick={createNewOrder}
-                  className="bg-gradient-primary hover:opacity-90"
+                  className="bg-gradient-primary hover:opacity-90 px-6"
                   disabled={!newOrderForm.customerName.trim() || newOrderForm.selectedItems.length === 0}
                 >
                   Crear Orden
@@ -378,12 +384,12 @@ export default function OrderManager() {
               </CardContent>
             </Card>
 
-            <Card>
+          <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Cobrando</CardTitle>
                 <DollarSign className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
+            </CardHeader>
+            <CardContent>
                 <div className="text-2xl font-bold">{getStatusCount('cobrando')}</div>
               </CardContent>
             </Card>
@@ -391,17 +397,17 @@ export default function OrderManager() {
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {getOrdersByStatus('resumen').map((order) => (
-              <div key={order.id} className="p-3 md:p-4 border border-border rounded-lg space-y-3">
+              <div key={order.id} className="p-4 border border-border rounded-lg bg-card hover:shadow-md transition-shadow space-y-3">
                 {/* Header */}
                 <div className="space-y-2">
                   <div className="grid grid-cols-3 items-center gap-2">
-                    <div className="font-semibold text-lg">{order.number}</div>
+                    <div className="font-bold text-lg text-foreground">{order.number}</div>
                     <div className="flex justify-center">
-                      <Badge className={getStatusColor(order.status)}>
+                      <Badge className={`${getStatusColor(order.status)} font-medium`}>
                         {order.status}
                       </Badge>
                     </div>
-                    <div className="text-right text-xs text-muted-foreground">
+                    <div className="text-right text-xs text-muted-foreground font-medium">
                       {order.createdAt.toLocaleTimeString('es-ES', { 
                         hour: '2-digit', 
                         minute: '2-digit' 
@@ -409,7 +415,7 @@ export default function OrderManager() {
                     </div>
                   </div>
                   
-                  <div className="text-sm text-muted-foreground">
+                  <div className="text-sm text-muted-foreground font-medium">
                     Cliente: {order.customerName}
                   </div>
                 </div>
@@ -417,24 +423,24 @@ export default function OrderManager() {
                 {/* Items */}
                 <div className="space-y-1">
                   {order.items.map((item) => (
-                    <div key={item.id} className="flex justify-between text-sm py-1">
-                      <span>{item.name} x{item.quantity}</span>
-                      <span>${(item.price * item.quantity).toFixed(2)}</span>
+                    <div key={item.id} className="flex justify-between text-sm py-1 px-2 bg-muted/30 rounded">
+                      <span className="font-medium text-foreground">{item.name} x{item.quantity}</span>
+                      <span className="font-semibold text-primary">${(item.price * item.quantity).toFixed(2)}</span>
                     </div>
                   ))}
                 </div>
                 
                 {/* Footer */}
-                <div className="flex items-center justify-between pt-2 border-t border-border">
+                <div className="flex items-center justify-between pt-3 border-t border-border">
                   <div>
-                    <span className="font-semibold">Total: ${order.total.toFixed(2)}</span>
+                    <span className="font-bold text-lg text-foreground">Total: ${order.total.toFixed(2)}</span>
                   </div>
                   <div className="flex gap-2">
                     {order.status === 'preparando' && (
                       <Button 
                         size="sm" 
                         onClick={() => updateOrderStatus(order.id, 'entregando')}
-                        className="bg-gradient-primary hover:opacity-90"
+                        className="bg-gradient-primary hover:opacity-90 font-medium"
                       >
                         Entregar
                       </Button>
@@ -443,7 +449,7 @@ export default function OrderManager() {
                       <Button 
                         size="sm" 
                         onClick={() => updateOrderStatus(order.id, 'cobrando')}
-                        className="bg-gradient-primary hover:opacity-90"
+                        className="bg-gradient-primary hover:opacity-90 font-medium"
                       >
                         Cobrar
                       </Button>
@@ -452,12 +458,12 @@ export default function OrderManager() {
                       <Button 
                         size="sm" 
                         onClick={() => updateOrderStatus(order.id, 'pagado')}
-                        className="bg-gradient-primary hover:opacity-90"
+                        className="bg-gradient-primary hover:opacity-90 font-medium"
                       >
                         Pagado
                       </Button>
                     )}
-                  </div>
+                </div>
                 </div>
               </div>
             ))}
@@ -483,17 +489,17 @@ export default function OrderManager() {
           <TabsContent key={status} value={status} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {getOrdersByStatus(status).map((order) => (
-                <div key={order.id} className="p-3 md:p-4 border border-border rounded-lg space-y-3">
+                <div key={order.id} className="p-4 border border-border rounded-lg bg-card hover:shadow-md transition-shadow space-y-3">
                   {/* Header */}
                   <div className="space-y-2">
                     <div className="grid grid-cols-3 items-center gap-2">
-                      <div className="font-semibold text-lg">{order.number}</div>
+                      <div className="font-bold text-lg text-foreground">{order.number}</div>
                       <div className="flex justify-center">
-                        <Badge className={getStatusColor(order.status)}>
+                        <Badge className={`${getStatusColor(order.status)} font-medium`}>
                           {order.status}
                         </Badge>
                       </div>
-                      <div className="text-right text-xs text-muted-foreground">
+                      <div className="text-right text-xs text-muted-foreground font-medium">
                         {order.createdAt.toLocaleTimeString('es-ES', { 
                           hour: '2-digit', 
                           minute: '2-digit' 
@@ -501,32 +507,32 @@ export default function OrderManager() {
                       </div>
                     </div>
                     
-                    <div className="text-sm text-muted-foreground">
+                    <div className="text-sm text-muted-foreground font-medium">
                       Cliente: {order.customerName}
                     </div>
-                  </div>
+              </div>
                   
                   {/* Items */}
                   <div className="space-y-1">
                     {order.items.map((item) => (
-                      <div key={item.id} className="flex justify-between text-sm py-1">
-                        <span>{item.name} x{item.quantity}</span>
-                        <span>${(item.price * item.quantity).toFixed(2)}</span>
+                      <div key={item.id} className="flex justify-between text-sm py-1 px-2 bg-muted/30 rounded">
+                        <span className="font-medium text-foreground">{item.name} x{item.quantity}</span>
+                        <span className="font-semibold text-primary">${(item.price * item.quantity).toFixed(2)}</span>
                       </div>
-                    ))}
-                  </div>
+                ))}
+              </div>
                   
                   {/* Footer */}
-                  <div className="flex items-center justify-between pt-2 border-t border-border">
+                  <div className="flex items-center justify-between pt-3 border-t border-border">
                     <div>
-                      <span className="font-semibold">Total: ${order.total.toFixed(2)}</span>
+                      <span className="font-bold text-lg text-foreground">Total: ${order.total.toFixed(2)}</span>
                     </div>
                     <div className="flex gap-2">
                       {order.status === 'preparando' && (
                         <Button 
                           size="sm" 
                           onClick={() => updateOrderStatus(order.id, 'entregando')}
-                          className="bg-gradient-primary hover:opacity-90"
+                          className="bg-gradient-primary hover:opacity-90 font-medium"
                         >
                           Entregar
                         </Button>
@@ -535,7 +541,7 @@ export default function OrderManager() {
                         <Button 
                           size="sm" 
                           onClick={() => updateOrderStatus(order.id, 'cobrando')}
-                          className="bg-gradient-primary hover:opacity-90"
+                          className="bg-gradient-primary hover:opacity-90 font-medium"
                         >
                           Cobrar
                         </Button>
@@ -544,7 +550,7 @@ export default function OrderManager() {
                         <Button 
                           size="sm" 
                           onClick={() => updateOrderStatus(order.id, 'pagado')}
-                          className="bg-gradient-primary hover:opacity-90"
+                          className="bg-gradient-primary hover:opacity-90 font-medium"
                         >
                           Pagado
                         </Button>
@@ -566,8 +572,8 @@ export default function OrderManager() {
                   </div>
                 </div>
               )}
-            </div>
-          </TabsContent>
+              </div>
+        </TabsContent>
         ))}
       </Tabs>
     </div>
