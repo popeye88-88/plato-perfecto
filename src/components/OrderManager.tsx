@@ -3,7 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Clock, Truck, DollarSign } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Plus, Clock, Truck, DollarSign, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface OrderItem {
@@ -35,6 +39,11 @@ export default function OrderManager() {
   const { toast } = useToast();
   const [orders, setOrders] = useState<Order[]>([]);
   const [activeTab, setActiveTab] = useState('resumen');
+  const [isNewOrderDialogOpen, setIsNewOrderDialogOpen] = useState(false);
+  const [newOrderForm, setNewOrderForm] = useState({
+    customerName: '',
+    selectedItems: [] as Array<{id: string, name: string, price: number, quantity: number}>
+  });
 
   // Load orders from localStorage (simple version)
   useEffect(() => {
@@ -88,32 +97,101 @@ export default function OrderManager() {
     }
   };
 
+  const addItemToOrder = (item: typeof menuItems[0]) => {
+    const existingItem = newOrderForm.selectedItems.find(i => i.id === item.id);
+    if (existingItem) {
+      setNewOrderForm(prev => ({
+        ...prev,
+        selectedItems: prev.selectedItems.map(i => 
+          i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
+        )
+      }));
+    } else {
+      setNewOrderForm(prev => ({
+        ...prev,
+        selectedItems: [...prev.selectedItems, { ...item, quantity: 1 }]
+      }));
+    }
+  };
+
+  const removeItemFromOrder = (itemId: string) => {
+    setNewOrderForm(prev => ({
+      ...prev,
+      selectedItems: prev.selectedItems.filter(item => item.id !== itemId)
+    }));
+  };
+
+  const updateItemQuantity = (itemId: string, quantity: number) => {
+    if (quantity <= 0) {
+      removeItemFromOrder(itemId);
+      return;
+    }
+    setNewOrderForm(prev => ({
+      ...prev,
+      selectedItems: prev.selectedItems.map(item => 
+        item.id === itemId ? { ...item, quantity } : item
+      )
+    }));
+  };
+
+  const calculateTotal = () => {
+    return newOrderForm.selectedItems.reduce((total, item) => total + (item.price * item.quantity), 0);
+  };
+
   const createNewOrder = () => {
+    if (!newOrderForm.customerName.trim()) {
+      toast({
+        title: "Error",
+        description: "Por favor ingresa el nombre del cliente",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (newOrderForm.selectedItems.length === 0) {
+      toast({
+        title: "Error",
+        description: "Por favor selecciona al menos un producto",
+        variant: "destructive"
+      });
+      return;
+    }
+
       const newOrder: Order = {
         id: Date.now().toString(),
       number: `ORD-${orders.length + 1}`,
-      customerName: 'Cliente',
-      items: [
-        {
-          id: '1',
-          name: 'Pizza Margherita',
-          price: 15.00,
-          quantity: 1,
-          status: 'preparando'
-        }
-      ],
-      total: 15.00,
+      customerName: newOrderForm.customerName,
+      items: newOrderForm.selectedItems.map(item => ({
+        ...item,
+        status: 'preparando' as const
+      })),
+        total: calculateTotal(),
         status: 'preparando',
       createdAt: new Date()
-      };
+    };
 
     const newOrders = [...orders, newOrder];
     saveOrders(newOrders);
-      
-      toast({
-        title: "Orden creada",
+    
+    // Reset form and close dialog
+    setNewOrderForm({
+      customerName: '',
+      selectedItems: []
+    });
+    setIsNewOrderDialogOpen(false);
+    
+    toast({
+      title: "Orden creada",
       description: `Orden ${newOrder.number} creada exitosamente`,
     });
+  };
+
+  const resetNewOrderForm = () => {
+    setNewOrderForm({
+      customerName: '',
+      selectedItems: []
+    });
+    setIsNewOrderDialogOpen(false);
   };
 
   const updateOrderStatus = (orderId: string, newStatus: Order['status']) => {
@@ -140,10 +218,123 @@ export default function OrderManager() {
           </p>
         </div>
         
-        <Button onClick={createNewOrder} className="bg-gradient-primary hover:opacity-90">
+        <Dialog open={isNewOrderDialogOpen} onOpenChange={setIsNewOrderDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="bg-gradient-primary hover:opacity-90">
               <Plus className="h-4 w-4 mr-2" />
               Nueva Orden
             </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Crear Nueva Orden</DialogTitle>
+            </DialogHeader>
+            
+            <div className="space-y-6">
+              {/* Customer Name */}
+              <div className="space-y-2">
+                <Label htmlFor="customerName">Nombre del Cliente</Label>
+                <Input
+                  id="customerName"
+                  value={newOrderForm.customerName}
+                  onChange={(e) => setNewOrderForm(prev => ({ ...prev, customerName: e.target.value }))}
+                  placeholder="Ingresa el nombre del cliente"
+                />
+                </div>
+
+              {/* Menu Items Selection */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Seleccionar Productos</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {menuItems.map((item) => (
+                    <Card key={item.id} className="p-4">
+                      <div className="flex justify-between items-center">
+                      <div>
+                          <h4 className="font-medium">{item.name}</h4>
+                          <p className="text-sm text-muted-foreground">{item.category}</p>
+                          <p className="font-semibold text-primary">${item.price.toFixed(2)}</p>
+                      </div>
+                        <Button
+                          size="sm"
+                          onClick={() => addItemToOrder(item)}
+                          className="bg-gradient-primary hover:opacity-90"
+                        >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+
+              {/* Selected Items */}
+              {newOrderForm.selectedItems.length > 0 && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Productos Seleccionados</h3>
+                  <div className="space-y-2">
+                    {newOrderForm.selectedItems.map((item) => (
+                      <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex-1">
+                          <p className="font-medium">{item.name}</p>
+                          <p className="text-sm text-muted-foreground">${item.price.toFixed(2)} c/u</p>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => updateItemQuantity(item.id, item.quantity - 1)}
+                          >
+                            -
+                          </Button>
+                          <span className="w-8 text-center">{item.quantity}</span>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => updateItemQuantity(item.id, item.quantity + 1)}
+                          >
+                            +
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="destructive"
+                            onClick={() => removeItemFromOrder(item.id)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <div className="ml-4 font-semibold">
+                          ${(item.price * item.quantity).toFixed(2)}
+                        </div>
+                    </div>
+                  ))}
+                </div>
+                
+                  {/* Total */}
+                  <div className="border-t pt-4">
+                    <div className="flex justify-between items-center text-lg font-semibold">
+                    <span>Total:</span>
+                    <span>${calculateTotal().toFixed(2)}</span>
+                  </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={resetNewOrderForm}>
+                  Cancelar
+                </Button>
+                <Button 
+                  onClick={createNewOrder}
+                  className="bg-gradient-primary hover:opacity-90"
+                  disabled={!newOrderForm.customerName.trim() || newOrderForm.selectedItems.length === 0}
+                >
+                  Crear Orden
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
@@ -187,12 +378,12 @@ export default function OrderManager() {
               </CardContent>
             </Card>
 
-            <Card>
+          <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Cobrando</CardTitle>
                 <DollarSign className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
+            </CardHeader>
+            <CardContent>
                 <div className="text-2xl font-bold">{getStatusCount('cobrando')}</div>
               </CardContent>
             </Card>
@@ -207,7 +398,7 @@ export default function OrderManager() {
               <p className="text-muted-foreground mb-6">
                 Crea tu primera orden para comenzar
               </p>
-              <Button onClick={createNewOrder}>
+              <Button onClick={() => setIsNewOrderDialogOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Crear Orden
               </Button>
@@ -227,7 +418,7 @@ export default function OrderManager() {
                       <Badge className={getStatusColor(order.status)}>
                         {order.status}
                       </Badge>
-                    </div>
+                </div>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2">
@@ -235,7 +426,7 @@ export default function OrderManager() {
                         <div key={item.id} className="flex justify-between">
                           <span>{item.name} x{item.quantity}</span>
                           <span>${(item.price * item.quantity).toFixed(2)}</span>
-                    </div>
+                </div>
                   ))}
                       <div className="border-t pt-2 font-semibold">
                         Total: ${order.total.toFixed(2)}
@@ -267,11 +458,11 @@ export default function OrderManager() {
                           Marcar como Pagado
                         </Button>
                       )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-                </div>
+              </div>
+            </CardContent>
+          </Card>
+                ))}
+              </div>
           )}
         </TabsContent>
 
@@ -291,7 +482,7 @@ export default function OrderManager() {
               <div className="space-y-4">
                 {getOrdersByStatus(status).map((order) => (
                   <Card key={order.id}>
-                    <CardHeader>
+            <CardHeader>
                       <div className="flex items-center justify-between">
                         <div>
                           <CardTitle className="text-lg">{order.number}</CardTitle>
@@ -303,8 +494,8 @@ export default function OrderManager() {
                           {order.status}
                         </Badge>
                       </div>
-                    </CardHeader>
-                    <CardContent>
+            </CardHeader>
+            <CardContent>
                       <div className="space-y-2">
                         {order.items.map((item) => (
                           <div key={item.id} className="flex justify-between">
