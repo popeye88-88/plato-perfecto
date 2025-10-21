@@ -154,78 +154,61 @@ export default function NewOrderDialog({ open, onOpenChange, onCreateOrder }: Ne
 
           {/* Menu Items */}
           <div>
-            <h3 className="text-lg font-semibold mb-4">Productos del Menú</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {menuItems.map((item) => (
-                <Card key={item.id} className="p-4">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <h4 className="font-medium">{item.name}</h4>
-                      <p className="text-sm text-muted-foreground">{item.category}</p>
-                      <p className="font-semibold text-primary">${item.price.toFixed(2)}</p>
+            <h3 className="text-lg font-semibold mb-4">Seleccionar Productos</h3>
+            <div className="space-y-2">
+              {menuItems.map((item) => {
+                const selectedItem = selectedItems.find(selected => selected.menuItem.id === item.id);
+                const quantity = selectedItem ? selectedItem.quantity : 0;
+                
+                return (
+                  <div key={item.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="font-medium text-base">{item.name}</h4>
+                          <p className="text-sm text-muted-foreground">{item.category}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-semibold text-primary text-lg">${item.price.toFixed(2)}</p>
+                        </div>
+                      </div>
                     </div>
-                    <Button
-                      size="sm"
-                      onClick={() => addItem(item)}
-                      className="bg-gradient-primary hover:opacity-90"
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
+                    
+                    <div className="flex items-center space-x-3 ml-4">
+                      {quantity > 0 && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => updateQuantity(item.id, quantity - 1)}
+                            className="h-8 w-8 p-0"
+                          >
+                            <Minus className="h-4 w-4" />
+                          </Button>
+                          <span className="w-8 text-center font-medium text-lg">{quantity}</span>
+                        </>
+                      )}
+                      <Button
+                        size="sm"
+                        onClick={() => addItem(item)}
+                        className="bg-gradient-primary hover:opacity-90 h-8 w-8 p-0"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
-                </Card>
-              ))}
+                );
+              })}
             </div>
           </div>
 
-          {/* Selected Items */}
+          {/* Total */}
           {selectedItems.length > 0 && (
-            <div>
-              <h3 className="text-lg font-semibold mb-4">Productos Seleccionados</h3>
-              <div className="space-y-2">
-                {selectedItems.map((item) => (
-                  <div key={item.menuItem.id} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="flex-1">
-                      <p className="font-medium">{item.menuItem.name}</p>
-                      <p className="text-sm text-muted-foreground">${item.menuItem.price.toFixed(2)} c/u</p>
-                      </div>
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => updateQuantity(item.menuItem.id, item.quantity - 1)}
-                      >
-                        <Minus className="h-4 w-4" />
-                      </Button>
-                      <span className="w-8 text-center">{item.quantity}</span>
-                            <Button
-                              size="sm"
-                        variant="outline"
-                        onClick={() => updateQuantity(item.menuItem.id, item.quantity + 1)}
-                      >
-                        <Plus className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="sm"
-                        variant="destructive"
-                        onClick={() => removeItem(item.menuItem.id)}
-                      >
-                        <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                    <div className="ml-4 font-semibold">
-                      ${(item.menuItem.price * item.quantity).toFixed(2)}
-                    </div>
-                  </div>
-                ))}
-          </div>
-
-              {/* Total */}
-              <div className="border-t pt-4 mt-4">
-                <div className="flex justify-between items-center text-lg font-semibold">
-                  <span>Total:</span>
-                  <span>${calculateTotal().toFixed(2)}</span>
-                </div>
-        </div>
+            <div className="border-t pt-4">
+              <div className="flex justify-between items-center text-xl font-bold">
+                <span>Total:</span>
+                <span className="text-primary">${calculateTotal().toFixed(2)}</span>
+              </div>
             </div>
           )}
 
