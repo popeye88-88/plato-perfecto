@@ -33,6 +33,7 @@ interface Order {
   edited?: boolean;
   discountAmount?: number;
   discountReason?: string;
+  paymentMethod?: 'tarjeta' | 'efectivo';
 }
 
 const menuItems = [
@@ -59,6 +60,9 @@ export default function OrderManager() {
   const [selectedOrderForDiscount, setSelectedOrderForDiscount] = useState<Order | null>(null);
   const [discountItems, setDiscountItems] = useState<Set<string>>(new Set());
   const [discountReason, setDiscountReason] = useState('');
+  const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+  const [selectedOrderForPayment, setSelectedOrderForPayment] = useState<Order | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<'tarjeta' | 'efectivo' | ''>('');
 
   // Load orders from localStorage (simple version)
   useEffect(() => {
@@ -87,11 +91,10 @@ export default function OrderManager() {
       return orders.filter(order => order.status !== 'pagado');
     }
     if (status === 'preparando') {
-      // Show orders that have at least one item in 'preparando' and no items in 'entregando' or 'cobrando'
+      // Show orders that have at least one item in 'preparando' status
       return orders.filter(order => {
         const activeItems = order.items.filter(item => !item.cancelled);
-        return activeItems.some(item => item.status === 'preparando') && 
-               !activeItems.some(item => item.status === 'entregando' || item.status === 'cobrando');
+        return activeItems.some(item => item.status === 'preparando');
       });
     }
     if (status === 'entregando') {
@@ -319,7 +322,7 @@ export default function OrderManager() {
             total: newTotal,
             edited: true
           }
-          : order
+        : order
     );
     
     saveOrders(updatedOrders);
@@ -331,6 +334,38 @@ export default function OrderManager() {
     toast({
       title: "Descuento aplicado",
       description: `Se aplicó un descuento de $${discountAmount.toFixed(2)}`
+    });
+  };
+
+  const processPayment = () => {
+    if (!selectedOrderForPayment || !paymentMethod) {
+      toast({
+        title: "Error",
+        description: "Debes seleccionar un método de pago",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const updatedOrders = orders.map(order => 
+      order.id === selectedOrderForPayment.id 
+        ? { 
+            ...order, 
+            status: 'pagado',
+            paymentMethod,
+            edited: true
+          }
+        : order
+    );
+    
+    saveOrders(updatedOrders);
+    setIsPaymentOpen(false);
+    setPaymentMethod('');
+    setSelectedOrderForPayment(null);
+    
+    toast({
+      title: "Pago procesado",
+      description: `Orden pagada con ${paymentMethod === 'tarjeta' ? 'tarjeta' : 'efectivo'}`
     });
   };
 
@@ -518,11 +553,14 @@ export default function OrderManager() {
                 </Button>
                 <Button 
                   size="sm" 
-                  onClick={() => updateOrderStatus(order.id, 'pagado')}
+                  onClick={() => {
+                    setSelectedOrderForPayment(order);
+                    setIsPaymentOpen(true);
+                  }}
                   className="bg-gradient-primary hover:opacity-90 font-medium"
                 >
                   <Check className="h-4 w-4 mr-1" />
-                  Pagado
+                  Cobrar
                 </Button>
               </>
             )}
@@ -833,6 +871,65 @@ export default function OrderManager() {
             <div className="flex justify-end">
               <Button variant="outline" onClick={() => setIsHistoryOpen(false)}>
                 Cerrar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Payment Dialog */}
+      <Dialog open={isPaymentOpen} onOpenChange={setIsPaymentOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Procesar Pago</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {selectedOrderForPayment && (
+              <div className="p-4 border border-border rounded-lg bg-card">
+                <h3 className="font-semibold text-foreground mb-2">Orden: {selectedOrderForPayment.number}</h3>
+                <p className="text-sm text-muted-foreground mb-2">Cliente: {selectedOrderForPayment.customerName}</p>
+                <div className="text-lg font-bold text-primary">
+                  Total: ${selectedOrderForPayment.total.toFixed(2)}
+                </div>
+                {selectedOrderForPayment.discountAmount && selectedOrderForPayment.discountAmount > 0 && (
+                  <div className="text-sm text-success-foreground">
+                    Descuento aplicado: -${selectedOrderForPayment.discountAmount.toFixed(2)}
+                  </div>
+                )}
+              </div>
+            )}
+            
+            <div>
+              <Label>Método de pago:</Label>
+              <div className="flex gap-4 mt-2">
+                <Button
+                  variant={paymentMethod === 'tarjeta' ? 'default' : 'outline'}
+                  onClick={() => setPaymentMethod('tarjeta')}
+                  className="flex-1"
+                >
+                  💳 Tarjeta
+                </Button>
+                <Button
+                  variant={paymentMethod === 'efectivo' ? 'default' : 'outline'}
+                  onClick={() => setPaymentMethod('efectivo')}
+                  className="flex-1"
+                >
+                  💵 Efectivo
+                </Button>
+              </div>
+            </div>
+            
+            <div className="flex justify-end space-x-2">
+              <Button variant="outline" onClick={() => setIsPaymentOpen(false)}>
+                Cancelar
+              </Button>
+              <Button 
+                onClick={processPayment} 
+                className="bg-gradient-primary hover:opacity-90"
+                disabled={!paymentMethod}
+              >
+                Procesar Pago
               </Button>
             </div>
           </div>
