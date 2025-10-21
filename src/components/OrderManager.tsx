@@ -93,18 +93,33 @@ export default function OrderManager() {
       return orders.filter(order => order.status !== 'pagado');
     }
     if (status === 'preparando') {
-      // Show orders that have at least one item in 'preparando' status
+      // Show orders that have at least one item in 'preparando' status OR have unprocessed individual items
       return orders.filter(order => {
         const activeItems = order.items.filter(item => !item.cancelled);
-        return activeItems.some(item => item.status === 'preparando');
+        return activeItems.some(item => {
+          if (item.status === 'preparando') {
+            // Check if there are any unprocessed individual items
+            const unprocessedCount = Array.from({ length: item.quantity }, (_, idx) => 
+              `${item.id}-${idx}`
+            ).filter(id => !order.individualItemsProcessed?.[id]).length;
+            return unprocessedCount > 0;
+          }
+          return false;
+        });
       });
     }
     if (status === 'entregando') {
-      // Show orders that have at least one item in 'entregando' or 'cobrando' but not ALL items are in 'cobrando'
+      // Show orders that have at least one processed individual item in 'preparando' OR items in 'entregando'/'cobrando'
       return orders.filter(order => {
         const activeItems = order.items.filter(item => !item.cancelled);
-        return (activeItems.some(item => item.status === 'entregando' || item.status === 'cobrando')) && 
-               !activeItems.every(item => item.status === 'cobrando');
+        return activeItems.some(item => {
+          // Check if there are processed individual items from 'preparando' stage
+          const processedCount = Array.from({ length: item.quantity }, (_, idx) => 
+            `${item.id}-${idx}`
+          ).filter(id => order.individualItemsProcessed?.[id]).length;
+          
+          return processedCount > 0 || item.status === 'entregando' || item.status === 'cobrando';
+        });
       });
     }
     if (status === 'cobrando') {
@@ -610,17 +625,25 @@ export default function OrderManager() {
                                     [individualItemId]: true
                                   };
                                   
-                                  // Update the main item status immediately when any individual item is processed
-                                  const updatedItems = o.items.map(i => {
-                                    if (i.id === item.id) {
-                                      if (isPreparandoTab) {
-                                        return { ...i, status: 'entregando' as const };
-                                      } else if (isEntregandoTab) {
-                                        return { ...i, status: 'cobrando' as const };
+                                  // Check if all individual items of this product are processed
+                                  const allItemsProcessed = Array.from({ length: item.quantity }, (_, idx) => 
+                                    `${item.id}-${idx}`
+                                  ).every(id => updatedIndividualItemsProcessed[id]);
+                                  
+                                  // Only update the main item status when ALL individual items are processed
+                                  let updatedItems = o.items;
+                                  if (allItemsProcessed) {
+                                    updatedItems = o.items.map(i => {
+                                      if (i.id === item.id) {
+                                        if (isPreparandoTab) {
+                                          return { ...i, status: 'entregando' as const };
+                                        } else if (isEntregandoTab) {
+                                          return { ...i, status: 'cobrando' as const };
+                                        }
                                       }
-                                    }
-                                    return i;
-                                  });
+                                      return i;
+                                    });
+                                  }
                                   
                                   return {
                                     ...o,
@@ -650,7 +673,10 @@ export default function OrderManager() {
                     <div className="flex items-center">
                       {!isCobrandoOrPagado && (
                         <span className="text-lg">
-                          {item.cancelled ? getStatusSymbol(item.cancelledInStage || 'preparando') : getStatusSymbol(item.status)}
+                          {item.cancelled ? getStatusSymbol(item.cancelledInStage || 'preparando') : 
+                           individualItemProcessed ? 
+                             (isPreparandoTab ? getStatusSymbol('entregando') : getStatusSymbol('cobrando')) :
+                             getStatusSymbol(item.status)}
                         </span>
                       )}
                     </div>
