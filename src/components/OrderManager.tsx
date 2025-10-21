@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Plus, Minus, Clock, Truck, DollarSign, X, Edit2, History, Percent, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useBusinessContext } from '@/contexts/BusinessContext';
 
 interface OrderItem {
   id: string;
@@ -38,15 +39,12 @@ interface Order {
   paymentMethod?: 'tarjeta' | 'efectivo';
 }
 
-const menuItems = [
-  { id: '1', name: 'Pizza Margherita', price: 15.00, category: 'Pizzas' },
-  { id: '2', name: 'Hamburguesa Clásica', price: 12.50, category: 'Hamburguesas' },
-  { id: '3', name: 'Pasta Carbonara', price: 14.00, category: 'Pastas' },
-  { id: '4', name: 'Ensalada César', price: 10.00, category: 'Ensaladas' },
-];
-
 export default function OrderManager() {
   const { toast } = useToast();
+  const { currentBusiness } = useBusinessContext();
+  
+  // Get menu items from current business
+  const menuItems = currentBusiness?.menuItems || [];
   const [orders, setOrders] = useState<Order[]>([]);
   const [activeTab, setActiveTab] = useState('resumen');
   const [isNewOrderDialogOpen, setIsNewOrderDialogOpen] = useState(false);
@@ -56,7 +54,6 @@ export default function OrderManager() {
     diners: 1,
     selectedItems: [] as Array<{id: string, name: string, price: number, quantity: number}>
   });
-  const [selectedOrderForEdit, setSelectedOrderForEdit] = useState<string | null>(null);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isDiscountOpen, setIsDiscountOpen] = useState(false);
   const [selectedOrderForDiscount, setSelectedOrderForDiscount] = useState<Order | null>(null);
@@ -355,7 +352,7 @@ export default function OrderManager() {
       order.id === selectedOrderForPayment.id 
         ? { 
             ...order, 
-            status: 'pagado',
+            status: 'pagado' as const,
             paymentMethod,
             edited: true
           }

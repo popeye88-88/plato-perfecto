@@ -1,16 +1,17 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, DollarSign, ShoppingCart, Users, TrendingUp } from 'lucide-react';
+import { CalendarIcon, DollarSign, ShoppingCart, Users, TrendingUp, Building2 } from 'lucide-react';
 import { format, startOfWeek, endOfWeek, addDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart } from 'recharts';
 import { Download } from 'lucide-react';
+import { useBusinessContext } from '@/contexts/BusinessContext';
 
 interface DashboardFilters {
   dateRange: {
@@ -67,6 +68,7 @@ const mockOrderDetails: OrderDetail[] = [
 ];
 
 export default function Dashboard() {
+  const { currentBusiness } = useBusinessContext();
   const [filters, setFilters] = useState<DashboardFilters>({
     dateRange: {
       from: startOfWeek(new Date(), { weekStartsOn: 1 }),
@@ -141,8 +143,15 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Dashboard</h1>
-        <p className="text-muted-foreground">Resumen del desempeño de tu restaurante</p>
+        <div className="flex items-center gap-3 mb-2">
+          <Building2 className="h-6 w-6 text-primary" />
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">
+            Dashboard - {currentBusiness?.name || 'Sin negocio seleccionado'}
+          </h1>
+        </div>
+        <p className="text-muted-foreground">
+          Resumen del desempeño de {currentBusiness?.name || 'tu restaurante'}
+        </p>
       </div>
 
       {/* Filters */}
