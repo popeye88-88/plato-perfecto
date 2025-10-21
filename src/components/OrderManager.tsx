@@ -93,8 +93,10 @@ export default function OrderManager() {
       return orders.filter(order => order.status !== 'pagado');
     }
     if (status === 'preparando') {
-      // Show orders that have at least one item in 'preparando' status OR have unprocessed individual items
+      // Show orders that have at least one item in 'preparando' status OR have unprocessed individual items AND order is not paid
       return orders.filter(order => {
+        if (order.status === 'pagado') return false;
+        
         const activeItems = order.items.filter(item => !item.cancelled);
         return activeItems.some(item => {
           if (item.status === 'preparando') {
@@ -109,8 +111,10 @@ export default function OrderManager() {
       });
     }
     if (status === 'entregando') {
-      // Show orders that have at least one processed individual item in 'preparando' OR items in 'entregando'/'cobrando'
+      // Show orders that have at least one processed individual item in 'preparando' OR items in 'entregando'/'cobrando' AND order is not paid
       return orders.filter(order => {
+        if (order.status === 'pagado') return false;
+        
         const activeItems = order.items.filter(item => !item.cancelled);
         return activeItems.some(item => {
           // Check if there are processed individual items from 'preparando' stage
@@ -123,10 +127,12 @@ export default function OrderManager() {
       });
     }
     if (status === 'cobrando') {
-      // Show orders where ALL items are in 'cobrando' status
+      // Show orders where ALL items are in 'cobrando' status AND order is not paid
       return orders.filter(order => {
         const activeItems = order.items.filter(item => !item.cancelled);
-        return activeItems.length > 0 && activeItems.every(item => item.status === 'cobrando');
+        return activeItems.length > 0 && 
+               activeItems.every(item => item.status === 'cobrando') &&
+               order.status !== 'pagado';
       });
     }
     return orders.filter(order => order.status === status);
