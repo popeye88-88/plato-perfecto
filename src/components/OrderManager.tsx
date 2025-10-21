@@ -17,6 +17,7 @@ interface OrderItem {
   price: number;
   quantity: number;
   status: 'preparando' | 'entregando' | 'cobrando';
+  cancelled?: boolean;
 }
 
 interface Order {
@@ -84,6 +85,29 @@ export default function OrderManager() {
   const getOrdersByStatus = (status: string) => {
     if (status === 'resumen') {
       return orders.filter(order => order.status !== 'pagado');
+    }
+    if (status === 'preparando') {
+      // Show orders that have at least one item in 'preparando' and no items in 'entregando' or 'cobrando'
+      return orders.filter(order => {
+        const activeItems = order.items.filter(item => !item.cancelled);
+        return activeItems.some(item => item.status === 'preparando') && 
+               !activeItems.some(item => item.status === 'entregando' || item.status === 'cobrando');
+      });
+    }
+    if (status === 'entregando') {
+      // Show orders that have at least one item in 'entregando' or 'cobrando' but not ALL items are in 'cobrando'
+      return orders.filter(order => {
+        const activeItems = order.items.filter(item => !item.cancelled);
+        return (activeItems.some(item => item.status === 'entregando' || item.status === 'cobrando')) && 
+               !activeItems.every(item => item.status === 'cobrando');
+      });
+    }
+    if (status === 'cobrando') {
+      // Show orders where ALL items are in 'cobrando' status
+      return orders.filter(order => {
+        const activeItems = order.items.filter(item => !item.cancelled);
+        return activeItems.length > 0 && activeItems.every(item => item.status === 'cobrando');
+      });
     }
     return orders.filter(order => order.status === status);
   };
@@ -236,13 +260,23 @@ export default function OrderManager() {
         
         // Determine order status based on item states
         const getOrderStatus = (items: OrderItem[]): Order['status'] => {
-          const hasPreparando = items.some(item => item.status === 'preparando');
-          const hasEntregando = items.some(item => item.status === 'entregando');
-          const hasCobrando = items.some(item => item.status === 'cobrando');
+          const activeItems = items.filter(item => !item.cancelled);
           
-          if (hasPreparando) return 'preparando';
-          if (hasEntregando) return 'entregando';
-          if (hasCobrando) return 'cobrando';
+          // If all items are in 'cobrando', order goes to 'cobrando'
+          if (activeItems.length > 0 && activeItems.every(item => item.status === 'cobrando')) {
+            return 'cobrando';
+          }
+          
+          // If any item is in 'entregando' or 'cobrando', order is in 'entregando'
+          if (activeItems.some(item => item.status === 'entregando' || item.status === 'cobrando')) {
+            return 'entregando';
+          }
+          
+          // If any item is in 'preparando', order is in 'preparando'
+          if (activeItems.some(item => item.status === 'preparando')) {
+            return 'preparando';
+          }
+          
           return 'pagado';
         };
         
