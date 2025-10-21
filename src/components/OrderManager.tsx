@@ -645,6 +645,9 @@ export default function OrderManager() {
                                     });
                                   }
                                   
+                                  // For individual item processing, we don't need to wait for all items of the same product
+                                  // The order will appear in 'entregando' tab based on individualItemsProcessed tracking
+                                  
                                   // Check if ALL individual items of the entire order are processed
                                   const allOrderItemsProcessed = o.items.every(orderItem => {
                                     if (orderItem.cancelled) return true; // Skip cancelled items
