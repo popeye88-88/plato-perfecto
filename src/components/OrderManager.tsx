@@ -18,6 +18,8 @@ interface OrderItem {
   quantity: number;
   status: 'preparando' | 'entregando' | 'cobrando';
   cancelled?: boolean;
+  cancelledAt?: Date;
+  cancelledInStage?: 'preparando' | 'entregando' | 'cobrando';
 }
 
 interface Order {
@@ -63,6 +65,8 @@ export default function OrderManager() {
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [selectedOrderForPayment, setSelectedOrderForPayment] = useState<Order | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'tarjeta' | 'efectivo' | ''>('');
+  const [isEditOrderOpen, setIsEditOrderOpen] = useState(false);
+  const [selectedOrderForEdit, setSelectedOrderForEdit] = useState<Order | null>(null);
 
   // Load orders from localStorage (simple version)
   useEffect(() => {
@@ -369,6 +373,76 @@ export default function OrderManager() {
     });
   };
 
+  const addItemToExistingOrder = (orderId: string, item: typeof menuItems[0]) => {
+    const updatedOrders = orders.map(order => {
+      if (order.id === orderId) {
+        const newItem: OrderItem = {
+          id: `${Date.now()}-${Math.random()}`,
+          name: item.name,
+          price: item.price,
+          quantity: 1,
+          status: 'preparando',
+          cancelled: false
+        };
+        
+        const updatedItems = [...order.items, newItem];
+        const newTotal = updatedItems
+          .filter(item => !item.cancelled)
+          .reduce((sum, item) => sum + (item.price * item.quantity), 0);
+        
+        return {
+          ...order,
+          items: updatedItems,
+          total: newTotal,
+          edited: true
+        };
+      }
+      return order;
+    });
+    
+    saveOrders(updatedOrders);
+    toast({
+      title: "Elemento añadido",
+      description: `${item.name} añadido a la orden`
+    });
+  };
+
+  const removeItemFromExistingOrder = (orderId: string, itemId: string, currentStage: string) => {
+    const updatedOrders = orders.map(order => {
+      if (order.id === orderId) {
+        const updatedItems = order.items.map(item => {
+          if (item.id === itemId) {
+            return {
+              ...item,
+              cancelled: true,
+              cancelledAt: new Date(),
+              cancelledInStage: currentStage as 'preparando' | 'entregando' | 'cobrando'
+            };
+          }
+          return item;
+        });
+        
+        const newTotal = updatedItems
+          .filter(item => !item.cancelled)
+          .reduce((sum, item) => sum + (item.price * item.quantity), 0);
+        
+        return {
+          ...order,
+          items: updatedItems,
+          total: newTotal,
+          edited: true
+        };
+      }
+      return order;
+    });
+    
+    saveOrders(updatedOrders);
+    toast({
+      title: "Elemento eliminado",
+      description: "Elemento marcado como eliminado"
+    });
+  };
+
   const getServiceTypeLabel = (serviceType: string) => {
     switch (serviceType) {
       case 'puesto': return 'En Puesto';
@@ -440,13 +514,16 @@ export default function OrderManager() {
               )}
               {order.status !== 'pagado' && (
                 <Button
-              variant="ghost" 
+                  variant="ghost"
                   size="sm"
-                  onClick={() => setSelectedOrderForEdit(order.id)}
-              className="h-8 w-8 p-0"
-            >
+                  onClick={() => {
+                    setSelectedOrderForEdit(order);
+                    setIsEditOrderOpen(true);
+                  }}
+                  className="h-8 w-8 p-0"
+                >
                   <Edit2 className="h-4 w-4" />
-            </Button>
+                </Button>
               )}
             </div>
           </div>
@@ -488,10 +565,10 @@ export default function OrderManager() {
               let isChecked = false;
               
               if (isPreparandoTab) {
-                isEnabled = item.status === 'preparando';
+                isEnabled = item.status === 'preparando' && !item.cancelled;
                 isChecked = item.status !== 'preparando';
               } else if (isEntregandoTab) {
-                isEnabled = item.status === 'entregando';
+                isEnabled = item.status === 'entregando' && !item.cancelled;
                 isChecked = item.status === 'cobrando';
               } else if (currentTab === 'resumen') {
                 showCheckbox = false;
@@ -499,28 +576,32 @@ export default function OrderManager() {
               
               return (
                 <div key={`${item.id}-${itemIndex}`} className="flex items-center justify-between text-sm py-1">
-                  <div className={`flex items-center gap-2 flex-1 ${!isEnabled && showCheckbox ? 'text-muted-foreground' : ''}`}>
+                  <div className={`flex items-center gap-2 flex-1 ${item.cancelled ? 'line-through text-muted-foreground' : (!isEnabled && showCheckbox ? 'text-muted-foreground' : '')}`}>
                     {!isCobrandoOrPagado && (
-                      <span className="text-lg">{getStatusSymbol(item.status)}</span>
+                      <span className="text-lg">
+                        {item.cancelled ? getStatusSymbol(item.cancelledInStage || 'preparando') : getStatusSymbol(item.status)}
+                      </span>
                     )}
-                    <span className="font-medium text-foreground">{item.name}</span>
+                    <span className={`font-medium ${item.cancelled ? 'text-muted-foreground' : 'text-foreground'}`}>
+                      {item.name}
+                    </span>
                   </div>
-                  {showCheckbox && (
-                  <Checkbox
+                  {showCheckbox && !item.cancelled && (
+                    <Checkbox
                       checked={isChecked}
                       disabled={!isEnabled}
-                    onCheckedChange={(checked) => {
+                      onCheckedChange={(checked) => {
                         if (checked && isEnabled) {
                           if (isPreparandoTab && item.status === 'preparando') {
-                        updateItemStatus(order.id, item.id, 'entregando');
+                            updateItemStatus(order.id, item.id, 'entregando');
                           } else if (isEntregandoTab && item.status === 'entregando') {
                             updateItemStatus(order.id, item.id, 'cobrando');
                           }
-                      }
-                    }}
-                    className="h-4 w-4"
-                  />
-                )}
+                        }
+                      }}
+                      className="h-4 w-4"
+                    />
+                  )}
                 </div>
               );
             })
@@ -930,6 +1011,93 @@ export default function OrderManager() {
                 disabled={!paymentMethod}
               >
                 Procesar Pago
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Order Dialog */}
+      <Dialog open={isEditOrderOpen} onOpenChange={setIsEditOrderOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Editar Orden - {selectedOrderForEdit?.number}</DialogTitle>
+          </DialogHeader>
+          
+          <div className="flex-1 overflow-y-auto space-y-6 pr-2">
+            {selectedOrderForEdit && (
+              <>
+                {/* Current Items */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-foreground">Elementos Actuales</h3>
+                  <div className="space-y-2">
+                    {selectedOrderForEdit.items.map((item, index) => (
+                      <div key={item.id} className="flex items-center justify-between p-3 border border-border rounded-lg bg-card">
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg">{getStatusSymbol(item.status)}</span>
+                          <div className={`${item.cancelled ? 'line-through text-muted-foreground' : ''}`}>
+                            <span className="font-medium">{item.name}</span>
+                            <span className="text-sm text-muted-foreground ml-2">x{item.quantity}</span>
+                          </div>
+                          {item.cancelled && (
+                            <Badge variant="secondary" className="text-xs">
+                              Eliminado en {item.cancelledInStage}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-primary">
+                            ${(item.price * item.quantity).toFixed(2)}
+                          </span>
+                          {!item.cancelled && (
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => removeItemFromExistingOrder(selectedOrderForEdit.id, item.id, activeTab)}
+                              className="h-8 w-8 p-0"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Add New Items */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-foreground">Añadir Elementos</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {menuItems.map((item) => (
+                      <div key={item.id} className="p-3 border border-border rounded-lg bg-card hover:bg-muted/50 transition-colors">
+                        <div className="flex justify-between items-center">
+                          <div className="flex-1">
+                            <h4 className="font-medium text-foreground">{item.name}</h4>
+                            <p className="text-xs text-muted-foreground">{item.category}</p>
+                            <p className="font-semibold text-primary text-sm">${item.price.toFixed(2)}</p>
+                          </div>
+                          <Button
+                            size="sm"
+                            onClick={() => addItemToExistingOrder(selectedOrderForEdit.id, item)}
+                            className="bg-gradient-primary hover:opacity-90 h-8 w-8 p-0"
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Fixed Footer */}
+          <div className="border-t border-border pt-4 mt-4">
+            <div className="flex justify-end">
+              <Button variant="outline" onClick={() => setIsEditOrderOpen(false)} className="px-6">
+                Cerrar
               </Button>
             </div>
           </div>
