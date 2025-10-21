@@ -630,7 +630,7 @@ export default function OrderManager() {
                                     `${item.id}-${idx}`
                                   ).every(id => updatedIndividualItemsProcessed[id]);
                                   
-                                  // Only update the main item status when ALL individual items are processed
+                                  // Update the main item status when ALL individual items are processed
                                   let updatedItems = o.items;
                                   if (allItemsProcessed) {
                                     updatedItems = o.items.map(i => {
@@ -645,8 +645,28 @@ export default function OrderManager() {
                                     });
                                   }
                                   
+                                  // Check if ALL individual items of the entire order are processed
+                                  const allOrderItemsProcessed = o.items.every(orderItem => {
+                                    if (orderItem.cancelled) return true; // Skip cancelled items
+                                    return Array.from({ length: orderItem.quantity }, (_, idx) => 
+                                      `${orderItem.id}-${idx}`
+                                    ).every(id => updatedIndividualItemsProcessed[id]);
+                                  });
+                                  
+                                  // If all order items are processed, move order to 'cobrando'
+                                  let updatedOrderStatus = o.status;
+                                  if (allOrderItemsProcessed && o.status !== 'pagado') {
+                                    updatedOrderStatus = 'cobrando';
+                                    // Update all items to 'cobrando' status
+                                    updatedItems = updatedItems.map(i => ({
+                                      ...i,
+                                      status: 'cobrando' as const
+                                    }));
+                                  }
+                                  
                                   return {
                                     ...o,
+                                    status: updatedOrderStatus,
                                     items: updatedItems,
                                     individualItemsProcessed: updatedIndividualItemsProcessed
                                   };
