@@ -610,25 +610,17 @@ export default function OrderManager() {
                                     [individualItemId]: true
                                   };
                                   
-                                  // Check if all individual items of this product are processed
-                                  const allItemsProcessed = Array.from({ length: item.quantity }, (_, idx) => 
-                                    `${item.id}-${idx}`
-                                  ).every(id => updatedIndividualItemsProcessed[id]);
-                                  
-                                  // If all items are processed, update the main item status
-                                  let updatedItems = o.items;
-                                  if (allItemsProcessed) {
-                                    updatedItems = o.items.map(i => {
-                                      if (i.id === item.id) {
-                                        if (isPreparandoTab) {
-                                          return { ...i, status: 'entregando' as const };
-                                        } else if (isEntregandoTab) {
-                                          return { ...i, status: 'cobrando' as const };
-                                        }
+                                  // Update the main item status immediately when any individual item is processed
+                                  const updatedItems = o.items.map(i => {
+                                    if (i.id === item.id) {
+                                      if (isPreparandoTab) {
+                                        return { ...i, status: 'entregando' as const };
+                                      } else if (isEntregandoTab) {
+                                        return { ...i, status: 'cobrando' as const };
                                       }
-                                      return i;
-                                    });
-                                  }
+                                    }
+                                    return i;
+                                  });
                                   
                                   return {
                                     ...o,
