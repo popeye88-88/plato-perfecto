@@ -39,103 +39,97 @@ export const useBusinessContext = () => {
 export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentBusiness, setCurrentBusiness] = useState<Business | null>(null);
   const [businesses, setBusinesses] = useState<Business[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
-  // Load businesses from localStorage
+  // Initialize with default business if none exist
   useEffect(() => {
     const savedBusinesses = localStorage.getItem('businesses');
     const savedCurrentBusiness = localStorage.getItem('currentBusiness');
     
     if (savedBusinesses) {
       try {
-        const parsedBusinesses = JSON.parse(savedBusinesses).map((business: any) => ({
-          ...business,
-          createdAt: new Date(business.createdAt)
-        }));
+        const parsedBusinesses = JSON.parse(savedBusinesses);
         setBusinesses(parsedBusinesses);
         
-        // Set current business if saved
         if (savedCurrentBusiness) {
           const parsedCurrentBusiness = JSON.parse(savedCurrentBusiness);
-          const foundBusiness = parsedBusinesses.find((b: Business) => b.id === parsedCurrentBusiness.id);
-          if (foundBusiness) {
-            setCurrentBusiness(foundBusiness);
-          }
+          setCurrentBusiness(parsedCurrentBusiness);
+        } else if (parsedBusinesses.length > 0) {
+          setCurrentBusiness(parsedBusinesses[0]);
         }
       } catch (error) {
         console.error('Error parsing saved businesses:', error);
+        // Create default business
+        const defaultBusiness: Business = {
+          id: 'default-1',
+          name: 'Mi Restaurante',
+          createdAt: new Date(),
+          menuItems: [
+            { id: '1', name: 'Pizza Margherita', price: 15.00, category: 'Pizzas', description: 'Tomate, mozzarella y albahaca fresca' },
+            { id: '2', name: 'Hamburguesa Clásica', price: 12.50, category: 'Hamburguesas', description: 'Carne, lechuga, tomate y queso' },
+            { id: '3', name: 'Pasta Carbonara', price: 14.00, category: 'Pastas', description: 'Pasta con panceta, huevo y parmesano' },
+          ]
+        };
+        setBusinesses([defaultBusiness]);
+        setCurrentBusiness(defaultBusiness);
+        localStorage.setItem('businesses', JSON.stringify([defaultBusiness]));
+        localStorage.setItem('currentBusiness', JSON.stringify(defaultBusiness));
       }
     } else {
-      // Create default business if none exist
+      // Create default business
       const defaultBusiness: Business = {
-        id: 'default-business',
+        id: 'default-1',
         name: 'Mi Restaurante',
-        description: 'Negocio principal',
         createdAt: new Date(),
         menuItems: [
-          { id: '1', name: 'Pizza Margherita', price: 15.00, category: 'Pizzas' },
-          { id: '2', name: 'Hamburguesa Clásica', price: 12.50, category: 'Hamburguesas' },
-          { id: '3', name: 'Pasta Carbonara', price: 14.00, category: 'Pastas' },
-          { id: '4', name: 'Ensalada César', price: 10.00, category: 'Ensaladas' },
+          { id: '1', name: 'Pizza Margherita', price: 15.00, category: 'Pizzas', description: 'Tomate, mozzarella y albahaca fresca' },
+          { id: '2', name: 'Hamburguesa Clásica', price: 12.50, category: 'Hamburguesas', description: 'Carne, lechuga, tomate y queso' },
+          { id: '3', name: 'Pasta Carbonara', price: 14.00, category: 'Pastas', description: 'Pasta con panceta, huevo y parmesano' },
         ]
       };
-      
       setBusinesses([defaultBusiness]);
       setCurrentBusiness(defaultBusiness);
       localStorage.setItem('businesses', JSON.stringify([defaultBusiness]));
       localStorage.setItem('currentBusiness', JSON.stringify(defaultBusiness));
     }
-    
-    setLoading(false);
   }, []);
 
-  // Save current business to localStorage when it changes
-  useEffect(() => {
-    if (currentBusiness) {
-      localStorage.setItem('currentBusiness', JSON.stringify(currentBusiness));
-    }
-  }, [currentBusiness]);
-
-  // Save businesses to localStorage when they change
-  useEffect(() => {
-    if (businesses.length > 0) {
-      localStorage.setItem('businesses', JSON.stringify(businesses));
-    }
-  }, [businesses]);
-
-  const addBusiness = (businessData: Omit<Business, 'id' | 'createdAt'>) => {
+  const addBusiness = (business: Omit<Business, 'id' | 'createdAt'>) => {
     const newBusiness: Business = {
-      ...businessData,
-      id: `business-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      createdAt: new Date()
+      ...business,
+      id: `business-${Date.now()}`,
+      createdAt: new Date(),
     };
-    
-    setBusinesses(prev => [...prev, newBusiness]);
-    return newBusiness;
+    const updatedBusinesses = [...businesses, newBusiness];
+    setBusinesses(updatedBusinesses);
+    localStorage.setItem('businesses', JSON.stringify(updatedBusinesses));
   };
 
   const updateBusiness = (id: string, updates: Partial<Business>) => {
-    setBusinesses(prev => prev.map(business => 
+    const updatedBusinesses = businesses.map(business =>
       business.id === id ? { ...business, ...updates } : business
-    ));
+    );
+    setBusinesses(updatedBusinesses);
+    localStorage.setItem('businesses', JSON.stringify(updatedBusinesses));
     
-    // Update current business if it's the one being updated
     if (currentBusiness?.id === id) {
-      setCurrentBusiness(prev => prev ? { ...prev, ...updates } : null);
+      const updatedCurrentBusiness = { ...currentBusiness, ...updates };
+      setCurrentBusiness(updatedCurrentBusiness);
+      localStorage.setItem('currentBusiness', JSON.stringify(updatedCurrentBusiness));
     }
   };
 
   const deleteBusiness = (id: string) => {
-    setBusinesses(prev => prev.filter(business => business.id !== id));
+    if (businesses.length <= 1) return; // Don't delete the last business
     
-    // If current business is deleted, switch to first available business
+    const updatedBusinesses = businesses.filter(business => business.id !== id);
+    setBusinesses(updatedBusinesses);
+    localStorage.setItem('businesses', JSON.stringify(updatedBusinesses));
+    
     if (currentBusiness?.id === id) {
-      const remainingBusinesses = businesses.filter(business => business.id !== id);
-      if (remainingBusinesses.length > 0) {
-        setCurrentBusiness(remainingBusinesses[0]);
-      } else {
-        setCurrentBusiness(null);
-      }
+      const newCurrentBusiness = updatedBusinesses[0];
+      setCurrentBusiness(newCurrentBusiness);
+      localStorage.setItem('currentBusiness', JSON.stringify(newCurrentBusiness));
     }
   };
 
@@ -146,7 +140,7 @@ export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     addBusiness,
     updateBusiness,
     deleteBusiness,
-    loading
+    loading,
   };
 
   return (
