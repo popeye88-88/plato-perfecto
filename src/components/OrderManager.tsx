@@ -257,11 +257,11 @@ export default function OrderManager() {
 
   const updateItemStatus = (orderId: string, itemId: string, newStatus: OrderItem['status']) => {
     const updatedOrders = orders.map(order => {
-      if (order.id === orderId) {
-        const updatedItems = order.items.map(item =>
-          item.id === itemId ? { ...item, status: newStatus } : item
-        );
-        
+        if (order.id === orderId) {
+          const updatedItems = order.items.map(item =>
+            item.id === itemId ? { ...item, status: newStatus } : item
+          );
+          
         // Determine order status based on item states
         const getOrderStatus = (items: OrderItem[]): Order['status'] => {
           const activeItems = items.filter(item => !item.cancelled);
@@ -316,14 +316,14 @@ export default function OrderManager() {
 
     const updatedOrders = orders.map(order => 
       order.id === selectedOrderForDiscount.id 
-        ? { 
-            ...order, 
+            ? { 
+                ...order, 
             discountAmount, 
             discountReason, 
             total: newTotal,
             edited: true
-          }
-        : order
+              }
+            : order
     );
     
     saveOrders(updatedOrders);
@@ -331,8 +331,8 @@ export default function OrderManager() {
     setDiscountItems(new Set());
     setDiscountReason('');
     setSelectedOrderForDiscount(null);
-    
-    toast({
+      
+      toast({
       title: "Descuento aplicado",
       description: `Se aplicó un descuento de $${discountAmount.toFixed(2)}`
     });
@@ -422,8 +422,8 @@ export default function OrderManager() {
         const newTotal = updatedItems
           .filter(item => !item.cancelled)
           .reduce((sum, item) => sum + (item.price * item.quantity), 0);
-        
-        return {
+    
+    return {
           ...order,
           items: updatedItems,
           total: newTotal,
@@ -495,7 +495,7 @@ export default function OrderManager() {
             <div className="flex justify-center">
               <Badge className={`${getStatusColor(order.status)} font-medium`}>
                 {order.status}
-              </Badge>
+            </Badge>
           </div>
             <div className="flex justify-end gap-1">
               {order.edited && (
@@ -511,20 +511,20 @@ export default function OrderManager() {
               )}
               {order.status !== 'pagado' && (
                 <Button
-                  variant="ghost"
+              variant="ghost" 
                   size="sm"
                   onClick={() => {
                     setSelectedOrderForEdit(order);
                     setIsEditOrderOpen(true);
                   }}
-                  className="h-8 w-8 p-0"
-                >
+              className="h-8 w-8 p-0"
+            >
                   <Edit2 className="h-4 w-4" />
-                </Button>
+            </Button>
               )}
-            </div>
           </div>
-          
+        </div>
+        
           {/* Second row: Name-diners | Service type | Date and time */}
           <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
             <div className="font-medium">
@@ -552,8 +552,8 @@ export default function OrderManager() {
               </div>
             ))
           ) : (
-            // Individual items for Preparando and Entregando
-            order.items.map((item, itemIndex) => {
+            // Individual items for Preparando and Entregando - one line per item
+            order.items.flatMap((item, itemIndex) => {
               const isPreparandoTab = currentTab === 'preparando';
               const isEntregandoTab = currentTab === 'entregando';
               
@@ -571,36 +571,46 @@ export default function OrderManager() {
                 showCheckbox = false;
               }
               
-              return (
-                <div key={`${item.id}-${itemIndex}`} className="flex items-center justify-between text-sm py-1">
-                  <div className={`flex items-center gap-2 flex-1 ${item.cancelled ? 'line-through text-muted-foreground' : (!isEnabled && showCheckbox ? 'text-muted-foreground' : '')}`}>
+              // Create one line per individual item (not grouped)
+              return Array.from({ length: item.quantity }, (_, quantityIndex) => (
+                <div key={`${item.id}-${itemIndex}-${quantityIndex}`} className="flex items-center justify-between text-sm py-2 border-b border-border/50 last:border-b-0">
+                  {/* Left column - Check mark */}
+                  <div className="flex items-center">
+                    {showCheckbox && !item.cancelled && (
+                  <Checkbox
+                        checked={isChecked}
+                        disabled={!isEnabled}
+                    onCheckedChange={(checked) => {
+                          if (checked && isEnabled) {
+                            if (isPreparandoTab && item.status === 'preparando') {
+                        updateItemStatus(order.id, item.id, 'entregando');
+                            } else if (isEntregandoTab && item.status === 'entregando') {
+                              updateItemStatus(order.id, item.id, 'cobrando');
+                            }
+                      }
+                    }}
+                    className="h-4 w-4"
+                  />
+                )}
+                  </div>
+                  
+                  {/* Center column - Item name */}
+                  <div className={`flex-1 px-3 ${item.cancelled ? 'line-through text-muted-foreground' : (!isEnabled && showCheckbox ? 'text-muted-foreground' : 'text-foreground')}`}>
+                    <span className={`font-medium ${item.cancelled ? 'text-muted-foreground' : 'text-foreground'}`}>
+                      {item.name}
+                </span>
+              </div>
+                  
+                  {/* Right column - Status symbol */}
+                  <div className="flex items-center">
                     {!isCobrandoOrPagado && (
                       <span className="text-lg">
                         {item.cancelled ? getStatusSymbol(item.cancelledInStage || 'preparando') : getStatusSymbol(item.status)}
                       </span>
                     )}
-                    <span className={`font-medium ${item.cancelled ? 'text-muted-foreground' : 'text-foreground'}`}>
-                      {item.name}
-                    </span>
-                  </div>
-                  {showCheckbox && !item.cancelled && (
-                    <Checkbox
-                      checked={isChecked}
-                      disabled={!isEnabled}
-                      onCheckedChange={(checked) => {
-                        if (checked && isEnabled) {
-                          if (isPreparandoTab && item.status === 'preparando') {
-                            updateItemStatus(order.id, item.id, 'entregando');
-                          } else if (isEntregandoTab && item.status === 'entregando') {
-                            updateItemStatus(order.id, item.id, 'cobrando');
-                          }
-                        }
-                      }}
-                      className="h-4 w-4"
-                    />
-                  )}
+          </div>
                 </div>
-              );
+              ));
             })
           )}
         </div>
@@ -712,8 +722,8 @@ export default function OrderManager() {
                     className="mt-2"
                   />
                 </div>
-              </div>
-
+                </div>
+                
               {/* Menu Items Selection */}
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold text-foreground">Seleccionar Productos</h3>
@@ -751,8 +761,8 @@ export default function OrderManager() {
                           >
                               <Plus className="h-4 w-4" />
                           </Button>
-                          </div>
                         </div>
+                    </div>
                     </div>
                     );
                   })}
@@ -870,11 +880,11 @@ export default function OrderManager() {
                     <p className="text-muted-foreground">
                       Las órdenes aparecerán aquí cuando cambien a este estado
                     </p>
-                  </div>
+              </div>
                 </div>
               )}
             </div>
-          </TabsContent>
+        </TabsContent>
         ))}
       </Tabs>
 
