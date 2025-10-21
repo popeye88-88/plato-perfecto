@@ -37,6 +37,7 @@ interface Order {
   discountAmount?: number;
   discountReason?: string;
   paymentMethod?: 'tarjeta' | 'efectivo';
+  individualItemsProcessed?: Record<string, boolean>;
 }
 
 export default function OrderManager() {
@@ -572,45 +573,98 @@ export default function OrderManager() {
               }
               
               // Create one line per individual item (not grouped)
-              return Array.from({ length: item.quantity }, (_, quantityIndex) => (
-                <div key={`${item.id}-${itemIndex}-${quantityIndex}`} className="flex items-center justify-between text-sm py-2 border-b border-border/50 last:border-b-0">
-                  {/* Left column - Check mark */}
-                  <div className="flex items-center">
-                    {showCheckbox && !item.cancelled && (
-                  <Checkbox
-                        checked={isChecked}
-                        disabled={!isEnabled}
-                    onCheckedChange={(checked) => {
-                          if (checked && isEnabled) {
-                            if (isPreparandoTab && item.status === 'preparando') {
-                        updateItemStatus(order.id, item.id, 'entregando');
-                            } else if (isEntregandoTab && item.status === 'entregando') {
-                              updateItemStatus(order.id, item.id, 'cobrando');
+              return Array.from({ length: item.quantity }, (_, quantityIndex) => {
+                // Create unique ID for each individual item
+                const individualItemId = `${item.id}-${quantityIndex}`;
+                
+                // Check if this individual item has been processed
+                const individualItemProcessed = order.individualItemsProcessed?.[individualItemId] || false;
+                
+                // Determine if this individual item should be enabled for checking
+                let individualItemEnabled = false;
+                let individualItemChecked = false;
+                
+                if (isPreparandoTab) {
+                  individualItemEnabled = item.status === 'preparando' && !item.cancelled && !individualItemProcessed;
+                  individualItemChecked = individualItemProcessed;
+                } else if (isEntregandoTab) {
+                  individualItemEnabled = item.status === 'entregando' && !item.cancelled && !individualItemProcessed;
+                  individualItemChecked = individualItemProcessed;
+                }
+                
+                return (
+                  <div key={individualItemId} className="flex items-center justify-between text-sm py-2 border-b border-border/50 last:border-b-0">
+                    {/* Left column - Check mark */}
+                    <div className="flex items-center">
+                      {showCheckbox && !item.cancelled && (
+                        <Checkbox
+                          checked={individualItemChecked}
+                          disabled={!individualItemEnabled}
+                          onCheckedChange={(checked) => {
+                            if (checked && individualItemEnabled) {
+                              // Mark this individual item as processed
+                              const updatedOrders = orders.map(o => {
+                                if (o.id === order.id) {
+                                  const updatedIndividualItemsProcessed = {
+                                    ...o.individualItemsProcessed,
+                                    [individualItemId]: true
+                                  };
+                                  
+                                  // Check if all individual items of this product are processed
+                                  const allItemsProcessed = Array.from({ length: item.quantity }, (_, idx) => 
+                                    `${item.id}-${idx}`
+                                  ).every(id => updatedIndividualItemsProcessed[id]);
+                                  
+                                  // If all items are processed, update the main item status
+                                  let updatedItems = o.items;
+                                  if (allItemsProcessed) {
+                                    updatedItems = o.items.map(i => {
+                                      if (i.id === item.id) {
+                                        if (isPreparandoTab) {
+                                          return { ...i, status: 'entregando' as const };
+                                        } else if (isEntregandoTab) {
+                                          return { ...i, status: 'cobrando' as const };
+                                        }
+                                      }
+                                      return i;
+                                    });
+                                  }
+                                  
+                                  return {
+                                    ...o,
+                                    items: updatedItems,
+                                    individualItemsProcessed: updatedIndividualItemsProcessed
+                                  };
+                                }
+                                return o;
+                              });
+                              
+                              saveOrders(updatedOrders);
                             }
-                      }
-                    }}
-                    className="h-4 w-4"
-                  />
-                )}
-                  </div>
-                  
-                  {/* Center column - Item name */}
-                  <div className={`flex-1 px-3 ${item.cancelled ? 'line-through text-muted-foreground' : (!isEnabled && showCheckbox ? 'text-muted-foreground' : 'text-foreground')}`}>
-                    <span className={`font-medium ${item.cancelled ? 'text-muted-foreground' : 'text-foreground'}`}>
-                      {item.name}
-                </span>
-              </div>
-                  
-                  {/* Right column - Status symbol */}
-                  <div className="flex items-center">
-                    {!isCobrandoOrPagado && (
-                      <span className="text-lg">
-                        {item.cancelled ? getStatusSymbol(item.cancelledInStage || 'preparando') : getStatusSymbol(item.status)}
+                          }}
+                          className="h-4 w-4"
+                        />
+                      )}
+                    </div>
+                    
+                    {/* Center column - Item name */}
+                    <div className={`flex-1 px-3 ${item.cancelled ? 'line-through text-muted-foreground' : (!individualItemEnabled && showCheckbox ? 'text-muted-foreground' : 'text-foreground')}`}>
+                      <span className={`font-medium ${item.cancelled ? 'text-muted-foreground' : 'text-foreground'}`}>
+                        {item.name}
                       </span>
-                    )}
-          </div>
-                </div>
-              ));
+                    </div>
+                    
+                    {/* Right column - Status symbol */}
+                    <div className="flex items-center">
+                      {!isCobrandoOrPagado && (
+                        <span className="text-lg">
+                          {item.cancelled ? getStatusSymbol(item.cancelledInStage || 'preparando') : getStatusSymbol(item.status)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              });
             })
           )}
         </div>
