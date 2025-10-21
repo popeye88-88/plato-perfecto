@@ -95,14 +95,14 @@ export default function NewOrderDialog({ open, onOpenChange, onCreateOrder }: Ne
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto w-[95vw] md:w-full">
         <DialogHeader>
           <DialogTitle>Nueva Orden</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6">
           {/* Customer Info */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
             <div>
               <Label htmlFor="customerName">Nombre del Cliente</Label>
               <Input
@@ -213,7 +213,7 @@ export default function NewOrderDialog({ open, onOpenChange, onCreateOrder }: Ne
           )}
 
           {/* Action Buttons */}
-          <div className="flex justify-end space-x-2">
+          <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>

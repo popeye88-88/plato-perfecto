@@ -143,13 +143,13 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       <div>
-        <div className="flex items-center gap-3 mb-2">
-          <Building2 className="h-6 w-6 text-primary" />
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">
+        <div className="flex items-center gap-2 md:gap-3 mb-2">
+          <Building2 className="h-5 w-5 md:h-6 md:w-6 text-primary" />
+          <h1 className="text-lg md:text-2xl lg:text-3xl font-bold text-foreground">
             Dashboard - {currentBusiness?.name || 'Sin negocio seleccionado'}
           </h1>
         </div>
-        <p className="text-muted-foreground">
+        <p className="text-sm md:text-base text-muted-foreground">
           Resumen del desempeño de {currentBusiness?.name || 'tu restaurante'}
         </p>
       </div>
@@ -279,7 +279,7 @@ export default function Dashboard() {
       </Card>
 
       {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 grid-cols-2 md:grid-cols-2 lg:grid-cols-4">
         <Card className="hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">

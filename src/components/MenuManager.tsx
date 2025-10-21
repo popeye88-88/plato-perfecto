@@ -159,10 +159,10 @@ export default function MenuManager() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Gestión de Menú</h1>
-          <p className="text-muted-foreground">Administra los productos de tu restaurante</p>
+          <h1 className="text-lg md:text-2xl lg:text-3xl font-bold text-foreground mb-2">Gestión de Menú</h1>
+          <p className="text-sm md:text-base text-muted-foreground">Administra los productos de tu restaurante</p>
         </div>
         
         <div className="flex gap-2 flex-wrap">
