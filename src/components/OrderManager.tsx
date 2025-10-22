@@ -37,7 +37,7 @@ interface Order {
   discountAmount?: number;
   discountReason?: string;
   paymentMethod?: 'tarjeta' | 'efectivo';
-  individualItemsProcessed?: Record<string, boolean>;
+  individualItemsStatus?: Record<string, 'preparando' | 'entregando' | 'entregado'>;
 }
 
 export default function OrderManager() {
@@ -88,51 +88,71 @@ export default function OrderManager() {
     localStorage.setItem('orders', JSON.stringify(newOrders));
   };
 
+  // Clear all orders for testing
+  const clearAllOrders = () => {
+    setOrders([]);
+    localStorage.removeItem('orders');
+    toast({
+      title: "Órdenes eliminadas",
+      description: "Todas las órdenes han sido eliminadas para testing",
+    });
+  };
+
   const getOrdersByStatus = (status: string) => {
     if (status === 'resumen') {
       return orders.filter(order => order.status !== 'pagado');
     }
     if (status === 'preparando') {
-      // Show orders that have at least one item in 'preparando' status OR have unprocessed individual items AND order is not paid
+      // Show orders that have at least one individual item in 'preparando' status AND order is not paid
       return orders.filter(order => {
         if (order.status === 'pagado') return false;
         
         const activeItems = order.items.filter(item => !item.cancelled);
         return activeItems.some(item => {
-          if (item.status === 'preparando') {
-            // Check if there are any unprocessed individual items
-            const unprocessedCount = Array.from({ length: item.quantity }, (_, idx) => 
-              `${item.id}-${idx}`
-            ).filter(id => !order.individualItemsProcessed?.[id]).length;
-            return unprocessedCount > 0;
-          }
-          return false;
+          // Check if there are any individual items still in 'preparando' status
+          return Array.from({ length: item.quantity }, (_, idx) => 
+            `${item.id}-${idx}`
+          ).some(id => {
+            const individualStatus = order.individualItemsStatus?.[id];
+            return !individualStatus || individualStatus === 'preparando';
+          });
         });
       });
     }
     if (status === 'entregando') {
-      // Show orders that have at least one processed individual item in 'preparando' OR items in 'entregando'/'cobrando' AND order is not paid
+      // Show orders that have at least one individual item in 'entregando' status AND order is not paid
       return orders.filter(order => {
         if (order.status === 'pagado') return false;
         
         const activeItems = order.items.filter(item => !item.cancelled);
         return activeItems.some(item => {
-          // Check if there are processed individual items from 'preparando' stage
-          const processedCount = Array.from({ length: item.quantity }, (_, idx) => 
+          // Check if there are any individual items in 'entregando' status
+          return Array.from({ length: item.quantity }, (_, idx) => 
             `${item.id}-${idx}`
-          ).filter(id => order.individualItemsProcessed?.[id]).length;
-          
-          return processedCount > 0 || item.status === 'entregando' || item.status === 'cobrando';
+          ).some(id => {
+            const individualStatus = order.individualItemsStatus?.[id];
+            return individualStatus === 'entregando';
+          });
         });
       });
     }
     if (status === 'cobrando') {
-      // Show orders where ALL items are in 'cobrando' status AND order is not paid
+      // Show orders where ALL individual items are 'entregado' AND order is not paid
       return orders.filter(order => {
+        if (order.status === 'pagado') return false;
+        
         const activeItems = order.items.filter(item => !item.cancelled);
-        return activeItems.length > 0 && 
-               activeItems.every(item => item.status === 'cobrando') &&
-               order.status !== 'pagado';
+        if (activeItems.length === 0) return false;
+        
+        // Check if ALL individual items are 'entregado'
+        return activeItems.every(item => {
+          return Array.from({ length: item.quantity }, (_, idx) => 
+            `${item.id}-${idx}`
+          ).every(id => {
+            const individualStatus = order.individualItemsStatus?.[id];
+            return individualStatus === 'entregado';
+          });
+        });
       });
     }
     return orders.filter(order => order.status === status);
@@ -221,8 +241,16 @@ export default function OrderManager() {
       return;
     }
 
-      const newOrder: Order = {
-        id: Date.now().toString(),
+    // Initialize individual items status
+    const individualItemsStatus: Record<string, 'preparando' | 'entregando' | 'entregado'> = {};
+    newOrderForm.selectedItems.forEach(item => {
+      for (let i = 0; i < item.quantity; i++) {
+        individualItemsStatus[`${item.id}-${i}`] = 'preparando';
+      }
+    });
+
+    const newOrder: Order = {
+      id: Date.now().toString(),
       number: `ORD-${orders.length + 1}`,
       customerName: newOrderForm.customerName,
       serviceType: newOrderForm.serviceType,
@@ -231,10 +259,11 @@ export default function OrderManager() {
         ...item,
         status: 'preparando' as const
       })),
-        total: calculateTotal(),
-        status: 'preparando',
-        createdAt: new Date(),
-      edited: false
+      total: calculateTotal(),
+      status: 'preparando',
+      createdAt: new Date(),
+      edited: false,
+      individualItemsStatus
     };
 
     const newOrders = [...orders, newOrder];
@@ -248,9 +277,9 @@ export default function OrderManager() {
       selectedItems: []
     });
     setIsNewOrderDialogOpen(false);
-      
-      toast({
-        title: "Orden creada",
+    
+    toast({
+      title: "Orden creada",
       description: `Orden ${newOrder.number} creada exitosamente`,
     });
   };
@@ -485,6 +514,7 @@ export default function OrderManager() {
     switch (status) {
       case 'preparando': return '🔥';
       case 'entregando': return '📦';
+      case 'entregado': return '✅';
       case 'cobrando': return '💰';
       case 'pagado': return '✅';
       default: return '•';
@@ -598,19 +628,21 @@ export default function OrderManager() {
                 // Create unique ID for each individual item
                 const individualItemId = `${item.id}-${quantityIndex}`;
                 
-                // Check if this individual item has been processed
-                const individualItemProcessed = order.individualItemsProcessed?.[individualItemId] || false;
+                // Get the current status of this individual item
+                const individualItemStatus = order.individualItemsStatus?.[individualItemId] || 'preparando';
                 
                 // Determine if this individual item should be enabled for checking
                 let individualItemEnabled = false;
                 let individualItemChecked = false;
                 
                 if (isPreparandoTab) {
-                  individualItemEnabled = item.status === 'preparando' && !item.cancelled && !individualItemProcessed;
-                  individualItemChecked = individualItemProcessed;
+                  // In preparando tab: can only check items that are in 'preparando' status
+                  individualItemEnabled = individualItemStatus === 'preparando' && !item.cancelled;
+                  individualItemChecked = individualItemStatus === 'entregando' || individualItemStatus === 'entregado';
                 } else if (isEntregandoTab) {
-                  individualItemEnabled = item.status === 'entregando' && !item.cancelled && !individualItemProcessed;
-                  individualItemChecked = individualItemProcessed;
+                  // In entregando tab: can only check items that are in 'entregando' status
+                  individualItemEnabled = individualItemStatus === 'entregando' && !item.cancelled;
+                  individualItemChecked = individualItemStatus === 'entregado';
                 }
                 
                 return (
@@ -618,32 +650,36 @@ export default function OrderManager() {
                     {/* Left column - Check mark */}
                     <div className="flex items-center">
                       {showCheckbox && !item.cancelled && (
-                        <Checkbox
+                  <Checkbox
                           checked={individualItemChecked}
                           disabled={!individualItemEnabled}
-                          onCheckedChange={(checked) => {
+                    onCheckedChange={(checked) => {
                             if (checked && individualItemEnabled) {
-                              // Mark this individual item as processed
+                              // Update individual item status
                               const updatedOrders = orders.map(o => {
                                 if (o.id === order.id) {
-                                  const updatedIndividualItemsProcessed = {
-                                    ...o.individualItemsProcessed,
-                                    [individualItemId]: true
+                                  const updatedIndividualItemsStatus: Record<string, 'preparando' | 'entregando' | 'entregado'> = {
+                                    ...o.individualItemsStatus,
+                                    [individualItemId]: isPreparandoTab ? 'entregando' : 'entregado'
                                   };
                                   
-                                  // Check if all individual items of this product are processed
-                                  const allItemsProcessed = Array.from({ length: item.quantity }, (_, idx) => 
+                                  // Check if all individual items of this product are in the same status
+                                  const allItemsInSameStatus = Array.from({ length: item.quantity }, (_, idx) => 
                                     `${item.id}-${idx}`
-                                  ).every(id => updatedIndividualItemsProcessed[id]);
+                                  ).every(id => {
+                                    const status = updatedIndividualItemsStatus[id];
+                                    return status === updatedIndividualItemsStatus[individualItemId];
+                                  });
                                   
-                                  // Update the main item status when ALL individual items are processed
+                                  // Update the main item status when ALL individual items are in the same status
                                   let updatedItems = o.items;
-                                  if (allItemsProcessed) {
+                                  if (allItemsInSameStatus) {
                                     updatedItems = o.items.map(i => {
                                       if (i.id === item.id) {
-                                        if (isPreparandoTab) {
+                                        const newStatus = updatedIndividualItemsStatus[individualItemId];
+                                        if (newStatus === 'entregando') {
                                           return { ...i, status: 'entregando' as const };
-                                        } else if (isEntregandoTab) {
+                                        } else if (newStatus === 'entregado') {
                                           return { ...i, status: 'cobrando' as const };
                                         }
                                       }
@@ -651,20 +687,17 @@ export default function OrderManager() {
                                     });
                                   }
                                   
-                                  // For individual item processing, we don't need to wait for all items of the same product
-                                  // The order will appear in 'entregando' tab based on individualItemsProcessed tracking
-                                  
-                                  // Check if ALL individual items of the entire order are processed
-                                  const allOrderItemsProcessed = o.items.every(orderItem => {
+                                  // Check if ALL individual items of the entire order are 'entregado'
+                                  const allOrderItemsDelivered = o.items.every(orderItem => {
                                     if (orderItem.cancelled) return true; // Skip cancelled items
                                     return Array.from({ length: orderItem.quantity }, (_, idx) => 
                                       `${orderItem.id}-${idx}`
-                                    ).every(id => updatedIndividualItemsProcessed[id]);
+                                    ).every(id => updatedIndividualItemsStatus[id] === 'entregado');
                                   });
                                   
-                                  // If all order items are processed, move order to 'cobrando'
+                                  // If all order items are delivered, move order to 'cobrando'
                                   let updatedOrderStatus = o.status;
-                                  if (allOrderItemsProcessed && o.status !== 'pagado') {
+                                  if (allOrderItemsDelivered && o.status !== 'pagado') {
                                     updatedOrderStatus = 'cobrando';
                                     // Update all items to 'cobrando' status
                                     updatedItems = updatedItems.map(i => ({
@@ -677,38 +710,36 @@ export default function OrderManager() {
                                     ...o,
                                     status: updatedOrderStatus,
                                     items: updatedItems,
-                                    individualItemsProcessed: updatedIndividualItemsProcessed
+                                    individualItemsStatus: updatedIndividualItemsStatus
                                   };
                                 }
                                 return o;
                               });
                               
                               saveOrders(updatedOrders);
-                            }
-                          }}
-                          className="h-4 w-4"
-                        />
-                      )}
+                      }
+                    }}
+                    className="h-4 w-4"
+                  />
+                )}
                     </div>
                     
                     {/* Center column - Item name */}
                     <div className={`flex-1 px-3 ${item.cancelled ? 'line-through text-muted-foreground' : (!individualItemEnabled && showCheckbox ? 'text-muted-foreground' : 'text-foreground')}`}>
                       <span className={`font-medium ${item.cancelled ? 'text-muted-foreground' : 'text-foreground'}`}>
                         {item.name}
-                      </span>
-                    </div>
+                </span>
+              </div>
                     
                     {/* Right column - Status symbol */}
                     <div className="flex items-center">
                       {!isCobrandoOrPagado && (
                         <span className="text-lg">
                           {item.cancelled ? getStatusSymbol(item.cancelledInStage || 'preparando') : 
-                           individualItemProcessed ? 
-                             (isPreparandoTab ? getStatusSymbol('entregando') : getStatusSymbol('cobrando')) :
-                             getStatusSymbol(item.status)}
+                           getStatusSymbol(individualItemStatus)}
                         </span>
                       )}
-                    </div>
+          </div>
                   </div>
                 );
               });
@@ -771,14 +802,15 @@ export default function OrderManager() {
           </p>
         </div>
         
-        <Dialog open={isNewOrderDialogOpen} onOpenChange={setIsNewOrderDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-gradient-primary hover:opacity-90">
-              <Plus className="h-4 w-4 mr-2" />
-              Nueva Orden
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+        <div className="flex gap-2">
+          <Dialog open={isNewOrderDialogOpen} onOpenChange={setIsNewOrderDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-gradient-primary hover:opacity-90">
+                <Plus className="h-4 w-4 mr-2" />
+                Nueva Orden
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
             <DialogHeader>
               <DialogTitle className="text-xl font-bold text-foreground">Crear Nueva Orden</DialogTitle>
             </DialogHeader>
@@ -893,6 +925,15 @@ export default function OrderManager() {
             </div>
           </DialogContent>
         </Dialog>
+          
+          <Button 
+            variant="outline" 
+            onClick={clearAllOrders}
+            className="text-red-600 border-red-600 hover:bg-red-50"
+          >
+            <X className="h-4 w-4 mr-2" />
+            Limpiar Órdenes
+          </Button>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
