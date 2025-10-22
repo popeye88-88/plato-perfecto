@@ -638,7 +638,7 @@ export default function OrderManager() {
                 if (isPreparandoTab) {
                   // In preparando tab: can only check items that are in 'preparando' status
                   individualItemEnabled = individualItemStatus === 'preparando' && !item.cancelled;
-                  individualItemChecked = individualItemStatus === 'entregando' || individualItemStatus === 'entregado';
+                  individualItemChecked = false; // Never checked in preparando tab
                 } else if (isEntregandoTab) {
                   // In entregando tab: can only check items that are in 'entregando' status
                   individualItemEnabled = individualItemStatus === 'entregando' && !item.cancelled;
@@ -804,12 +804,12 @@ export default function OrderManager() {
         
         <div className="flex gap-2">
           <Dialog open={isNewOrderDialogOpen} onOpenChange={setIsNewOrderDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-gradient-primary hover:opacity-90">
-                <Plus className="h-4 w-4 mr-2" />
-                Nueva Orden
-              </Button>
-            </DialogTrigger>
+          <DialogTrigger asChild>
+            <Button className="bg-gradient-primary hover:opacity-90">
+              <Plus className="h-4 w-4 mr-2" />
+              Nueva Orden
+            </Button>
+          </DialogTrigger>
             <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
             <DialogHeader>
               <DialogTitle className="text-xl font-bold text-foreground">Crear Nueva Orden</DialogTitle>
