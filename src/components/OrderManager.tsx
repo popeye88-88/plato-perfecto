@@ -37,7 +37,7 @@ interface Order {
   discountAmount?: number;
   discountReason?: string;
   paymentMethod?: 'tarjeta' | 'efectivo';
-  individualItemsStatus?: Record<string, 'preparando' | 'entregando' | 'entregado'>;
+  individualItemsStatus?: Record<string, 'preparando' | 'entregando' | 'cobrando'>;
 }
 
 export default function OrderManager() {
@@ -144,13 +144,13 @@ export default function OrderManager() {
         const activeItems = order.items.filter(item => !item.cancelled);
         if (activeItems.length === 0) return false;
         
-        // Check if ALL individual items are 'entregado'
+        // Check if ALL individual items are 'cobrando'
         return activeItems.every(item => {
           return Array.from({ length: item.quantity }, (_, idx) => 
             `${item.id}-${idx}`
           ).every(id => {
             const individualStatus = order.individualItemsStatus?.[id];
-            return individualStatus === 'entregado';
+            return individualStatus === 'cobrando';
           });
         });
       });
@@ -242,7 +242,7 @@ export default function OrderManager() {
     }
 
     // Initialize individual items status
-    const individualItemsStatus: Record<string, 'preparando' | 'entregando' | 'entregado'> = {};
+    const individualItemsStatus: Record<string, 'preparando' | 'entregando' | 'cobrando'> = {};
     newOrderForm.selectedItems.forEach(item => {
       for (let i = 0; i < item.quantity; i++) {
         individualItemsStatus[`${item.id}-${i}`] = 'preparando';
@@ -514,7 +514,6 @@ export default function OrderManager() {
     switch (status) {
       case 'preparando': return '🔥';
       case 'entregando': return '📦';
-      case 'entregado': return '✅';
       case 'cobrando': return '💰';
       case 'pagado': return '✅';
       default: return '•';
@@ -642,7 +641,7 @@ export default function OrderManager() {
                 } else if (isEntregandoTab) {
                   // In entregando tab: can only check items that are in 'entregando' status
                   individualItemEnabled = individualItemStatus === 'entregando' && !item.cancelled;
-                  individualItemChecked = individualItemStatus === 'entregado';
+                  individualItemChecked = individualItemStatus === 'cobrando';
                 }
                 
                 return (
@@ -658,9 +657,9 @@ export default function OrderManager() {
                               // Update individual item status
                               const updatedOrders = orders.map(o => {
                                 if (o.id === order.id) {
-                                  const updatedIndividualItemsStatus: Record<string, 'preparando' | 'entregando' | 'entregado'> = {
+                                  const updatedIndividualItemsStatus: Record<string, 'preparando' | 'entregando' | 'cobrando'> = {
                                     ...o.individualItemsStatus,
-                                    [individualItemId]: isPreparandoTab ? 'entregando' : 'entregado'
+                                    [individualItemId]: isPreparandoTab ? 'entregando' : 'cobrando'
                                   };
                                   
                                   // Check if all individual items of this product are in the same status
@@ -679,7 +678,7 @@ export default function OrderManager() {
                                         const newStatus = updatedIndividualItemsStatus[individualItemId];
                                         if (newStatus === 'entregando') {
                                           return { ...i, status: 'entregando' as const };
-                                        } else if (newStatus === 'entregado') {
+                                        } else if (newStatus === 'cobrando') {
                                           return { ...i, status: 'cobrando' as const };
                                         }
                                       }
@@ -687,17 +686,17 @@ export default function OrderManager() {
                                     });
                                   }
                                   
-                                  // Check if ALL individual items of the entire order are 'entregado'
-                                  const allOrderItemsDelivered = o.items.every(orderItem => {
+                                  // Check if ALL individual items of the entire order are 'cobrando'
+                                  const allOrderItemsReadyForPayment = o.items.every(orderItem => {
                                     if (orderItem.cancelled) return true; // Skip cancelled items
                                     return Array.from({ length: orderItem.quantity }, (_, idx) => 
                                       `${orderItem.id}-${idx}`
-                                    ).every(id => updatedIndividualItemsStatus[id] === 'entregado');
+                                    ).every(id => updatedIndividualItemsStatus[id] === 'cobrando');
                                   });
                                   
-                                  // If all order items are delivered, move order to 'cobrando'
+                                  // If all order items are ready for payment, move order to 'cobrando'
                                   let updatedOrderStatus = o.status;
-                                  if (allOrderItemsDelivered && o.status !== 'pagado') {
+                                  if (allOrderItemsReadyForPayment && o.status !== 'pagado') {
                                     updatedOrderStatus = 'cobrando';
                                     // Update all items to 'cobrando' status
                                     updatedItems = updatedItems.map(i => ({
