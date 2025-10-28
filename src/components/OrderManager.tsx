@@ -38,6 +38,7 @@ interface Order {
   discountReason?: string;
   paymentMethod?: 'tarjeta' | 'efectivo';
   individualItemsStatus?: Record<string, 'preparando' | 'entregando' | 'cobrando'>;
+  individualItemsCancelled?: Record<string, boolean>;
 }
 
 export default function OrderManager() {
@@ -66,7 +67,7 @@ export default function OrderManager() {
   const [isEditOrderOpen, setIsEditOrderOpen] = useState(false);
   const [selectedOrderForEdit, setSelectedOrderForEdit] = useState<Order | null>(null);
   const [isCancelItemDialogOpen, setIsCancelItemDialogOpen] = useState(false);
-  const [itemToCancel, setItemToCancel] = useState<{orderId: string, itemId: string} | null>(null);
+  const [itemToCancel, setItemToCancel] = useState<{orderId: string, itemId: string, individualId?: string} | null>(null);
   const [cancelReason, setCancelReason] = useState('');
 
   // Load orders from localStorage (simple version)
@@ -498,6 +499,66 @@ export default function OrderManager() {
       title: "Elemento añadido",
       description: `${item.name} añadido a la orden`
     });
+  };
+
+  const increaseItemQuantity = (orderId: string, itemId: string, price: number) => {
+    const updatedOrders = orders.map(order => {
+      if (order.id === orderId) {
+        const updatedItems = order.items.map(item => {
+          if (item.id === itemId) {
+            return {
+              ...item,
+              quantity: item.quantity + 1
+            };
+          }
+          return item;
+        });
+        
+        const newTotal = updatedItems
+          .filter(item => !item.cancelled)
+          .reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    
+        return {
+          ...order,
+          items: updatedItems,
+          total: newTotal,
+          edited: true
+        };
+      }
+      return order;
+    });
+    
+    saveOrders(updatedOrders);
+  };
+
+  const decreaseItemQuantity = (orderId: string, itemId: string) => {
+    const updatedOrders = orders.map(order => {
+      if (order.id === orderId) {
+        const updatedItems = order.items.map(item => {
+          if (item.id === itemId && item.quantity > 1) {
+            return {
+              ...item,
+              quantity: item.quantity - 1
+            };
+          }
+          return item;
+        });
+        
+        const newTotal = updatedItems
+          .filter(item => !item.cancelled)
+          .reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    
+        return {
+          ...order,
+          items: updatedItems,
+          total: newTotal,
+          edited: true
+        };
+      }
+      return order;
+    });
+    
+    saveOrders(updatedOrders);
   };
 
   const requestItemCancellation = (orderId: string, itemId: string, currentStage: string) => {
@@ -1262,8 +1323,29 @@ export default function OrderManager() {
                           <span className="text-lg">{getStatusSymbol(item.status)}</span>
                           <div className={`${item.cancelled ? 'line-through text-muted-foreground' : ''}`}>
                             <span className="font-medium">{item.name}</span>
-                            <span className="text-sm text-muted-foreground ml-2">x{item.quantity}</span>
                           </div>
+                          {!item.cancelled && (
+                            <div className="flex items-center gap-2 border border-border rounded-md">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => decreaseItemQuantity(selectedOrderForEdit.id, item.id)}
+                                disabled={item.quantity <= 1}
+                                className="h-6 w-6 p-0"
+                              >
+                                <Minus className="h-3 w-3" />
+                              </Button>
+                              <span className="text-sm font-medium w-8 text-center">{item.quantity}</span>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => increaseItemQuantity(selectedOrderForEdit.id, item.id, item.price)}
+                                className="h-6 w-6 p-0"
+                              >
+                                <Plus className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          )}
                           {item.cancelled && (
                             <Badge variant="secondary" className="text-xs">
                               Eliminado en {item.cancelledInStage}
@@ -1274,7 +1356,7 @@ export default function OrderManager() {
                           <span className="font-semibold text-primary">
                             ${(item.price * item.quantity).toFixed(2)}
                           </span>
-                          {!item.cancelled && (
+                          {!item.cancelled && activeTab === 'cobrando' && (
                             <Button
                               size="sm"
                               variant="destructive"
