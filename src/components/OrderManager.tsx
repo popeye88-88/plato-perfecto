@@ -148,10 +148,25 @@ export default function OrderManager() {
     }
     if (status === 'entregando') {
       // Show orders that have at least one individual item in 'entregando' or 'cobrando' status AND order is not paid
+      // BUT exclude orders where ALL items are in 'cobrando' status
       return orders.filter(order => {
         if (order.status === 'pagado') return false;
         
         const activeItems = order.items.filter(item => !item.cancelled);
+        if (activeItems.length === 0) return false;
+        
+        // Check if ALL individual items are in 'cobrando' - if so, exclude from 'entregando'
+        const allItemsReadyForPayment = activeItems.every(item => {
+          return Array.from({ length: item.quantity }, (_, idx) => 
+            `${item.id}-${idx}`
+          ).every(id => {
+            const individualStatus = order.individualItemsStatus?.[id];
+            return individualStatus === 'cobrando';
+          });
+        });
+        
+        if (allItemsReadyForPayment) return false;
+        
         return activeItems.some(item => {
           // Check if there are any individual items in 'entregando' or 'cobrando' status
           return Array.from({ length: item.quantity }, (_, idx) => 
