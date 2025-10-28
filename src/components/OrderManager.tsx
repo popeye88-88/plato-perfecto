@@ -65,6 +65,9 @@ export default function OrderManager() {
   const [paymentMethod, setPaymentMethod] = useState<'tarjeta' | 'efectivo' | ''>('');
   const [isEditOrderOpen, setIsEditOrderOpen] = useState(false);
   const [selectedOrderForEdit, setSelectedOrderForEdit] = useState<Order | null>(null);
+  const [isCancelItemDialogOpen, setIsCancelItemDialogOpen] = useState(false);
+  const [itemToCancel, setItemToCancel] = useState<{orderId: string, itemId: string} | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
 
   // Load orders from localStorage (simple version)
   useEffect(() => {
@@ -443,21 +446,21 @@ export default function OrderManager() {
 
     const updatedOrders = orders.map(order => 
       order.id === selectedOrderForPayment.id 
-        ? { 
-            ...order, 
+            ? { 
+                ...order, 
             status: 'pagado' as const,
             paymentMethod,
             edited: true
-          }
-        : order
-    );
+              }
+            : order
+      );
     
     saveOrders(updatedOrders);
     setIsPaymentOpen(false);
     setPaymentMethod('');
     setSelectedOrderForPayment(null);
-    
-    toast({
+      
+      toast({
       title: "Pago procesado",
       description: `Orden pagada con ${paymentMethod === 'tarjeta' ? 'tarjeta' : 'efectivo'}`
     });
@@ -471,7 +474,7 @@ export default function OrderManager() {
           name: item.name,
           price: item.price,
           quantity: 1,
-          status: 'preparando',
+        status: 'preparando',
           cancelled: false
         };
         
@@ -494,6 +497,38 @@ export default function OrderManager() {
     toast({
       title: "Elemento añadido",
       description: `${item.name} añadido a la orden`
+    });
+  };
+
+  const requestItemCancellation = (orderId: string, itemId: string, currentStage: string) => {
+    // If order is in 'cobrando' stage, require confirmation and reason
+    if (currentStage === 'cobrando') {
+      setItemToCancel({ orderId, itemId });
+      setIsCancelItemDialogOpen(true);
+    } else {
+      // For other stages, cancel directly without confirmation
+      removeItemFromExistingOrder(orderId, itemId, currentStage);
+    }
+  };
+
+  const handleConfirmItemCancellation = () => {
+    if (!itemToCancel || !cancelReason.trim()) {
+      toast({
+        title: "Error",
+        description: "Debes proporcionar una razón para eliminar el elemento",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    removeItemFromExistingOrder(itemToCancel.orderId, itemToCancel.itemId, 'cobrando');
+    setIsCancelItemDialogOpen(false);
+    setItemToCancel(null);
+    setCancelReason('');
+    
+    toast({
+      title: "Elemento eliminado",
+      description: "Elemento marcado como eliminado con la razón especificada"
     });
   };
 
@@ -1243,7 +1278,7 @@ export default function OrderManager() {
                             <Button
                               size="sm"
                               variant="destructive"
-                              onClick={() => removeItemFromExistingOrder(selectedOrderForEdit.id, item.id, activeTab)}
+                              onClick={() => requestItemCancellation(selectedOrderForEdit.id, item.id, activeTab)}
                               className="h-8 w-8 p-0"
                             >
                               <X className="h-4 w-4" />
@@ -1290,6 +1325,63 @@ export default function OrderManager() {
                 Cerrar
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancel Item Confirmation Dialog */}
+      <Dialog open={isCancelItemDialogOpen} onOpenChange={setIsCancelItemDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmar Eliminación de Elemento</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <span className="text-yellow-600 text-xl">⚠️</span>
+                <div>
+                  <p className="font-semibold text-yellow-900">Advertencia</p>
+                  <p className="text-sm text-yellow-700 mt-1">
+                    Estás a punto de eliminar un elemento de una orden en etapa de cobro. Este elemento aparecerá como tachado y no será cobrado.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="cancelReason" className="text-sm font-medium">Razón de eliminación *</Label>
+              <Input
+                id="cancelReason"
+                placeholder="Ej: Cliente canceló, producto defectuoso, etc."
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+              />
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              * Campo obligatorio. Explica por qué se elimina este elemento.
+            </p>
+          </div>
+
+          <div className="flex justify-end gap-3 mt-6">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setIsCancelItemDialogOpen(false);
+                setCancelReason('');
+                setItemToCancel(null);
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={handleConfirmItemCancellation}
+              disabled={!cancelReason.trim()}
+            >
+              Confirmar Eliminación
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
