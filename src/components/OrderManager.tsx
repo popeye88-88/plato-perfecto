@@ -71,10 +71,37 @@ export default function OrderManager() {
     const savedOrders = localStorage.getItem('orders');
     if (savedOrders) {
       try {
-        const parsedOrders = JSON.parse(savedOrders).map((order: any) => ({
-          ...order,
-          createdAt: new Date(order.createdAt)
-        }));
+        const parsedOrders = JSON.parse(savedOrders).map((order: any) => {
+          // Migrate old 'entregado' status to 'cobrando'
+          const migrateStatus = (status: string) => {
+            if (status === 'entregado') return 'cobrando';
+            return status;
+          };
+          
+          // Migrate individual items status
+          if (order.individualItemsStatus) {
+            const migratedIndividualStatus: Record<string, 'preparando' | 'entregando' | 'cobrando'> = {};
+            Object.entries(order.individualItemsStatus).forEach(([key, status]) => {
+              if (typeof status === 'string') {
+                migratedIndividualStatus[key] = migrateStatus(status) as 'preparando' | 'entregando' | 'cobrando';
+              }
+            });
+            order.individualItemsStatus = migratedIndividualStatus;
+          }
+          
+          // Migrate items status
+          if (order.items) {
+            order.items = order.items.map((item: any) => ({
+              ...item,
+              status: migrateStatus(item.status)
+            }));
+          }
+          
+          return {
+            ...order,
+            createdAt: new Date(order.createdAt)
+          };
+        });
         setOrders(parsedOrders);
       } catch (error) {
         console.error('Error parsing saved orders:', error);
