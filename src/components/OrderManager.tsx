@@ -147,18 +147,18 @@ export default function OrderManager() {
       });
     }
     if (status === 'entregando') {
-      // Show orders that have at least one individual item in 'entregando' status AND order is not paid
+      // Show orders that have at least one individual item in 'entregando' or 'cobrando' status AND order is not paid
       return orders.filter(order => {
         if (order.status === 'pagado') return false;
         
         const activeItems = order.items.filter(item => !item.cancelled);
         return activeItems.some(item => {
-          // Check if there are any individual items in 'entregando' status
+          // Check if there are any individual items in 'entregando' or 'cobrando' status
           return Array.from({ length: item.quantity }, (_, idx) => 
             `${item.id}-${idx}`
           ).some(id => {
             const individualStatus = order.individualItemsStatus?.[id];
-            return individualStatus === 'entregando';
+            return individualStatus === 'entregando' || individualStatus === 'cobrando';
           });
         });
       });
