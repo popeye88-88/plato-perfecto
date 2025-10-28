@@ -17,6 +17,7 @@ interface OrderItem {
   name: string;
   price: number;
   quantity: number;
+  originalQuantity?: number;
   status: 'preparando' | 'entregando' | 'cobrando' | 'pagado';
   cancelled?: boolean;
   cancelledAt?: Date;
@@ -303,6 +304,7 @@ export default function OrderManager() {
       diners: newOrderForm.diners,
       items: newOrderForm.selectedItems.map(item => ({
         ...item,
+        originalQuantity: item.quantity,
         status: 'preparando' as const
       })),
       total: calculateTotal(),
@@ -885,22 +887,30 @@ export default function OrderManager() {
         </div>
         
         {/* Cancelled Items Section */}
-        {order.items.filter(item => item.quantity === 0 || item.cancelled).length > 0 && (
+        {order.items.some(item => {
+          const cancelledCount = item.cancelled ? item.quantity : 0;
+          const reducedCount = item.originalQuantity ? Math.max(0, item.originalQuantity - item.quantity) : 0;
+          return cancelledCount > 0 || reducedCount > 0;
+        }) && (
           <div className="mt-2 pt-2 border-t border-red-200">
             {(() => {
               // Group cancelled items by name
               const groupedCancelled = order.items
-                .filter(item => item.quantity === 0 || item.cancelled)
                 .reduce((acc, item) => {
                   const cancelledCount = item.cancelled ? item.quantity : 0;
-                  if (!acc[item.name]) {
-                    acc[item.name] = {
-                      name: item.name,
-                      quantity: cancelledCount,
-                      price: item.price
-                    };
-                  } else {
-                    acc[item.name].quantity += cancelledCount;
+                  const reducedCount = item.originalQuantity ? Math.max(0, item.originalQuantity - item.quantity) : 0;
+                  const totalRemoved = cancelledCount + reducedCount;
+                  
+                  if (totalRemoved > 0) {
+                    if (!acc[item.name]) {
+                      acc[item.name] = {
+                        name: item.name,
+                        quantity: totalRemoved,
+                        price: item.price
+                      };
+                    } else {
+                      acc[item.name].quantity += totalRemoved;
+                    }
                   }
                   return acc;
                 }, {} as Record<string, {name: string, quantity: number, price: number}>);
