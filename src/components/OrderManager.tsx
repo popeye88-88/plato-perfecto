@@ -125,6 +125,17 @@ export default function OrderManager() {
     }
   }, []);
 
+  // Update selectedOrderForEdit when orders change
+  useEffect(() => {
+    if (selectedOrderForEdit && isEditOrderOpen) {
+      const updatedOrder = orders.find(o => o.id === selectedOrderForEdit.id);
+      if (updatedOrder) {
+        setSelectedOrderForEdit(updatedOrder);
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orders, isEditOrderOpen]);
+
   // Save orders to localStorage
   const saveOrders = (newOrders: Order[]) => {
     setOrders(newOrders);
