@@ -1307,46 +1307,97 @@ export default function OrderManager() {
           </DialogHeader>
           
           <div className="space-y-4">
-            {selectedOrderForHistory?.editHistory && selectedOrderForHistory.editHistory.length > 0 ? (
-              <div className="space-y-2 max-h-[400px] overflow-y-auto">
-                {selectedOrderForHistory.editHistory
-                  .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-                  .map((entry, index) => (
-                    <div key={index} className="p-3 border border-border rounded-lg bg-card">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <Badge 
-                              variant={entry.action === 'added' ? 'default' : 'destructive'}
-                              className="text-xs"
-                            >
-                              {entry.action === 'added' ? 'Añadido' : entry.action === 'removed' ? 'Eliminado' : entry.action}
-                            </Badge>
-                            <Badge variant="outline" className="text-xs">
-                              {entry.stage}
-                            </Badge>
-                            <span className="text-xs text-muted-foreground">
-                              {new Date(entry.timestamp).toLocaleString('es-ES')}
-                            </span>
+            {selectedOrderForHistory ? (
+              <div className="space-y-3 max-h-[500px] overflow-y-auto">
+                {(() => {
+                  // Group all items (original, added, removed) by item name
+                  const groupedItems: Record<string, {
+                    original: number;
+                    added: Array<{timestamp: Date, quantity: number}>;
+                    removed: Array<{timestamp: Date, quantity: number, reason?: string}>;
+                  }> = {};
+                  
+                  // Get original items (non-cancelled items that were not added)
+                  selectedOrderForHistory.items.forEach(item => {
+                    if (!groupedItems[item.name]) {
+                      groupedItems[item.name] = { original: 0, added: [], removed: [] };
+                    }
+                    if (item.cancelled) {
+                      groupedItems[item.name].removed.push({
+                        timestamp: item.cancelledAt || selectedOrderForHistory.createdAt,
+                        quantity: item.quantity,
+                        reason: item.cancelledInStage === 'cobrando' ? 'Razón no especificada' : undefined
+                      });
+                    } else {
+                      groupedItems[item.name].original += item.quantity;
+                    }
+                  });
+                  
+                  // Process edit history
+                  selectedOrderForHistory.editHistory?.forEach(entry => {
+                    if (!entry.itemName) return;
+                    
+                    if (!groupedItems[entry.itemName]) {
+                      groupedItems[entry.itemName] = { original: 0, added: [], removed: [] };
+                    }
+                    
+                    if (entry.action === 'added' && entry.quantity) {
+                      groupedItems[entry.itemName].added.push({
+                        timestamp: entry.timestamp,
+                        quantity: entry.quantity
+                      });
+                    } else if (entry.action === 'removed' && entry.quantity) {
+                      groupedItems[entry.itemName].removed.push({
+                        timestamp: entry.timestamp,
+                        quantity: entry.quantity,
+                        reason: entry.details
+                      });
+                    }
+                  });
+                  
+                  return Object.entries(groupedItems).map(([itemName, data]) => {
+                    const hasChanges = data.added.length > 0 || data.removed.length > 0;
+                    return (
+                      <div key={itemName} className="border border-border rounded-lg p-3 bg-card">
+                        <h4 className="font-medium mb-2">{itemName}</h4>
+                        
+                        {/* Original items */}
+                        {data.original > 0 && (
+                          <div className="text-sm text-foreground mb-1">
+                            {data.original}x {!hasChanges ? 'originales' : 'original'}
                           </div>
-                          {entry.itemName && (
-                            <p className="text-sm font-medium">
-                              {entry.itemName} {entry.quantity && entry.quantity > 1 && `(x${entry.quantity})`}
-                            </p>
-                          )}
-                          {entry.details && (
-                            <p className="text-xs text-muted-foreground mt-1 italic">
-                              Razón: {entry.details}
-                            </p>
-                          )}
-                        </div>
+                        )}
+                        
+                        {/* Added items */}
+                        {data.added.length > 0 && (
+                          <div className="space-y-1 mb-2">
+                            {data.added.map((add, idx) => (
+                              <div key={idx} className="text-sm text-green-600">
+                                +{add.quantity} - {new Date(add.timestamp).toLocaleString('es-ES')}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        
+                        {/* Removed items */}
+                        {data.removed.length > 0 && (
+                          <div className="space-y-1">
+                            {data.removed.map((rem, idx) => (
+                              <div key={idx} className="text-sm text-red-600 line-through">
+                                -{rem.quantity} - {new Date(rem.timestamp).toLocaleString('es-ES')}
+                                {rem.reason && <span className="text-xs"> - {rem.reason}</span>}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  });
+                })()}
               </div>
             ) : (
               <p className="text-muted-foreground text-center py-8">
-                No hay historial de ediciones disponible
+                No hay historial disponible
               </p>
             )}
             
