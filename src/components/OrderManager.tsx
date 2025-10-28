@@ -24,6 +24,15 @@ interface OrderItem {
   cancelledInStage?: 'preparando' | 'entregando' | 'cobrando';
 }
 
+interface EditHistoryEntry {
+  timestamp: Date;
+  action: 'added' | 'removed' | 'discount_applied' | 'payment_processed';
+  stage: 'preparando' | 'entregando' | 'cobrando';
+  itemName?: string;
+  quantity?: number;
+  details?: string;
+}
+
 interface Order {
   id: string;
   number: string;
@@ -40,6 +49,7 @@ interface Order {
   paymentMethod?: 'tarjeta' | 'efectivo';
   individualItemsStatus?: Record<string, 'preparando' | 'entregando' | 'cobrando'>;
   individualItemsCancelled?: Record<string, boolean>;
+  editHistory?: EditHistoryEntry[];
 }
 
 export default function OrderManager() {
@@ -58,6 +68,7 @@ export default function OrderManager() {
     selectedItems: [] as Array<{id: string, name: string, price: number, quantity: number}>
   });
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [selectedOrderForHistory, setSelectedOrderForHistory] = useState<Order | null>(null);
   const [isDiscountOpen, setIsDiscountOpen] = useState(false);
   const [selectedOrderForDiscount, setSelectedOrderForDiscount] = useState<Order | null>(null);
   const [discountItems, setDiscountItems] = useState<Set<string>>(new Set());
@@ -118,6 +129,16 @@ export default function OrderManager() {
   const saveOrders = (newOrders: Order[]) => {
     setOrders(newOrders);
     localStorage.setItem('orders', JSON.stringify(newOrders));
+  };
+
+  // Add entry to edit history
+  const addToEditHistory = (order: Order, historyEntry: EditHistoryEntry) => {
+    const updatedOrders = orders.map(o => 
+      o.id === order.id 
+        ? { ...o, editHistory: [...(o.editHistory || []), historyEntry], edited: true }
+        : o
+    );
+    saveOrders(updatedOrders);
   };
 
   // Clear all orders for testing
@@ -472,6 +493,8 @@ export default function OrderManager() {
   const addItemToExistingOrder = (orderId: string, item: typeof menuItems[0]) => {
     const updatedOrders = orders.map(order => {
       if (order.id === orderId) {
+        const currentStage = order.status as 'preparando' | 'entregando' | 'cobrando';
+        
         const newItem: OrderItem = {
           id: `${Date.now()}-${Math.random()}`,
           name: item.name,
@@ -486,11 +509,20 @@ export default function OrderManager() {
           .filter(item => !item.cancelled)
           .reduce((sum, item) => sum + (item.price * item.quantity), 0);
         
+        const historyEntry: EditHistoryEntry = {
+          timestamp: new Date(),
+          action: 'added',
+          stage: currentStage,
+          itemName: item.name,
+          quantity: 1
+        };
+        
         return {
           ...order,
           items: updatedItems,
           total: newTotal,
-          edited: true
+          edited: true,
+          editHistory: [...(order.editHistory || []), historyEntry]
         };
       }
       return order;
@@ -693,7 +725,10 @@ export default function OrderManager() {
             <Button 
                   variant="ghost"
               size="sm" 
-                  onClick={() => setIsHistoryOpen(true)}
+                  onClick={() => {
+                    setSelectedOrderForHistory(order);
+                    setIsHistoryOpen(true);
+                  }}
                   className="h-8 w-8 p-0"
                   title="Ver historial"
                 >
@@ -878,7 +913,7 @@ export default function OrderManager() {
                            getStatusSymbol(individualItemStatus)}
                         </span>
                       )}
-          </div>
+            </div>
                   </div>
                 );
               });
@@ -919,10 +954,10 @@ export default function OrderManager() {
                 <div key={idx} className="text-xs text-muted-foreground line-through flex justify-between">
                   <span>{grouped.quantity}x {grouped.name}</span>
                   <span>${(grouped.price * grouped.quantity).toFixed(2)}</span>
-                </div>
+          </div>
               ));
             })()}
-          </div>
+        </div>
         )}
         
         {/* Footer with total and actions */}
@@ -1266,15 +1301,54 @@ export default function OrderManager() {
 
       {/* History Dialog */}
       <Dialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Historial de Ediciones</DialogTitle>
+            <DialogTitle>Historial de Ediciones - {selectedOrderForHistory?.number}</DialogTitle>
           </DialogHeader>
           
           <div className="space-y-4">
-            <p className="text-muted-foreground">
-              Esta orden ha sido editada. El historial de cambios se mostrará aquí cuando esté disponible.
-            </p>
+            {selectedOrderForHistory?.editHistory && selectedOrderForHistory.editHistory.length > 0 ? (
+              <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                {selectedOrderForHistory.editHistory
+                  .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+                  .map((entry, index) => (
+                    <div key={index} className="p-3 border border-border rounded-lg bg-card">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Badge 
+                              variant={entry.action === 'added' ? 'default' : 'destructive'}
+                              className="text-xs"
+                            >
+                              {entry.action === 'added' ? 'Añadido' : entry.action === 'removed' ? 'Eliminado' : entry.action}
+                            </Badge>
+                            <Badge variant="outline" className="text-xs">
+                              {entry.stage}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(entry.timestamp).toLocaleString('es-ES')}
+                            </span>
+                          </div>
+                          {entry.itemName && (
+                            <p className="text-sm font-medium">
+                              {entry.itemName} {entry.quantity && entry.quantity > 1 && `(x${entry.quantity})`}
+                            </p>
+                          )}
+                          {entry.details && (
+                            <p className="text-xs text-muted-foreground mt-1 italic">
+                              Razón: {entry.details}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            ) : (
+              <p className="text-muted-foreground text-center py-8">
+                No hay historial de ediciones disponible
+              </p>
+            )}
             
             <div className="flex justify-end">
               <Button variant="outline" onClick={() => setIsHistoryOpen(false)}>
@@ -1356,60 +1430,50 @@ export default function OrderManager() {
               <>
                 {/* Active Items */}
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-foreground">Elementos Activos</h3>
+                  <h3 className="text-lg font-semibold text-foreground">Elementos del Menú</h3>
                   <div className="space-y-2">
-                    {selectedOrderForEdit.items.filter(item => !item.cancelled && item.quantity > 0).map((item, index) => (
-                      <div key={item.id} className="flex items-center justify-between p-3 border border-border rounded-lg bg-card">
-                        <div className="flex items-center gap-3">
-                          <span className="text-lg">{getStatusSymbol(item.status)}</span>
-                          <div className={`${item.cancelled ? 'line-through text-muted-foreground' : ''}`}>
-                            <span className="font-medium">{item.name}</span>
+                    {menuItems.map((menuItem) => {
+                      const existingItem = selectedOrderForEdit.items.find(item => item.id === menuItem.id);
+                      const currentQuantity = existingItem ? existingItem.quantity : 0;
+                      
+                      return (
+                        <div key={menuItem.id} className="flex items-center justify-between p-3 border border-border rounded-lg bg-card">
+                          <div className="flex items-center gap-3 flex-1">
+                            <span className="font-medium">{menuItem.name}</span>
+                            <span className="text-xs text-muted-foreground">{menuItem.category}</span>
                           </div>
-                          {!item.cancelled && (
+                          <div className="flex items-center gap-3">
                             <div className="flex items-center gap-2 border border-border rounded-md">
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                onClick={() => decreaseItemQuantity(selectedOrderForEdit.id, item.id)}
-                                disabled={item.quantity <= 0}
+                                onClick={() => {
+                                  if (currentQuantity > 0) {
+                                    decreaseItemQuantity(selectedOrderForEdit.id, menuItem.id);
+                                  }
+                                }}
+                                disabled={currentQuantity <= 0}
                                 className="h-6 w-6 p-0"
                               >
                                 <Minus className="h-3 w-3" />
                               </Button>
-                              <span className="text-sm font-medium w-8 text-center">{item.quantity}</span>
+                              <span className="text-sm font-medium w-8 text-center">{currentQuantity}</span>
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                onClick={() => increaseItemQuantity(selectedOrderForEdit.id, item.id, item.price)}
+                                onClick={() => addItemToExistingOrder(selectedOrderForEdit.id, menuItem)}
                                 className="h-6 w-6 p-0"
                               >
                                 <Plus className="h-3 w-3" />
                               </Button>
                             </div>
-                          )}
-                          {item.cancelled && (
-                            <Badge variant="secondary" className="text-xs">
-                              Eliminado en {item.cancelledInStage}
-                            </Badge>
-                          )}
+                            <span className="font-semibold text-primary min-w-[70px] text-right">
+                              ${(menuItem.price * currentQuantity).toFixed(2)}
+                            </span>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-primary">
-                            ${(item.price * item.quantity).toFixed(2)}
-                          </span>
-                          {!item.cancelled && activeTab === 'cobrando' && (
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => requestItemCancellation(selectedOrderForEdit.id, item.id, activeTab)}
-                              className="h-8 w-8 p-0"
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 
