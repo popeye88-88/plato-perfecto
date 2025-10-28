@@ -495,7 +495,7 @@ export default function OrderManager() {
     });
     
     saveOrders(updatedOrders);
-    toast({
+      toast({
       title: "Elemento añadido",
       description: `${item.name} añadido a la orden`
     });
@@ -1424,30 +1424,6 @@ export default function OrderManager() {
                   </div>
                 )}
 
-                {/* Add New Items */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-foreground">Añadir Elementos</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {menuItems.map((item) => (
-                      <div key={item.id} className="p-3 border border-border rounded-lg bg-card hover:bg-muted/50 transition-colors">
-                        <div className="flex justify-between items-center">
-                          <div className="flex-1">
-                            <h4 className="font-medium text-foreground">{item.name}</h4>
-                            <p className="text-xs text-muted-foreground">{item.category}</p>
-                            <p className="font-semibold text-primary text-sm">${item.price.toFixed(2)}</p>
-                          </div>
-                          <Button
-                            size="sm"
-                            onClick={() => addItemToExistingOrder(selectedOrderForEdit.id, item)}
-                            className="bg-gradient-primary hover:opacity-90 h-8 w-8 p-0"
-                          >
-                            <Plus className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
               </>
             )}
           </div>
