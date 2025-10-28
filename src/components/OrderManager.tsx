@@ -1756,7 +1756,6 @@ export default function OrderManager() {
           </div>
         </DialogContent>
       </Dialog>
-      </div>
     </div>
   );
 }
