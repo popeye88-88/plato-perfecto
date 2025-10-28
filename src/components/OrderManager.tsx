@@ -862,8 +862,8 @@ export default function OrderManager() {
                     </div>
                     
                     {/* Center column - Item name */}
-                    <div className={`flex-1 px-3 ${item.cancelled ? 'line-through text-muted-foreground' : (!individualItemEnabled && showCheckbox ? 'text-muted-foreground' : 'text-foreground')}`}>
-                      <span className={`font-medium ${item.cancelled ? 'text-muted-foreground' : 'text-foreground'}`}>
+                    <div className={`flex-1 px-3 ${(item.cancelled || item.quantity === 0) ? 'line-through text-muted-foreground' : (!individualItemEnabled && showCheckbox ? 'text-muted-foreground' : 'text-foreground')}`}>
+                      <span className={`font-medium ${(item.cancelled || item.quantity === 0) ? 'text-muted-foreground' : 'text-foreground'}`}>
                         {item.name}
                 </span>
               </div>
@@ -872,7 +872,7 @@ export default function OrderManager() {
                     <div className="flex items-center">
                       {!isCobrandoOrPagado && (
                         <span className="text-lg">
-                          {item.cancelled ? getStatusSymbol(item.cancelledInStage || 'preparando') : 
+                          {(item.cancelled || item.quantity === 0) ? getStatusSymbol(item.cancelledInStage || 'preparando') : 
                            getStatusSymbol(individualItemStatus)}
                         </span>
                       )}
