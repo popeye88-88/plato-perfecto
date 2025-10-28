@@ -506,16 +506,34 @@ export default function OrderManager() {
       if (order.id === orderId) {
         const currentStage = order.status as 'preparando' | 'entregando' | 'cobrando';
         
-        const newItem: OrderItem = {
-          id: `${Date.now()}-${Math.random()}`,
-          name: item.name,
-          price: item.price,
-          quantity: 1,
-        status: 'preparando',
-          cancelled: false
-        };
+        // Check if item already exists in the order
+        const existingItemIndex = order.items.findIndex(i => i.name === item.name && !i.cancelled);
         
-        const updatedItems = [...order.items, newItem];
+        let updatedItems;
+        if (existingItemIndex !== -1) {
+          // Increment quantity of existing item
+          updatedItems = order.items.map((existingItem, index) => {
+            if (index === existingItemIndex) {
+              return {
+                ...existingItem,
+                quantity: existingItem.quantity + 1
+              };
+            }
+            return existingItem;
+      });
+    } else {
+          // Add new item
+          const newItem: OrderItem = {
+            id: `${Date.now()}-${Math.random()}`,
+            name: item.name,
+            price: item.price,
+            quantity: 1,
+        status: 'preparando',
+            cancelled: false
+          };
+          updatedItems = [...order.items, newItem];
+        }
+        
         const newTotal = updatedItems
           .filter(item => !item.cancelled)
           .reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -1511,7 +1529,11 @@ export default function OrderManager() {
                                 variant="ghost"
                                 onClick={() => {
                                   if (currentQuantity > 0) {
-                                    decreaseItemQuantity(selectedOrderForEdit.id, menuItem.id);
+                                    // Find the existing item in the order by name
+                                    const existingItem = selectedOrderForEdit.items.find(item => item.name === menuItem.name);
+                                    if (existingItem) {
+                                      decreaseItemQuantity(selectedOrderForEdit.id, existingItem.id);
+                                    }
                                   }
                                 }}
                                 disabled={currentQuantity <= 0}
