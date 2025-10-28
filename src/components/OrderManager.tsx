@@ -535,7 +535,7 @@ export default function OrderManager() {
     const updatedOrders = orders.map(order => {
       if (order.id === orderId) {
         const updatedItems = order.items.map(item => {
-          if (item.id === itemId && item.quantity > 1) {
+          if (item.id === itemId && item.quantity > 0) {
             return {
               ...item,
               quantity: item.quantity - 1
@@ -545,7 +545,7 @@ export default function OrderManager() {
         });
         
         const newTotal = updatedItems
-          .filter(item => !item.cancelled)
+          .filter(item => !item.cancelled && item.quantity > 0)
           .reduce((sum, item) => sum + (item.price * item.quantity), 0);
     
         return {
@@ -1313,11 +1313,11 @@ export default function OrderManager() {
           <div className="flex-1 overflow-y-auto space-y-6 pr-2">
             {selectedOrderForEdit && (
               <>
-                {/* Current Items */}
+                {/* Active Items */}
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-foreground">Elementos Actuales</h3>
+                  <h3 className="text-lg font-semibold text-foreground">Elementos Activos</h3>
                   <div className="space-y-2">
-                    {selectedOrderForEdit.items.map((item, index) => (
+                    {selectedOrderForEdit.items.filter(item => !item.cancelled && item.quantity > 0).map((item, index) => (
                       <div key={item.id} className="flex items-center justify-between p-3 border border-border rounded-lg bg-card">
                         <div className="flex items-center gap-3">
                           <span className="text-lg">{getStatusSymbol(item.status)}</span>
@@ -1330,7 +1330,7 @@ export default function OrderManager() {
                                 size="sm"
                                 variant="ghost"
                                 onClick={() => decreaseItemQuantity(selectedOrderForEdit.id, item.id)}
-                                disabled={item.quantity <= 1}
+                                disabled={item.quantity <= 0}
                                 className="h-6 w-6 p-0"
                               >
                                 <Minus className="h-3 w-3" />
@@ -1371,6 +1371,58 @@ export default function OrderManager() {
                     ))}
                   </div>
                 </div>
+
+                {/* Cancelled Items (if any) */}
+                {selectedOrderForEdit.items.filter(item => item.cancelled || item.quantity === 0).length > 0 && (
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold text-muted-foreground">Elementos Eliminados</h3>
+                    <div className="space-y-2">
+                      {(() => {
+                        // Group cancelled items by name
+                        const groupedCancelled = selectedOrderForEdit.items
+                          .filter(item => item.cancelled || item.quantity === 0)
+                          .reduce((acc, item) => {
+                            const originalQuantity = item.quantity;
+                            const cancelledQuantity = item.cancelled ? originalQuantity : originalQuantity;
+                            
+                            if (!acc[item.name]) {
+                              acc[item.name] = {
+                                name: item.name,
+                                price: item.price,
+                                quantity: cancelledQuantity,
+                                cancelledInStage: item.cancelledInStage
+                              };
+                            } else {
+                              acc[item.name].quantity += cancelledQuantity;
+                            }
+                            return acc;
+                          }, {} as Record<string, {name: string, price: number, quantity: number, cancelledInStage?: string}>);
+
+                        return Object.values(groupedCancelled).map((grouped, index) => (
+                          <div key={`cancelled-${index}`} className="flex items-center justify-between p-3 border border-red-200 rounded-lg bg-red-50">
+                            <div className="flex items-center gap-3">
+                              <span className="text-lg">❌</span>
+                              <div className="line-through text-muted-foreground">
+                                <span className="font-medium">{grouped.name}</span>
+                              </div>
+                              <Badge variant="secondary" className="text-xs">
+                                Eliminado en {grouped.cancelledInStage || 'edición'}
+                              </Badge>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-muted-foreground">
+                                x{grouped.quantity}
+                              </span>
+                              <span className="font-semibold text-muted-foreground line-through">
+                                ${(grouped.price * grouped.quantity).toFixed(2)}
+                              </span>
+                            </div>
+                          </div>
+                        ));
+                      })()}
+                    </div>
+                  </div>
+                )}
 
                 {/* Add New Items */}
                 <div className="space-y-4">
