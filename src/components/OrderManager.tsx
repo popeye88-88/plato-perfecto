@@ -78,6 +78,7 @@ export default function OrderManager() {
   const [paymentMethod, setPaymentMethod] = useState<'tarjeta' | 'efectivo' | ''>('');
   const [isEditOrderOpen, setIsEditOrderOpen] = useState(false);
   const [selectedOrderForEdit, setSelectedOrderForEdit] = useState<Order | null>(null);
+  const [localEditQuantities, setLocalEditQuantities] = useState<Record<string, number>>({});
   const [isCancelItemDialogOpen, setIsCancelItemDialogOpen] = useState(false);
   const [itemToCancel, setItemToCancel] = useState<{orderId: string, itemId: string, individualId?: string} | null>(null);
   const [cancelReason, setCancelReason] = useState('');
@@ -770,6 +771,14 @@ export default function OrderManager() {
                   size="sm"
                   onClick={() => {
                     setSelectedOrderForEdit(order);
+                    // Initialize local quantities with current order quantities
+                    const initialQuantities: Record<string, number> = {};
+                    order.items.forEach(item => {
+                      if (!item.cancelled) {
+                        initialQuantities[item.name] = item.quantity;
+                      }
+                    });
+                    setLocalEditQuantities(initialQuantities);
                     setIsEditOrderOpen(true);
                   }}
               className="h-8 w-8 p-0"
@@ -1513,8 +1522,7 @@ export default function OrderManager() {
                   <h3 className="text-lg font-semibold text-foreground">Elementos del Menú</h3>
                   <div className="space-y-2">
                     {menuItems.map((menuItem) => {
-                      const existingItem = selectedOrderForEdit.items.find(item => item.id === menuItem.id);
-                      const currentQuantity = existingItem ? existingItem.quantity : 0;
+                      const currentQuantity = localEditQuantities[menuItem.name] || 0;
                       
                       return (
                         <div key={menuItem.id} className="flex items-center justify-between p-3 border border-border rounded-lg bg-card">
@@ -1528,13 +1536,10 @@ export default function OrderManager() {
                                 size="sm"
                                 variant="ghost"
                                 onClick={() => {
-                                  if (currentQuantity > 0) {
-                                    // Find the existing item in the order by name
-                                    const existingItem = selectedOrderForEdit.items.find(item => item.name === menuItem.name);
-                                    if (existingItem) {
-                                      decreaseItemQuantity(selectedOrderForEdit.id, existingItem.id);
-                                    }
-                                  }
+                                  setLocalEditQuantities(prev => ({
+                                    ...prev,
+                                    [menuItem.name]: Math.max(0, (prev[menuItem.name] || 0) - 1)
+                                  }));
                                 }}
                                 disabled={currentQuantity <= 0}
                                 className="h-6 w-6 p-0"
@@ -1545,7 +1550,12 @@ export default function OrderManager() {
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                onClick={() => addItemToExistingOrder(selectedOrderForEdit.id, menuItem)}
+                                onClick={() => {
+                                  setLocalEditQuantities(prev => ({
+                                    ...prev,
+                                    [menuItem.name]: (prev[menuItem.name] || 0) + 1
+                                  }));
+                                }}
                                 className="h-6 w-6 p-0"
                               >
                                 <Plus className="h-3 w-3" />
@@ -1619,9 +1629,81 @@ export default function OrderManager() {
 
           {/* Fixed Footer */}
           <div className="border-t border-border pt-4 mt-4">
-            <div className="flex justify-end">
-              <Button variant="outline" onClick={() => setIsEditOrderOpen(false)} className="px-6">
-                Cerrar
+            <div className="flex justify-between">
+              <Button variant="outline" onClick={() => {
+                setIsEditOrderOpen(false);
+                setLocalEditQuantities({});
+              }} className="px-6">
+                Cancelar
+              </Button>
+              <Button 
+                onClick={() => {
+                  // Apply changes to the order
+                  if (selectedOrderForEdit) {
+                    const updatedOrders = orders.map(order => {
+                      if (order.id === selectedOrderForEdit.id) {
+                        // Update or add items based on localEditQuantities
+                        const updatedItems: OrderItem[] = [];
+                        const processedItems = new Set<string>();
+                        
+                        // First, update existing items
+                        order.items.forEach(item => {
+                          if (!item.cancelled && localEditQuantities.hasOwnProperty(item.name)) {
+                            const newQuantity = localEditQuantities[item.name];
+                            if (newQuantity > 0) {
+                              updatedItems.push({ ...item, quantity: newQuantity });
+                            }
+                            processedItems.add(item.name);
+                          } else if (!item.cancelled) {
+                            // Keep items that aren't in the local edit
+                            updatedItems.push(item);
+                            processedItems.add(item.name);
+                          }
+                        });
+                        
+                        // Add new items
+                        Object.entries(localEditQuantities).forEach(([name, quantity]) => {
+                          if (!processedItems.has(name) && quantity > 0) {
+                            const menuItem = menuItems.find(m => m.name === name);
+                            if (menuItem) {
+                              updatedItems.push({
+                                id: `${Date.now()}-${Math.random()}`,
+                                name: menuItem.name,
+                                price: menuItem.price,
+                                quantity: quantity,
+                                status: 'preparando' as const,
+                                cancelled: false
+                              });
+                            }
+                          }
+                        });
+                        
+                        const newTotal = updatedItems
+                          .filter(item => !item.cancelled)
+                          .reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                        
+                        return {
+                          ...order,
+                          items: updatedItems,
+                          total: newTotal,
+                          edited: true
+                        };
+                      }
+                      return order;
+                    });
+                    
+                    saveOrders(updatedOrders);
+                    setIsEditOrderOpen(false);
+                    setLocalEditQuantities({});
+                    toast({
+                      title: "Orden actualizada",
+                      description: "Los cambios se han aplicado correctamente"
+                    });
+                  }
+                }}
+                className="px-6 bg-gradient-primary hover:opacity-90"
+              >
+                Aceptar
               </Button>
             </div>
           </div>
