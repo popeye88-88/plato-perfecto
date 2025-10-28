@@ -17,7 +17,7 @@ interface OrderItem {
   name: string;
   price: number;
   quantity: number;
-  status: 'preparando' | 'entregando' | 'cobrando';
+  status: 'preparando' | 'entregando' | 'cobrando' | 'pagado';
   cancelled?: boolean;
   cancelledAt?: Date;
   cancelledInStage?: 'preparando' | 'entregando' | 'cobrando';
@@ -68,11 +68,6 @@ export default function OrderManager() {
 
   // Load orders from localStorage (simple version)
   useEffect(() => {
-    // Clear all orders for testing
-    localStorage.removeItem('orders');
-    setOrders([]);
-    return;
-    
     const savedOrders = localStorage.getItem('orders');
     if (savedOrders) {
       try {
