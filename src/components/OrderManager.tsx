@@ -884,6 +884,37 @@ export default function OrderManager() {
           )}
         </div>
         
+        {/* Cancelled Items Section */}
+        {order.items.filter(item => item.quantity === 0 || item.cancelled).length > 0 && (
+          <div className="mt-2 pt-2 border-t border-red-200">
+            <div className="text-xs text-muted-foreground mb-1">Elementos Eliminados:</div>
+            {(() => {
+              // Group cancelled items by name
+              const groupedCancelled = order.items
+                .filter(item => item.quantity === 0 || item.cancelled)
+                .reduce((acc, item) => {
+                  if (!acc[item.name]) {
+                    acc[item.name] = {
+                      name: item.name,
+                      quantity: item.cancelled ? item.quantity : 0,
+                      price: item.price
+                    };
+                  } else {
+                    acc[item.name].quantity += item.cancelled ? item.quantity : 0;
+                  }
+                  return acc;
+                }, {} as Record<string, {name: string, quantity: number, price: number}>);
+
+              return Object.values(groupedCancelled).map((grouped, idx) => (
+                <div key={idx} className="text-xs text-muted-foreground line-through flex justify-between">
+                  <span>{grouped.quantity}x {grouped.name}</span>
+                  <span>${(grouped.price * grouped.quantity).toFixed(2)}</span>
+                </div>
+              ));
+            })()}
+          </div>
+        )}
+        
         {/* Footer with total and actions */}
         <div className="flex items-center justify-between pt-3 border-t border-border">
           <div>
