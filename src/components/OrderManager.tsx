@@ -887,20 +887,20 @@ export default function OrderManager() {
         {/* Cancelled Items Section */}
         {order.items.filter(item => item.quantity === 0 || item.cancelled).length > 0 && (
           <div className="mt-2 pt-2 border-t border-red-200">
-            <div className="text-xs text-muted-foreground mb-1">Elementos Eliminados:</div>
             {(() => {
               // Group cancelled items by name
               const groupedCancelled = order.items
                 .filter(item => item.quantity === 0 || item.cancelled)
                 .reduce((acc, item) => {
+                  const cancelledCount = item.cancelled ? item.quantity : 0;
                   if (!acc[item.name]) {
                     acc[item.name] = {
                       name: item.name,
-                      quantity: item.cancelled ? item.quantity : 0,
+                      quantity: cancelledCount,
                       price: item.price
                     };
                   } else {
-                    acc[item.name].quantity += item.cancelled ? item.quantity : 0;
+                    acc[item.name].quantity += cancelledCount;
                   }
                   return acc;
                 }, {} as Record<string, {name: string, quantity: number, price: number}>);
