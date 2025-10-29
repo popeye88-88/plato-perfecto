@@ -1571,10 +1571,67 @@ export default function OrderManager() {
                   </div>
                 </div>
 
+                {/* Removed Items (from current edit session) */}
+                {(() => {
+                  // Calculate removed items by comparing localEditQuantities with original quantities
+                  const removedItems: Array<{name: string, quantity: number, price: number}> = [];
+                  
+                  selectedOrderForEdit.items.forEach(item => {
+                    if (!item.cancelled) {
+                      const originalQuantity = item.quantity;
+                      const currentQuantity = localEditQuantities[item.name] || 0;
+                      const removedQuantity = originalQuantity - currentQuantity;
+                      
+                      if (removedQuantity > 0) {
+                        removedItems.push({
+                          name: item.name,
+                          quantity: removedQuantity,
+                          price: item.price
+                        });
+                      }
+                    }
+                  });
+                  
+                  if (removedItems.length > 0) {
+                    // Group removed items by name
+                    const groupedRemoved = removedItems.reduce((acc, item) => {
+                      if (!acc[item.name]) {
+                        acc[item.name] = { name: item.name, price: item.price, quantity: 0 };
+                      }
+                      acc[item.name].quantity += item.quantity;
+                      return acc;
+                    }, {} as Record<string, {name: string, price: number, quantity: number}>);
+                    
+                    return (
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-semibold text-muted-foreground">Elementos Eliminados</h3>
+                        <div className="space-y-2">
+                          {Object.values(groupedRemoved).map((item, index) => (
+                            <div key={`removed-${index}`} className="flex items-center justify-between p-3 border border-red-200 rounded-lg bg-red-50">
+                              <div className="flex items-center gap-3 flex-1">
+                                <span className="text-lg">❌</span>
+                                <div className="line-through text-red-600">
+                                  <span className="font-medium">{item.quantity}x {item.name}</span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold text-red-600 line-through">
+                                  ${(item.price * item.quantity).toFixed(2)}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+
                 {/* Cancelled Items (if any) */}
                 {selectedOrderForEdit.items.filter(item => item.cancelled || item.quantity === 0).length > 0 && (
                   <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-muted-foreground">Elementos Eliminados</h3>
+                    <h3 className="text-lg font-semibold text-muted-foreground">Elementos Previamente Eliminados</h3>
                     <div className="space-y-2">
                       {(() => {
                         // Group cancelled items by name
@@ -1668,6 +1725,27 @@ export default function OrderManager() {
                           }
                         });
                         
+                        // Create cancelled items for removed quantities
+                        const removedQuantities: OrderItem[] = [];
+                        order.items.forEach(item => {
+                          if (!item.cancelled && localEditQuantities.hasOwnProperty(item.name)) {
+                            const originalQuantity = item.quantity;
+                            const newQuantity = localEditQuantities[item.name];
+                            const removedQuantity = originalQuantity - newQuantity;
+                            
+                            if (removedQuantity > 0) {
+                              // Create a cancelled item for the removed quantity
+                              removedQuantities.push({
+                                ...item,
+                                quantity: removedQuantity,
+                                cancelled: true,
+                                cancelledAt: new Date(),
+                                cancelledInStage: order.status as 'preparando' | 'entregando' | 'cobrando'
+                              });
+                            }
+                          }
+                        });
+                        
                         // Add new items
                         Object.entries(localEditQuantities).forEach(([name, quantity]) => {
                           if (!processedItems.has(name) && quantity > 0) {
@@ -1685,8 +1763,8 @@ export default function OrderManager() {
                           }
                         });
                         
-                        // Combine updated items with cancelled items
-                        const finalItems = [...updatedItems, ...cancelledItems];
+                        // Combine updated items with existing cancelled items and new removed quantities
+                        const finalItems = [...updatedItems, ...cancelledItems, ...removedQuantities];
                         
                         const newTotal = finalItems
                           .filter(item => !item.cancelled)
