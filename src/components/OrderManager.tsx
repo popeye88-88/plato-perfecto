@@ -1105,7 +1105,7 @@ export default function OrderManager() {
                     onChange={(e) => setNewOrderForm(prev => ({ ...prev, diners: parseInt(e.target.value) || 1 }))}
                     className="mt-2"
                   />
-                </div>
+                      </div>
                 </div>
                 
               {/* Menu Items Selection */}
@@ -1143,17 +1143,17 @@ export default function OrderManager() {
                               onClick={() => addItemToOrder(item)}
                               className="bg-gradient-primary hover:opacity-90 h-8 w-8 p-0"
                           >
-                              <Plus className="h-4 w-4" />
-                          </Button>
-                        </div>
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
                     </div>
                     </div>
                     );
                   })}
                 </div>
-              </div>
                 </div>
-                
+              </div>
+
             {/* Fixed Footer */}
             <div className="border-t border-border pt-4 mt-4">
               <div className="flex justify-between items-center mb-4">
@@ -1289,7 +1289,7 @@ export default function OrderManager() {
           </DialogHeader>
           
           <div className="space-y-4">
-            <div>
+              <div>
               <Label>Seleccionar productos para descuento:</Label>
               <div className="space-y-2 mt-2">
                 {selectedOrderForDiscount?.items.map((item) => (
@@ -1312,19 +1312,19 @@ export default function OrderManager() {
                   </div>
                 ))}
               </div>
-            </div>
-            
+                </div>
+                
             <div>
               <Label htmlFor="discountReason">Razón del descuento (obligatorio):</Label>
-              <Input
+                  <Input
                 id="discountReason"
                 value={discountReason}
                 onChange={(e) => setDiscountReason(e.target.value)}
                 placeholder="Ej: Cliente frecuente, problema con el pedido..."
                 className="mt-2"
-              />
-            </div>
-            
+                  />
+                </div>
+                
             <div className="flex justify-end space-x-2">
               <Button variant="outline" onClick={() => setIsDiscountOpen(false)}>
                 Cancelar
@@ -1332,7 +1332,7 @@ export default function OrderManager() {
               <Button onClick={applyDiscount} className="bg-gradient-primary hover:opacity-90">
                 Aplicar Descuento
               </Button>
-            </div>
+                        </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -1412,9 +1412,9 @@ export default function OrderManager() {
                             {data.added.map((add, idx) => (
                               <div key={idx} className="text-sm text-green-600">
                                 +{add.quantity} - {new Date(add.timestamp).toLocaleString('es-ES')}
-                              </div>
+                        </div>
                             ))}
-                          </div>
+                      </div>
                         )}
                         
                         {/* Removed items */}
@@ -1474,13 +1474,13 @@ export default function OrderManager() {
             <div>
               <Label>Método de pago:</Label>
               <div className="flex gap-4 mt-2">
-                <Button
+                          <Button 
                   variant={paymentMethod === 'tarjeta' ? 'default' : 'outline'}
                   onClick={() => setPaymentMethod('tarjeta')}
                   className="flex-1"
                 >
                   💳 Tarjeta
-                </Button>
+                          </Button>
                 <Button
                   variant={paymentMethod === 'efectivo' ? 'default' : 'outline'}
                   onClick={() => setPaymentMethod('efectivo')}
@@ -1523,6 +1523,15 @@ export default function OrderManager() {
                   <div className="space-y-2">
                     {menuItems.map((menuItem) => {
                       const currentQuantity = localEditQuantities[menuItem.name] || 0;
+                      // Check if this item was in the original order
+                      const originalItem = selectedOrderForEdit.items.find(item => item.name === menuItem.name && !item.cancelled);
+                      const originalQuantity = originalItem ? originalItem.quantity : 0;
+                      
+                      // If there were units removed (originalQuantity > currentQuantity), don't show in normal list
+                      // Only show if no original item existed OR if currentQuantity equals or exceeds originalQuantity
+                      if (originalQuantity > 0 && originalQuantity > currentQuantity) {
+                        return null;
+                      }
                       
                       return (
                         <div key={menuItem.id} className="flex items-center justify-between p-3 border border-border rounded-lg bg-card">
@@ -1532,8 +1541,8 @@ export default function OrderManager() {
                           </div>
                           <div className="flex items-center gap-3">
                             <div className="flex items-center gap-2 border border-border rounded-md">
-                              <Button
-                                size="sm"
+                          <Button 
+                            size="sm" 
                                 variant="ghost"
                                 onClick={() => {
                                   setLocalEditQuantities(prev => ({
@@ -1545,12 +1554,12 @@ export default function OrderManager() {
                                 className="h-6 w-6 p-0"
                               >
                                 <Minus className="h-3 w-3" />
-                              </Button>
+                          </Button>
                               <span className="text-sm font-medium w-8 text-center">{currentQuantity}</span>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => {
+                          <Button 
+                            size="sm" 
+                            variant="ghost"
+                            onClick={() => {
                                   setLocalEditQuantities(prev => ({
                                     ...prev,
                                     [menuItem.name]: (prev[menuItem.name] || 0) + 1
@@ -1559,8 +1568,8 @@ export default function OrderManager() {
                                 className="h-6 w-6 p-0"
                               >
                                 <Plus className="h-3 w-3" />
-                              </Button>
-                            </div>
+                          </Button>
+                        </div>
                             <span className="font-semibold text-primary min-w-[70px] text-right">
                               ${(menuItem.price * currentQuantity).toFixed(2)}
                             </span>
@@ -1619,9 +1628,9 @@ export default function OrderManager() {
                                   ${(item.price * item.quantity).toFixed(2)}
                                 </span>
                               </div>
-                            </div>
-                          ))}
-                        </div>
+                    </div>
+                  ))}
+                </div>
                       </div>
                     );
                   }
@@ -1660,7 +1669,7 @@ export default function OrderManager() {
                               <span className="text-lg">❌</span>
                               <div className="line-through text-muted-foreground">
                                 <span className="font-medium">{grouped.name}</span>
-                              </div>
+                  </div>
                               <Badge variant="secondary" className="text-xs">
                                 Eliminado en {grouped.cancelledInStage || 'edición'}
                               </Badge>
@@ -1687,16 +1696,16 @@ export default function OrderManager() {
           {/* Fixed Footer */}
           <div className="border-t border-border pt-4 mt-4">
             <div className="flex justify-between">
-              <Button 
-                variant="outline" 
-                onClick={() => {
+                    <Button 
+                      variant="outline" 
+                      onClick={() => {
                   setIsEditOrderOpen(false);
                   setLocalEditQuantities({});
                 }} 
                 className="px-6"
-              >
-                Cancelar
-              </Button>
+                    >
+                      Cancelar
+                    </Button>
               <Button 
                 onClick={() => {
                   // Apply changes to the order
@@ -1714,7 +1723,14 @@ export default function OrderManager() {
                         order.items.forEach(item => {
                           if (!item.cancelled && localEditQuantities.hasOwnProperty(item.name)) {
                             const newQuantity = localEditQuantities[item.name];
-                            if (newQuantity > 0) {
+                            const originalQuantity = item.quantity;
+                            
+                            // Only add to updated items if:
+                            // - No units were removed (newQuantity >= originalQuantity), OR
+                            // - This is a new item that wasn't in the order before (originalQuantity === 0)
+                            // If units were removed (originalQuantity > newQuantity), don't add here
+                            // It will be handled by the removedQuantities logic below
+                            if (newQuantity > 0 && newQuantity >= originalQuantity) {
                               updatedItems.push({ ...item, quantity: newQuantity });
                             }
                             processedItems.add(item.name);
@@ -1792,11 +1808,11 @@ export default function OrderManager() {
                 className="px-6 bg-gradient-primary hover:opacity-90"
               >
                 Aceptar
-              </Button>
+                    </Button>
+              </div>
             </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+          </DialogContent>
+        </Dialog>
 
       {/* Cancel Item Confirmation Dialog */}
       <Dialog open={isCancelItemDialogOpen} onOpenChange={setIsCancelItemDialogOpen}>
@@ -1815,8 +1831,8 @@ export default function OrderManager() {
                     Estás a punto de eliminar un elemento de una orden en etapa de cobro. Este elemento aparecerá como tachado y no será cobrado.
                   </p>
                 </div>
-              </div>
-            </div>
+                </div>
+                </div>
 
             <div className="space-y-2">
               <Label htmlFor="cancelReason" className="text-sm font-medium">Razón de eliminación *</Label>
@@ -1826,12 +1842,12 @@ export default function OrderManager() {
                 value={cancelReason}
                 onChange={(e) => setCancelReason(e.target.value)}
               />
-            </div>
+              </div>
 
             <p className="text-xs text-muted-foreground">
               * Campo obligatorio. Explica por qué se elimina este elemento.
             </p>
-          </div>
+              </div>
 
           <div className="flex justify-end gap-3 mt-6">
             <Button 
@@ -1851,7 +1867,7 @@ export default function OrderManager() {
             >
               Confirmar Eliminación
             </Button>
-          </div>
+              </div>
         </DialogContent>
       </Dialog>
       </div>
