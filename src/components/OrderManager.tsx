@@ -126,16 +126,6 @@ export default function OrderManager() {
     }
   }, []);
 
-  // Update selectedOrderForEdit when orders change
-  useEffect(() => {
-    if (selectedOrderForEdit && isEditOrderOpen) {
-      const updatedOrder = orders.find(o => o.id === selectedOrderForEdit.id);
-      if (updatedOrder) {
-        setSelectedOrderForEdit(updatedOrder);
-      }
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orders, isEditOrderOpen]);
 
   // Save orders to localStorage
   const saveOrders = (newOrders: Order[]) => {
@@ -1630,14 +1620,10 @@ export default function OrderManager() {
           {/* Fixed Footer */}
           <div className="border-t border-border pt-4 mt-4">
             <div className="flex justify-between">
-              <Button 
-                variant="outline" 
-                onClick={() => {
-                  setIsEditOrderOpen(false);
-                  setLocalEditQuantities({});
-                }} 
-                className="px-6"
-              >
+              <Button variant="outline" onClick={() => {
+                setIsEditOrderOpen(false);
+                setLocalEditQuantities({});
+              }} className="px-6">
                 Cancelar
               </Button>
               <Button 
@@ -1646,14 +1632,11 @@ export default function OrderManager() {
                   if (selectedOrderForEdit) {
                     const updatedOrders = orders.map(order => {
                       if (order.id === selectedOrderForEdit.id) {
-                        // Keep cancelled items
-                        const cancelledItems = order.items.filter(item => item.cancelled);
-                        
                         // Update or add items based on localEditQuantities
                         const updatedItems: OrderItem[] = [];
                         const processedItems = new Set<string>();
                         
-                        // First, update existing non-cancelled items
+                        // First, update existing items
                         order.items.forEach(item => {
                           if (!item.cancelled && localEditQuantities.hasOwnProperty(item.name)) {
                             const newQuantity = localEditQuantities[item.name];
@@ -1685,16 +1668,13 @@ export default function OrderManager() {
                           }
                         });
                         
-                        // Combine updated items with cancelled items
-                        const finalItems = [...updatedItems, ...cancelledItems];
-                        
-                        const newTotal = finalItems
+                        const newTotal = updatedItems
                           .filter(item => !item.cancelled)
                           .reduce((sum, item) => sum + (item.price * item.quantity), 0);
                         
                         return {
                           ...order,
-                          items: finalItems,
+                          items: updatedItems,
                           total: newTotal,
                           edited: true
                         };
