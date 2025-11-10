@@ -1585,7 +1585,8 @@ export default function OrderManager() {
                   selectedOrderForEdit.items.forEach(item => {
                     if (!item.cancelled) {
                       const originalQuantity = item.quantity;
-                      const currentQuantity = localEditQuantities[item.name] || 0;
+                      const quantityKey = item.id ?? item.name;
+                      const currentQuantity = localEditQuantities[quantityKey] ?? localEditQuantities[item.name] ?? 0;
                       const removedQuantity = originalQuantity - currentQuantity;
                       
                       if (removedQuantity > 0) {
