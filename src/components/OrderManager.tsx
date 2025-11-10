@@ -1730,7 +1730,7 @@ export default function OrderManager() {
                             // - This is a new item that wasn't in the order before (originalQuantity === 0)
                             // If units were removed (originalQuantity > newQuantity), don't add here
                             // It will be handled by the removedQuantities logic below
-                            if (newQuantity > 0 && newQuantity >= originalQuantity) {
+                            if (newQuantity > 0) {
                               updatedItems.push({ ...item, quantity: newQuantity });
                             }
                             processedItems.add(item.name);
