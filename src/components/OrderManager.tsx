@@ -778,7 +778,7 @@ export default function OrderManager() {
                     const initialQuantities: Record<string, number> = {};
                     order.items.forEach(item => {
                       if (!item.cancelled) {
-                        initialQuantities[item.name] = item.quantity;
+                        initialQuantities[item.id] = item.quantity;
                       }
                     });
                     setLocalEditQuantities(initialQuantities);
@@ -1519,9 +1519,9 @@ export default function OrderManager() {
                   <h3 className="text-lg font-semibold text-foreground">Elementos del Menú</h3>
                   <div className="space-y-2">
                     {menuItems.map((menuItem) => {
-                      const currentQuantity = localEditQuantities[menuItem.name] || 0;
+                      const currentQuantity = localEditQuantities[menuItem.id] || 0;
                       // Check if this item was in the original order
-                      const originalItem = selectedOrderForEdit.items.find(item => item.name === menuItem.name && !item.cancelled);
+                      const originalItem = selectedOrderForEdit.items.find(item => item.id === menuItem.id && !item.cancelled);
                       const originalQuantity = originalItem ? originalItem.quantity : 0;
                       
                       // If there were units removed (originalQuantity > currentQuantity), don't show in normal list
@@ -1544,7 +1544,7 @@ export default function OrderManager() {
                                 onClick={() => {
                                   setLocalEditQuantities(prev => ({
                                     ...prev,
-                                    [menuItem.name]: Math.max(0, (prev[menuItem.name] || 0) - 1)
+                                    [menuItem.id]: Math.max(0, (prev[menuItem.id] || 0) - 1)
                                   }));
                                 }}
                                 disabled={currentQuantity <= 0}
@@ -1559,7 +1559,7 @@ export default function OrderManager() {
                             onClick={() => {
                                   setLocalEditQuantities(prev => ({
                                     ...prev,
-                                    [menuItem.name]: (prev[menuItem.name] || 0) + 1
+                                    [menuItem.id]: (prev[menuItem.id] || 0) + 1
                                   }));
                                 }}
                                 className="h-6 w-6 p-0"
@@ -1721,8 +1721,8 @@ export default function OrderManager() {
                         
                         // First, update existing non-cancelled items
                         order.items.forEach(item => {
-                          if (!item.cancelled && localEditQuantities.hasOwnProperty(item.name)) {
-                            const newQuantity = localEditQuantities[item.name];
+                          if (!item.cancelled && localEditQuantities.hasOwnProperty(item.id)) {
+                            const newQuantity = localEditQuantities[item.id];
                             
                             if (newQuantity > 0) {
                               updatedItems.push({ 
@@ -1732,23 +1732,23 @@ export default function OrderManager() {
                                 cancelled: false 
                               });
                             }
-                            processedItems.add(item.name);
+                            processedItems.add(item.id);
                           } else if (!item.cancelled) {
                             updatedItems.push({ 
                               ...item, 
                               originalQuantity: item.quantity,
                               cancelled: false 
                             });
-                            processedItems.add(item.name);
+                            processedItems.add(item.id);
                           }
                         });
                         
                         // Create cancelled items for removed quantities
                         const removedQuantities: OrderItem[] = [];
                         order.items.forEach(item => {
-                          if (!item.cancelled && localEditQuantities.hasOwnProperty(item.name)) {
+                          if (!item.cancelled && localEditQuantities.hasOwnProperty(item.id)) {
                             const originalQuantity = item.quantity;
-                            const newQuantity = localEditQuantities[item.name];
+                            const newQuantity = localEditQuantities[item.id];
                             const removedQuantity = originalQuantity - newQuantity;
                             
                             if (removedQuantity > 0) {
@@ -1766,12 +1766,12 @@ export default function OrderManager() {
                         });
                         
                         // Add new items
-                        Object.entries(localEditQuantities).forEach(([name, quantity]) => {
-                          if (!processedItems.has(name) && quantity > 0) {
-                            const menuItem = menuItems.find(m => m.name === name);
+                        Object.entries(localEditQuantities).forEach(([itemId, quantity]) => {
+                          if (!processedItems.has(itemId) && quantity > 0) {
+                            const menuItem = menuItems.find(m => m.id === itemId);
                             if (menuItem) {
                               updatedItems.push({
-                                id: `${Date.now()}-${Math.random()}`,
+                                id: menuItem.id,
                                 name: menuItem.name,
                                 price: menuItem.price,
                                 quantity: quantity,
