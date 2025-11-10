@@ -726,8 +726,11 @@ export default function OrderManager() {
     const isCobrandoOrPagado = currentTab === 'cobrando' || currentTab === 'pagado';
     
     // Group items for Cobrando and Pagado tabs
+    const activeItems = order.items.filter(item => !item.cancelled && item.quantity > 0);
+    const cancelledItems = order.items.filter(item => item.cancelled && item.quantity > 0);
+
     const groupedItems = isCobrandoOrPagado
-      ? order.items.reduce((acc, item) => {
+      ? activeItems.reduce((acc, item) => {
           const key = item.name;
           if (!acc[key]) {
             acc[key] = { name: item.name, price: item.price, quantity: 0, totalPrice: 0 };
@@ -817,7 +820,7 @@ export default function OrderManager() {
             ))
           ) : (
             // Individual items for Preparando and Entregando - one line per item
-            order.items.flatMap((item, itemIndex) => {
+            activeItems.flatMap((item, itemIndex) => {
               const isPreparandoTab = currentTab === 'preparando';
               const isEntregandoTab = currentTab === 'entregando';
               
@@ -861,7 +864,7 @@ export default function OrderManager() {
                   <div key={individualItemId} className="flex items-center justify-between text-sm py-2 border-b border-border/50 last:border-b-0">
                     {/* Left column - Check mark */}
                     <div className="flex items-center">
-                      {showCheckbox && !item.cancelled && (
+                      {showCheckbox && (
                   <Checkbox
                           checked={individualItemChecked}
                           disabled={!individualItemEnabled}
@@ -937,8 +940,8 @@ export default function OrderManager() {
                     </div>
                     
                     {/* Center column - Item name */}
-                    <div className={`flex-1 px-3 ${(item.cancelled || item.quantity === 0) ? 'line-through text-muted-foreground' : (!individualItemEnabled && showCheckbox ? 'text-muted-foreground' : 'text-foreground')}`}>
-                      <span className={`font-medium ${(item.cancelled || item.quantity === 0) ? 'text-muted-foreground' : 'text-foreground'}`}>
+                    <div className={`flex-1 px-3 ${(!individualItemEnabled && showCheckbox) ? 'text-muted-foreground' : 'text-foreground'}`}>
+                      <span className="font-medium text-foreground">
                         {item.name}
                 </span>
               </div>
@@ -947,8 +950,7 @@ export default function OrderManager() {
                     <div className="flex items-center">
                       {!isCobrandoOrPagado && (
                         <span className="text-lg">
-                          {(item.cancelled || item.quantity === 0) ? getStatusSymbol(item.cancelledInStage || 'preparando') : 
-                           getStatusSymbol(individualItemStatus)}
+                          {getStatusSymbol(individualItemStatus)}
                         </span>
                       )}
             </div>
@@ -960,37 +962,32 @@ export default function OrderManager() {
         </div>
         
         {/* Cancelled Items Section */}
-        {order.items.some(item => {
-          const cancelledCount = item.cancelled ? item.quantity : 0;
-          const reducedCount = item.originalQuantity ? Math.max(0, item.originalQuantity - item.quantity) : 0;
-          return cancelledCount > 0 || reducedCount > 0;
-        }) && (
+        {cancelledItems.length > 0 && (
           <div className="mt-2 pt-2 border-t border-red-200">
             {(() => {
-              // Group cancelled items by name
-              const groupedCancelled = order.items
-                .reduce((acc, item) => {
-                  const cancelledCount = item.cancelled ? item.quantity : 0;
-                  const reducedCount = item.originalQuantity ? Math.max(0, item.originalQuantity - item.quantity) : 0;
-                  const totalRemoved = cancelledCount + reducedCount;
-                  
-                  if (totalRemoved > 0) {
-                    if (!acc[item.name]) {
-                      acc[item.name] = {
-                        name: item.name,
-                        quantity: totalRemoved,
-                        price: item.price
-                      };
-                    } else {
-                      acc[item.name].quantity += totalRemoved;
-                    }
-                  }
-                  return acc;
-                }, {} as Record<string, {name: string, quantity: number, price: number}>);
+              const groupedCancelled = cancelledItems.reduce((acc, item) => {
+                if (!acc[item.name]) {
+                  acc[item.name] = {
+                    name: item.name,
+                    quantity: 0,
+                    price: item.price,
+                    cancelledInStage: item.cancelledInStage
+                  };
+                }
+                acc[item.name].quantity += item.quantity;
+                return acc;
+              }, {} as Record<string, {name: string; quantity: number; price: number; cancelledInStage?: string}>);
 
               return Object.values(groupedCancelled).map((grouped, idx) => (
-                <div key={idx} className="text-xs text-muted-foreground line-through flex justify-between">
-                  <span>{grouped.quantity}x {grouped.name}</span>
+                <div key={idx} className="flex justify-between items-center text-xs text-muted-foreground line-through">
+                  <div className="flex items-center gap-2">
+                    <span>{grouped.quantity}x {grouped.name}</span>
+                    {grouped.cancelledInStage && (
+                      <Badge variant="secondary" className="text-[10px]">
+                        Eliminado en {grouped.cancelledInStage}
+                      </Badge>
+                    )}
+                  </div>
                   <span>${(grouped.price * grouped.quantity).toFixed(2)}</span>
           </div>
               ));
@@ -1712,6 +1709,9 @@ export default function OrderManager() {
                   if (selectedOrderForEdit) {
                     const updatedOrders = orders.map(order => {
                       if (order.id === selectedOrderForEdit.id) {
+                        const currentStage: 'preparando' | 'entregando' | 'cobrando' =
+                          order.status === 'pagado' ? 'cobrando' : order.status;
+
                         // Keep cancelled items
                         const cancelledItems = order.items.filter(item => item.cancelled);
                         
@@ -1723,20 +1723,22 @@ export default function OrderManager() {
                         order.items.forEach(item => {
                           if (!item.cancelled && localEditQuantities.hasOwnProperty(item.name)) {
                             const newQuantity = localEditQuantities[item.name];
-                            const originalQuantity = item.quantity;
                             
-                            // Only add to updated items if:
-                            // - No units were removed (newQuantity >= originalQuantity), OR
-                            // - This is a new item that wasn't in the order before (originalQuantity === 0)
-                            // If units were removed (originalQuantity > newQuantity), don't add here
-                            // It will be handled by the removedQuantities logic below
                             if (newQuantity > 0) {
-                              updatedItems.push({ ...item, quantity: newQuantity });
+                              updatedItems.push({ 
+                                ...item, 
+                                quantity: newQuantity,
+                                originalQuantity: newQuantity,
+                                cancelled: false 
+                              });
                             }
                             processedItems.add(item.name);
                           } else if (!item.cancelled) {
-                            // Keep items that aren't in the local edit
-                            updatedItems.push(item);
+                            updatedItems.push({ 
+                              ...item, 
+                              originalQuantity: item.quantity,
+                              cancelled: false 
+                            });
                             processedItems.add(item.name);
                           }
                         });
@@ -1754,9 +1756,10 @@ export default function OrderManager() {
                               removedQuantities.push({
                                 ...item,
                                 quantity: removedQuantity,
+                                originalQuantity: removedQuantity,
                                 cancelled: true,
                                 cancelledAt: new Date(),
-                                cancelledInStage: order.status as 'preparando' | 'entregando' | 'cobrando'
+                                cancelledInStage: currentStage
                               });
                             }
                           }
@@ -1772,6 +1775,7 @@ export default function OrderManager() {
                                 name: menuItem.name,
                                 price: menuItem.price,
                                 quantity: quantity,
+                                originalQuantity: quantity,
                                 status: 'preparando' as const,
                                 cancelled: false
                               });
@@ -1781,6 +1785,21 @@ export default function OrderManager() {
                         
                         // Combine updated items with existing cancelled items and new removed quantities
                         const finalItems = [...updatedItems, ...cancelledItems, ...removedQuantities];
+
+                        const previousIndividualStatus = order.individualItemsStatus || {};
+                        const getItemStatusForIndividual = (status: OrderItem['status']): 'preparando' | 'entregando' | 'cobrando' => {
+                          if (status === 'pagado') return 'cobrando';
+                          return status;
+                        };
+                        const rebuiltIndividualStatus: Record<string, 'preparando' | 'entregando' | 'cobrando'> = {};
+
+                        finalItems.forEach(item => {
+                          if (item.cancelled) return;
+                          for (let i = 0; i < item.quantity; i++) {
+                            const key = `${item.id}-${i}`;
+                            rebuiltIndividualStatus[key] = previousIndividualStatus[key] || getItemStatusForIndividual(item.status);
+                          }
+                        });
                         
                         const newTotal = finalItems
                           .filter(item => !item.cancelled)
@@ -1789,6 +1808,7 @@ export default function OrderManager() {
                         return {
                           ...order,
                           items: finalItems,
+                          individualItemsStatus: rebuiltIndividualStatus,
                           total: newTotal,
                           edited: true
                         };
