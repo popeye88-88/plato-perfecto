@@ -722,6 +722,47 @@ export default function OrderManager() {
     }
   };
 
+  const collectQuantityKeys = (
+    orderItem?: OrderItem,
+    menuItem?: { id?: string; name?: string }
+  ): string[] => {
+    const keys = new Set<string>();
+    if (menuItem?.id) keys.add(menuItem.id);
+    if (orderItem?.id) keys.add(orderItem.id);
+    if (menuItem?.name) keys.add(menuItem.name);
+    if (orderItem?.name) keys.add(orderItem.name);
+    return Array.from(keys);
+  };
+
+  const resolveQuantityValue = (
+    quantities: Record<string, number>,
+    orderItem?: OrderItem,
+    menuItem?: { id?: string; name?: string },
+    fallback: number = 0
+  ): number => {
+    for (const key of collectQuantityKeys(orderItem, menuItem)) {
+      if (key && Object.prototype.hasOwnProperty.call(quantities, key)) {
+        return quantities[key];
+      }
+    }
+    return orderItem?.quantity ?? fallback;
+  };
+
+  const applyQuantityUpdate = (
+    quantities: Record<string, number>,
+    newQuantity: number,
+    orderItem?: OrderItem,
+    menuItem?: { id?: string; name?: string }
+  ): Record<string, number> => {
+    const updated = { ...quantities };
+    collectQuantityKeys(orderItem, menuItem).forEach(key => {
+      if (key) {
+        updated[key] = newQuantity;
+      }
+    });
+    return updated;
+  };
+
   const renderOrderCard = (order: Order, currentTab: string) => {
     const isCobrandoOrPagado = currentTab === 'cobrando' || currentTab === 'pagado';
     
@@ -778,7 +819,14 @@ export default function OrderManager() {
                     const initialQuantities: Record<string, number> = {};
                     order.items.forEach(item => {
                       if (!item.cancelled) {
-                        initialQuantities[item.id] = item.quantity;
+                        const matchingMenuItem = menuItems.find(menuItem => 
+                          menuItem.id === item.id || menuItem.name === item.name
+                        );
+                        collectQuantityKeys(item, matchingMenuItem).forEach(key => {
+                          if (key) {
+                            initialQuantities[key] = item.quantity;
+                          }
+                        });
                       }
                     });
                     setLocalEditQuantities(initialQuantities);
@@ -1519,17 +1567,11 @@ export default function OrderManager() {
                   <h3 className="text-lg font-semibold text-foreground">Elementos del Menú</h3>
                   <div className="space-y-2">
                     {menuItems.map((menuItem) => {
-                      const currentQuantity = localEditQuantities[menuItem.id] || 0;
-                      // Check if this item was in the original order
-                      const originalItem = selectedOrderForEdit.items.find(item => item.id === menuItem.id && !item.cancelled);
-                      const originalQuantity = originalItem ? originalItem.quantity : 0;
-                      
-                      // If there were units removed (originalQuantity > currentQuantity), don't show in normal list
-                      // Only show if no original item existed OR if currentQuantity equals or exceeds originalQuantity
-                      if (originalQuantity > 0 && originalQuantity > currentQuantity) {
-                        return null;
-                      }
-                      
+                      const orderItem = selectedOrderForEdit.items.find(item => 
+                        !item.cancelled && (item.id === menuItem.id || item.name === menuItem.name)
+                      );
+                      const currentQuantity = resolveQuantityValue(localEditQuantities, orderItem, menuItem, 0);
+
                       return (
                         <div key={menuItem.id} className="flex items-center justify-between p-3 border border-border rounded-lg bg-card">
                           <div className="flex items-center gap-3 flex-1">
@@ -1542,10 +1584,13 @@ export default function OrderManager() {
                             size="sm" 
                                 variant="ghost"
                                 onClick={() => {
-                                  setLocalEditQuantities(prev => ({
-                                    ...prev,
-                                    [menuItem.id]: Math.max(0, (prev[menuItem.id] || 0) - 1)
-                                  }));
+                                  setLocalEditQuantities(prev => {
+                                    const newQuantity = Math.max(
+                                      0,
+                                      resolveQuantityValue(prev, orderItem, menuItem, 0) - 1
+                                    );
+                                    return applyQuantityUpdate(prev, newQuantity, orderItem, menuItem);
+                                  });
                                 }}
                                 disabled={currentQuantity <= 0}
                                 className="h-6 w-6 p-0"
@@ -1557,10 +1602,10 @@ export default function OrderManager() {
                             size="sm" 
                             variant="ghost"
                             onClick={() => {
-                                  setLocalEditQuantities(prev => ({
-                                    ...prev,
-                                    [menuItem.id]: (prev[menuItem.id] || 0) + 1
-                                  }));
+                                  setLocalEditQuantities(prev => {
+                                    const newQuantity = resolveQuantityValue(prev, orderItem, menuItem, 0) + 1;
+                                    return applyQuantityUpdate(prev, newQuantity, orderItem, menuItem);
+                                  });
                                 }}
                                 className="h-6 w-6 p-0"
                               >
@@ -1585,8 +1630,10 @@ export default function OrderManager() {
                   selectedOrderForEdit.items.forEach(item => {
                     if (!item.cancelled) {
                       const originalQuantity = item.quantity;
-                      const quantityKey = item.id ?? item.name;
-                      const currentQuantity = localEditQuantities[quantityKey] ?? localEditQuantities[item.name] ?? 0;
+                      const matchingMenuItem = menuItems.find(menuItem => 
+                        menuItem.id === item.id || menuItem.name === item.name
+                      );
+                      const currentQuantity = resolveQuantityValue(localEditQuantities, item, matchingMenuItem, 0);
                       const removedQuantity = originalQuantity - currentQuantity;
                       
                       if (removedQuantity > 0) {
@@ -1719,41 +1766,34 @@ export default function OrderManager() {
                         // Update or add items based on localEditQuantities
                         const updatedItems: OrderItem[] = [];
                         const processedItems = new Set<string>();
-                        
-                        // First, update existing non-cancelled items
+                        const removedQuantities: OrderItem[] = [];
+
                         order.items.forEach(item => {
-                          if (!item.cancelled && localEditQuantities.hasOwnProperty(item.id)) {
-                            const newQuantity = localEditQuantities[item.id];
-                            
+                          const matchingMenuItem = menuItems.find(menuItem =>
+                            menuItem.id === item.id || menuItem.name === item.name
+                          );
+                          const keys = collectQuantityKeys(item, matchingMenuItem);
+                          keys.forEach(key => processedItems.add(key));
+
+                          if (!item.cancelled) {
+                            const hasEditEntry = keys.some(key =>
+                              key && Object.prototype.hasOwnProperty.call(localEditQuantities, key)
+                            );
+                            const newQuantity = hasEditEntry
+                              ? resolveQuantityValue(localEditQuantities, item, matchingMenuItem, item.quantity)
+                              : item.quantity;
+
                             if (newQuantity > 0) {
-                              updatedItems.push({ 
-                                ...item, 
+                              updatedItems.push({
+                                ...item,
                                 quantity: newQuantity,
                                 originalQuantity: newQuantity,
-                                cancelled: false 
+                                cancelled: false
                               });
                             }
-                            processedItems.add(item.id);
-                          } else if (!item.cancelled) {
-                            updatedItems.push({ 
-                              ...item, 
-                              originalQuantity: item.quantity,
-                              cancelled: false 
-                            });
-                            processedItems.add(item.id);
-                          }
-                        });
-                        
-                        // Create cancelled items for removed quantities
-                        const removedQuantities: OrderItem[] = [];
-                        order.items.forEach(item => {
-                          if (!item.cancelled && localEditQuantities.hasOwnProperty(item.id)) {
-                            const originalQuantity = item.quantity;
-                            const newQuantity = localEditQuantities[item.id];
-                            const removedQuantity = originalQuantity - newQuantity;
-                            
+
+                            const removedQuantity = Math.max(0, item.quantity - newQuantity);
                             if (removedQuantity > 0) {
-                              // Create a cancelled item for the removed quantity
                               removedQuantities.push({
                                 ...item,
                                 quantity: removedQuantity,
@@ -1765,22 +1805,24 @@ export default function OrderManager() {
                             }
                           }
                         });
-                        
-                        // Add new items
-                        Object.entries(localEditQuantities).forEach(([itemId, quantity]) => {
-                          if (!processedItems.has(itemId) && quantity > 0) {
-                            const menuItem = menuItems.find(m => m.id === itemId);
-                            if (menuItem) {
-                              updatedItems.push({
-                                id: menuItem.id,
-                                name: menuItem.name,
-                                price: menuItem.price,
-                                quantity: quantity,
-                                originalQuantity: quantity,
-                                status: 'preparando' as const,
-                                cancelled: false
-                              });
-                            }
+
+                        menuItems.forEach(menuItem => {
+                          const quantity = resolveQuantityValue(localEditQuantities, undefined, menuItem, 0);
+                          const keys = collectQuantityKeys(undefined, menuItem);
+                          const alreadyProcessed = keys.some(key => processedItems.has(key));
+
+                          if (!alreadyProcessed && quantity > 0) {
+                            updatedItems.push({
+                              id: menuItem.id,
+                              name: menuItem.name,
+                              price: menuItem.price,
+                              quantity,
+                              originalQuantity: quantity,
+                              status: 'preparando' as const,
+                              cancelled: false
+                            });
+
+                            keys.forEach(key => processedItems.add(key));
                           }
                         });
                         
