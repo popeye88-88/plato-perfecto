@@ -1098,10 +1098,10 @@ export default function OrderManager() {
           </p>
         </div>
         
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto sm:justify-end">
           <Dialog open={isNewOrderDialogOpen} onOpenChange={setIsNewOrderDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-gradient-primary hover:opacity-90">
+            <Button className="bg-gradient-primary hover:opacity-90 w-full sm:w-auto">
               <Plus className="h-4 w-4 mr-2" />
               Nueva Orden
             </Button>
@@ -1225,7 +1225,7 @@ export default function OrderManager() {
           <Button 
             variant="outline" 
             onClick={clearAllOrders}
-            className="text-red-600 border-red-600 hover:bg-red-50"
+            className="text-red-600 border-red-600 hover:bg-red-50 w-full sm:w-auto"
           >
             <X className="h-4 w-4 mr-2" />
             Limpiar Órdenes
