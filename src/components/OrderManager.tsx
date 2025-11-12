@@ -1088,17 +1088,9 @@ export default function OrderManager() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-lg md:text-2xl lg:text-3xl font-bold text-foreground mb-2">
-            Gestión de Comandas
-          </h1>
-          <p className="text-sm md:text-base text-muted-foreground">
-            Administra las órdenes de tu restaurante
-          </p>
-        </div>
-        
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto sm:justify-end">
+      <div className="flex flex-col gap-4">
+        {/* Buttons at the top */}
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto sm:justify-end">
           <Dialog open={isNewOrderDialogOpen} onOpenChange={setIsNewOrderDialogOpen}>
           <DialogTrigger asChild>
             <Button className="bg-gradient-primary hover:opacity-90 w-full sm:w-auto">
@@ -1230,6 +1222,17 @@ export default function OrderManager() {
             <X className="h-4 w-4 mr-2" />
             Limpiar Órdenes
           </Button>
+        </div>
+        
+        {/* Title and description */}
+        <div>
+          <h1 className="text-lg md:text-2xl lg:text-3xl font-bold text-foreground mb-2">
+            Gestión de Comandas
+          </h1>
+          <p className="text-sm md:text-base text-muted-foreground">
+            Administra las órdenes de tu restaurante
+          </p>
+        </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
@@ -1873,7 +1876,6 @@ export default function OrderManager() {
               </div>
         </DialogContent>
       </Dialog>
-      </div>
     </div>
   );
 }
