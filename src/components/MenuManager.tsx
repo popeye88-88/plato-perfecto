@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, Edit2, Trash2, Settings } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import CategoryManager from './CategoryManager';
+import { useBusinessContext } from '@/contexts/BusinessContext';
 
 interface MenuItem {
   id: string;
@@ -24,19 +25,14 @@ interface Category {
   productCount: number;
 }
 
+type StoredCategory = Pick<Category, 'id' | 'name'>;
+
 export default function MenuManager() {
   const { toast } = useToast();
-  const [menuItems, setMenuItems] = useState<MenuItem[]>([
-    { id: '1', name: 'Pizza Margherita', price: 15.00, category: 'Pizzas', description: 'Tomate, mozzarella y albahaca fresca' },
-    { id: '2', name: 'Hamburguesa Clásica', price: 12.50, category: 'Hamburguesas', description: 'Carne, lechuga, tomate y queso' },
-    { id: '3', name: 'Pasta Carbonara', price: 14.00, category: 'Pastas', description: 'Pasta con panceta, huevo y parmesano' },
-  ]);
-  
-  const [categories, setCategories] = useState<Category[]>([
-    { id: '1', name: 'Pizzas', productCount: 1 },
-    { id: '2', name: 'Hamburguesas', productCount: 1 },
-    { id: '3', name: 'Pastas', productCount: 1 },
-  ]);
+  const { currentBusiness, updateBusiness } = useBusinessContext();
+
+  const [menuItems, setMenuItems] = useState<MenuItem[]>(currentBusiness?.menuItems || []);
+  const [categories, setCategories] = useState<Category[]>([]);
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
@@ -49,13 +45,116 @@ export default function MenuManager() {
   });
   const [newCategoryName, setNewCategoryName] = useState('');
 
-  const updateCategories = (newCategories: Category[]) => {
-    const updatedCategories = newCategories.map(cat => ({
+  const categoriesStorageKey = useMemo(() => {
+    return currentBusiness?.id ? `categories_${currentBusiness.id}` : null;
+  }, [currentBusiness?.id]);
+
+  const menuItemsStorageKey = useMemo(() => {
+    return currentBusiness?.id ? `menuItems_${currentBusiness.id}` : null;
+  }, [currentBusiness?.id]);
+
+  const recalcCategoryCounts = (cats: StoredCategory[], items: MenuItem[]): Category[] => {
+    return cats.map(cat => ({
       ...cat,
-      productCount: menuItems.filter(item => item.category === cat.name).length
+      productCount: items.filter(item => item.category === cat.name).length
     }));
-    setCategories(updatedCategories);
   };
+
+  const persistCategories = (cats: Category[]) => {
+    if (!categoriesStorageKey) return;
+    const categoriesToStore: StoredCategory[] = cats.map(({ id, name }) => ({ id, name }));
+    localStorage.setItem(categoriesStorageKey, JSON.stringify(categoriesToStore));
+  };
+
+  const updateCategories = (newCategories: Category[], items: MenuItem[] = menuItems) => {
+    const storedCategories: StoredCategory[] = newCategories.map(({ id, name }) => ({ id, name }));
+    const recalculated = recalcCategoryCounts(storedCategories, items);
+    setCategories(recalculated);
+    persistCategories(recalculated);
+  };
+
+  const persistMenuItems = (items: MenuItem[]) => {
+    if (!menuItemsStorageKey) return;
+    localStorage.setItem(menuItemsStorageKey, JSON.stringify(items));
+  };
+
+  const syncMenuItems = (items: MenuItem[]) => {
+    setMenuItems(items);
+    if (currentBusiness) {
+      const currentItemsString = JSON.stringify(currentBusiness.menuItems || []);
+      const itemsString = JSON.stringify(items);
+      if (currentItemsString !== itemsString) {
+        updateBusiness(currentBusiness.id, { menuItems: items });
+      }
+    }
+    persistMenuItems(items);
+    if (currentBusiness) {
+      updateBusiness(currentBusiness.id, { menuItems: items });
+    }
+  };
+
+  useEffect(() => {
+    const fallbackItems = currentBusiness?.menuItems || [];
+    let items = fallbackItems;
+
+    if (menuItemsStorageKey) {
+      const storedItems = localStorage.getItem(menuItemsStorageKey);
+      if (storedItems) {
+        try {
+          items = JSON.parse(storedItems);
+        } catch (error) {
+          console.error('Error parsing stored menu items:', error);
+        }
+      } else if (fallbackItems.length > 0) {
+        localStorage.setItem(menuItemsStorageKey, JSON.stringify(fallbackItems));
+      }
+    }
+
+    setMenuItems(items);
+    setEditingItem(null);
+    setFormData({ name: '', price: '', category: '', description: '' });
+    setNewCategoryName('');
+    setIsDialogOpen(false);
+  }, [currentBusiness, menuItemsStorageKey]);
+
+  useEffect(() => {
+    if (!categoriesStorageKey) {
+      setCategories([]);
+      return;
+    }
+
+    const baseItems = menuItems;
+    const savedCategories = localStorage.getItem(categoriesStorageKey);
+
+    if (savedCategories) {
+      try {
+        const parsed: StoredCategory[] = JSON.parse(savedCategories);
+        const recalculated = recalcCategoryCounts(parsed, baseItems);
+        setCategories(recalculated);
+        return;
+      } catch (error) {
+        console.error('Error parsing saved categories:', error);
+      }
+    }
+
+    const derivedNames = Array.from(new Set(baseItems.map(item => item.category)));
+    const derivedCategories = recalcCategoryCounts(
+      derivedNames.map(name => ({ id: name, name })),
+      baseItems
+    );
+    setCategories(derivedCategories);
+    persistCategories(derivedCategories);
+  }, [categoriesStorageKey, currentBusiness, menuItems]);
+
+  useEffect(() => {
+    if (!categoriesStorageKey) return;
+    setCategories(prev => {
+      const stored = prev.map(({ id, name }) => ({ id, name }));
+      const recalculated = recalcCategoryCounts(stored, menuItems);
+      persistCategories(recalculated);
+      return recalculated;
+    });
+  }, [menuItems, categoriesStorageKey]);
 
   const handleCategoryChange = (value: string) => {
     if (value === 'nueva-categoria') {
@@ -72,6 +171,15 @@ export default function MenuManager() {
     
     const categoryName = newCategoryName || formData.category;
     
+    if (!currentBusiness) {
+      toast({
+        title: "Negocio no seleccionado",
+        description: "Selecciona un negocio en el menú de ajustes para administrar su menú.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     if (!formData.name || !formData.price || !categoryName) {
       toast({
         title: "Error",
@@ -89,32 +197,37 @@ export default function MenuManager() {
       description: formData.description
     };
 
+    let updatedMenuItems: MenuItem[] = [];
+
     if (editingItem) {
-      setMenuItems(items => items.map(item => 
+      updatedMenuItems = menuItems.map(item => 
         item.id === editingItem.id ? newItem : item
-      ));
+      );
+      syncMenuItems(updatedMenuItems);
       toast({
         title: "Producto actualizado",
         description: "El producto ha sido actualizado correctamente"
       });
     } else {
-      setMenuItems(items => [...items, newItem]);
-      
-      // Add new category if it doesn't exist
-      if (newCategoryName && !categories.find(cat => cat.name === newCategoryName)) {
-        const newCategory: Category = {
-          id: Date.now().toString(),
-          name: newCategoryName,
-          productCount: 1
-        };
-        setCategories(prev => [...prev, newCategory]);
-      }
-      
+      updatedMenuItems = [...menuItems, newItem];
+      syncMenuItems(updatedMenuItems);
       toast({
         title: "Producto agregado",
         description: "El producto ha sido agregado al menú"
       });
     }
+
+    let updatedCategories = categories;
+    if (newCategoryName && !categories.find(cat => cat.name === newCategoryName)) {
+      const newCategory: Category = {
+        id: Date.now().toString(),
+        name: newCategoryName,
+        productCount: 0
+      };
+      updatedCategories = [...categories, newCategory];
+    }
+
+    updateCategories(updatedCategories, updatedMenuItems);
 
     setFormData({ name: '', price: '', category: '', description: '' });
     setNewCategoryName('');
@@ -135,7 +248,9 @@ export default function MenuManager() {
   };
 
   const handleDelete = (id: string) => {
-    setMenuItems(items => items.filter(item => item.id !== id));
+    const updatedMenuItems = menuItems.filter(item => item.id !== id);
+    syncMenuItems(updatedMenuItems);
+    updateCategories(categories, updatedMenuItems);
     toast({
       title: "Producto eliminado",
       description: "El producto ha sido eliminado del menú"
@@ -143,11 +258,33 @@ export default function MenuManager() {
   };
 
   const openNewProductDialog = () => {
+    if (!currentBusiness) {
+      toast({
+        title: "Negocio no disponible",
+        description: "Selecciona un negocio para agregar productos.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setEditingItem(null);
     setFormData({ name: '', price: '', category: '', description: '' });
     setNewCategoryName('');
     setIsDialogOpen(true);
   };
+
+  if (!currentBusiness) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-lg md:text-2xl lg:text-3xl font-bold text-foreground mb-2">Gestión de Menú</h1>
+          <p className="text-sm md:text-base text-muted-foreground">
+            Selecciona un negocio en el menú de ajustes para administrar sus productos.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const groupedItems = menuItems.reduce((acc, item) => {
     if (!acc[item.category]) {
@@ -161,7 +298,12 @@ export default function MenuManager() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-lg md:text-2xl lg:text-3xl font-bold text-foreground mb-2">Gestión de Menú</h1>
+          <div className="flex items-center gap-3 mb-2">
+            <h1 className="text-lg md:text-2xl lg:text-3xl font-bold text-foreground">Gestión de Menú</h1>
+            <Badge variant="secondary" className="text-xs md:text-sm">
+              {currentBusiness.name}
+            </Badge>
+          </div>
           <p className="text-sm md:text-base text-muted-foreground">Administra los productos de tu restaurante</p>
         </div>
         
@@ -169,6 +311,7 @@ export default function MenuManager() {
           <Button 
             onClick={openNewProductDialog}
             className="bg-gradient-primary hover:opacity-90"
+            disabled={!currentBusiness}
           >
             <Plus className="h-4 w-4 mr-2" />
             <span className="hidden sm:inline">Agregar Producto</span>
@@ -178,6 +321,7 @@ export default function MenuManager() {
             variant="outline" 
             onClick={() => setIsCategoryManagerOpen(true)}
             className="flex items-center gap-2"
+            disabled={!currentBusiness}
           >
             <Settings className="h-4 w-4" />
             <span className="hidden sm:inline">Editar Categorías</span>

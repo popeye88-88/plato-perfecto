@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -58,6 +58,9 @@ export default function OrderManager() {
   
   // Get menu items from current business
   const menuItems = currentBusiness?.menuItems || [];
+  const ordersStorageKey = useMemo(() => {
+    return currentBusiness?.id ? `orders_${currentBusiness.id}` : null;
+  }, [currentBusiness?.id]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [activeTab, setActiveTab] = useState('resumen');
   const [isNewOrderDialogOpen, setIsNewOrderDialogOpen] = useState(false);
@@ -83,48 +86,69 @@ export default function OrderManager() {
   const [itemToCancel, setItemToCancel] = useState<{orderId: string, itemId: string, individualId?: string} | null>(null);
   const [cancelReason, setCancelReason] = useState('');
 
-  // Load orders from localStorage (simple version)
-  useEffect(() => {
-    const savedOrders = localStorage.getItem('orders');
-    if (savedOrders) {
-      try {
-        const parsedOrders = JSON.parse(savedOrders).map((order: any) => {
-          // Migrate old 'entregado' status to 'cobrando'
-          const migrateStatus = (status: string) => {
-            if (status === 'entregado') return 'cobrando';
-            return status;
-          };
-          
-          // Migrate individual items status
-          if (order.individualItemsStatus) {
-            const migratedIndividualStatus: Record<string, 'preparando' | 'entregando' | 'cobrando'> = {};
-            Object.entries(order.individualItemsStatus).forEach(([key, status]) => {
-              if (typeof status === 'string') {
-                migratedIndividualStatus[key] = migrateStatus(status) as 'preparando' | 'entregando' | 'cobrando';
-              }
-            });
-            order.individualItemsStatus = migratedIndividualStatus;
-          }
-          
-          // Migrate items status
-          if (order.items) {
-            order.items = order.items.map((item: any) => ({
-              ...item,
-              status: migrateStatus(item.status)
-            }));
-          }
-          
-          return {
-            ...order,
-            createdAt: new Date(order.createdAt)
-          };
-        });
-        setOrders(parsedOrders);
-      } catch (error) {
-        console.error('Error parsing saved orders:', error);
-      }
+  const parseStoredOrders = (rawOrders: string): Order[] => {
+    try {
+      const parsedOrders = JSON.parse(rawOrders).map((order: any) => {
+        const migrateStatus = (status: string) => {
+          if (status === 'entregado') return 'cobrando';
+          return status;
+        };
+
+        if (order.individualItemsStatus) {
+          const migratedIndividualStatus: Record<string, 'preparando' | 'entregando' | 'cobrando'> = {};
+          Object.entries(order.individualItemsStatus).forEach(([key, status]) => {
+            if (typeof status === 'string') {
+              migratedIndividualStatus[key] = migrateStatus(status) as 'preparando' | 'entregando' | 'cobrando';
+            }
+          });
+          order.individualItemsStatus = migratedIndividualStatus;
+        }
+
+        if (order.items) {
+          order.items = order.items.map((item: any) => ({
+            ...item,
+            status: migrateStatus(item.status)
+          }));
+        }
+
+        return {
+          ...order,
+          createdAt: new Date(order.createdAt)
+        };
+      });
+
+      return Array.isArray(parsedOrders) ? parsedOrders : [];
+    } catch (error) {
+      console.error('Error parsing saved orders:', error);
+      return [];
     }
-  }, []);
+  };
+
+  // Load orders for the current business from localStorage
+  useEffect(() => {
+    if (!ordersStorageKey) {
+      setOrders([]);
+      return;
+    }
+
+    const savedOrders = localStorage.getItem(ordersStorageKey);
+    if (savedOrders) {
+      setOrders(parseStoredOrders(savedOrders));
+      return;
+    }
+
+    // Fallback to legacy key if present, then migrate (only for default business)
+    const legacyOrders = localStorage.getItem('orders');
+    if (legacyOrders && currentBusiness?.id === 'default-business') {
+      const migratedOrders = parseStoredOrders(legacyOrders);
+      setOrders(migratedOrders);
+      localStorage.setItem(ordersStorageKey, JSON.stringify(migratedOrders));
+      localStorage.removeItem('orders');
+      return;
+    }
+
+    setOrders([]);
+  }, [ordersStorageKey, currentBusiness?.id]);
 
   // Update selectedOrderForEdit when orders change
   useEffect(() => {
@@ -137,10 +161,24 @@ export default function OrderManager() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orders, isEditOrderOpen]);
 
+  useEffect(() => {
+    setSelectedOrderForEdit(null);
+    setSelectedOrderForHistory(null);
+    setSelectedOrderForDiscount(null);
+    setSelectedOrderForPayment(null);
+    setIsEditOrderOpen(false);
+    setIsHistoryOpen(false);
+    setIsDiscountOpen(false);
+    setIsPaymentOpen(false);
+    setLocalEditQuantities({});
+  }, [ordersStorageKey]);
+
   // Save orders to localStorage
   const saveOrders = (newOrders: Order[]) => {
     setOrders(newOrders);
-    localStorage.setItem('orders', JSON.stringify(newOrders));
+    if (ordersStorageKey) {
+      localStorage.setItem(ordersStorageKey, JSON.stringify(newOrders));
+    }
   };
 
   // Add entry to edit history
@@ -155,8 +193,17 @@ export default function OrderManager() {
 
   // Clear all orders for testing
   const clearAllOrders = () => {
+    if (!ordersStorageKey) {
+      toast({
+        title: "Negocio no seleccionado",
+        description: "Selecciona un negocio para administrar sus órdenes.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setOrders([]);
-    localStorage.removeItem('orders');
+    localStorage.removeItem(ordersStorageKey);
     toast({
       title: "Órdenes eliminadas",
       description: "Todas las órdenes han sido eliminadas para testing",
@@ -303,6 +350,15 @@ export default function OrderManager() {
   };
 
   const createNewOrder = () => {
+    if (!currentBusiness || !ordersStorageKey) {
+      toast({
+        title: "Negocio no disponible",
+        description: "Selecciona un negocio para crear órdenes.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     if (!newOrderForm.customerName.trim()) {
       toast({
         title: "Error",
@@ -1086,14 +1142,47 @@ export default function OrderManager() {
     );
   };
 
+  if (!currentBusiness) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-lg md:text-2xl lg:text-3xl font-bold text-foreground mb-2">
+              Gestión de Comandas
+            </h1>
+            <p className="text-sm md:text-base text-muted-foreground">
+              Selecciona un negocio en el menú de ajustes para visualizar sus órdenes.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4">
-        {/* Buttons at the top */}
-        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto sm:justify-end">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-3 mb-2">
+            <h1 className="text-lg md:text-2xl lg:text-3xl font-bold text-foreground">
+              Gestión de Comandas
+            </h1>
+            <Badge variant="secondary" className="text-xs md:text-sm">
+              {currentBusiness.name}
+            </Badge>
+          </div>
+          <p className="text-sm md:text-base text-muted-foreground">
+            Administra las órdenes de tu restaurante
+          </p>
+        </div>
+        
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto sm:justify-end">
           <Dialog open={isNewOrderDialogOpen} onOpenChange={setIsNewOrderDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-gradient-primary hover:opacity-90 w-full sm:w-auto">
+            <Button 
+              className="bg-gradient-primary hover:opacity-90 w-full sm:w-auto"
+              disabled={!currentBusiness}
+            >
               <Plus className="h-4 w-4 mr-2" />
               Nueva Orden
             </Button>
@@ -1218,20 +1307,11 @@ export default function OrderManager() {
             variant="outline" 
             onClick={clearAllOrders}
             className="text-red-600 border-red-600 hover:bg-red-50 w-full sm:w-auto"
+            disabled={!currentBusiness}
           >
             <X className="h-4 w-4 mr-2" />
             Limpiar Órdenes
           </Button>
-        </div>
-        
-        {/* Title and description */}
-        <div>
-          <h1 className="text-lg md:text-2xl lg:text-3xl font-bold text-foreground mb-2">
-            Gestión de Comandas
-          </h1>
-          <p className="text-sm md:text-base text-muted-foreground">
-            Administra las órdenes de tu restaurante
-          </p>
         </div>
       </div>
 
