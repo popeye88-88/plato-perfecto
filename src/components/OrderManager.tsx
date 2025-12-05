@@ -22,6 +22,7 @@ interface OrderItem {
   cancelled?: boolean;
   cancelledAt?: Date;
   cancelledInStage?: 'preparando' | 'entregando' | 'cobrando';
+  cancellationReason?: string;
 }
 
 interface EditHistoryEntry {
@@ -85,41 +86,45 @@ export default function OrderManager() {
   const [isCancelItemDialogOpen, setIsCancelItemDialogOpen] = useState(false);
   const [itemToCancel, setItemToCancel] = useState<{orderId: string, itemId: string, individualId?: string} | null>(null);
   const [cancelReason, setCancelReason] = useState('');
+  const [isReduceQuantityDialogOpen, setIsReduceQuantityDialogOpen] = useState(false);
+  const [itemToReduce, setItemToReduce] = useState<{menuItemId: string, menuItemName: string, currentQuantity: number} | null>(null);
+  const [reduceQuantityReason, setReduceQuantityReason] = useState('');
+  const [reduceQuantityReasons, setReduceQuantityReasons] = useState<Record<string, string>>({});
 
   const parseStoredOrders = (rawOrders: string): Order[] => {
-    try {
+      try {
       const parsedOrders = JSON.parse(rawOrders).map((order: any) => {
-        const migrateStatus = (status: string) => {
-          if (status === 'entregado') return 'cobrando';
-          return status;
-        };
-
-        if (order.individualItemsStatus) {
-          const migratedIndividualStatus: Record<string, 'preparando' | 'entregando' | 'cobrando'> = {};
-          Object.entries(order.individualItemsStatus).forEach(([key, status]) => {
-            if (typeof status === 'string') {
-              migratedIndividualStatus[key] = migrateStatus(status) as 'preparando' | 'entregando' | 'cobrando';
-            }
-          });
-          order.individualItemsStatus = migratedIndividualStatus;
-        }
-
-        if (order.items) {
-          order.items = order.items.map((item: any) => ({
-            ...item,
-            status: migrateStatus(item.status)
-          }));
-        }
-
-        return {
-          ...order,
-          createdAt: new Date(order.createdAt)
-        };
-      });
+          const migrateStatus = (status: string) => {
+            if (status === 'entregado') return 'cobrando';
+            return status;
+          };
+          
+          if (order.individualItemsStatus) {
+            const migratedIndividualStatus: Record<string, 'preparando' | 'entregando' | 'cobrando'> = {};
+            Object.entries(order.individualItemsStatus).forEach(([key, status]) => {
+              if (typeof status === 'string') {
+                migratedIndividualStatus[key] = migrateStatus(status) as 'preparando' | 'entregando' | 'cobrando';
+              }
+            });
+            order.individualItemsStatus = migratedIndividualStatus;
+          }
+          
+          if (order.items) {
+            order.items = order.items.map((item: any) => ({
+              ...item,
+              status: migrateStatus(item.status)
+            }));
+          }
+          
+          return {
+            ...order,
+            createdAt: new Date(order.createdAt)
+          };
+        });
 
       return Array.isArray(parsedOrders) ? parsedOrders : [];
-    } catch (error) {
-      console.error('Error parsing saved orders:', error);
+      } catch (error) {
+        console.error('Error parsing saved orders:', error);
       return [];
     }
   };
@@ -171,6 +176,7 @@ export default function OrderManager() {
     setIsDiscountOpen(false);
     setIsPaymentOpen(false);
     setLocalEditQuantities({});
+    setReduceQuantityReasons({});
   }, [ordersStorageKey]);
 
   // Save orders to localStorage
@@ -1070,22 +1076,22 @@ export default function OrderManager() {
           <div className="mt-2 pt-2 border-t border-red-200">
             {(() => {
               const groupedCancelled = cancelledItems.reduce((acc, item) => {
-                if (!acc[item.name]) {
-                  acc[item.name] = {
-                    name: item.name,
+                    if (!acc[item.name]) {
+                      acc[item.name] = {
+                        name: item.name,
                     quantity: 0,
                     price: item.price,
                     cancelledInStage: item.cancelledInStage
-                  };
-                }
+                      };
+                    }
                 acc[item.name].quantity += item.quantity;
-                return acc;
+                  return acc;
               }, {} as Record<string, {name: string; quantity: number; price: number; cancelledInStage?: string}>);
 
               return Object.values(groupedCancelled).map((grouped, idx) => (
                 <div key={idx} className="flex justify-between items-center text-xs text-muted-foreground line-through">
                   <div className="flex items-center gap-2">
-                    <span>{grouped.quantity}x {grouped.name}</span>
+                  <span>{grouped.quantity}x {grouped.name}</span>
                     {grouped.cancelledInStage && (
                       <span className="text-lg">
                         {getStatusSymbol(grouped.cancelledInStage)}
@@ -1142,13 +1148,13 @@ export default function OrderManager() {
   };
 
   if (!currentBusiness) {
-    return (
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-lg md:text-2xl lg:text-3xl font-bold text-foreground mb-2">
-              Gestión de Comandas
-            </h1>
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-lg md:text-2xl lg:text-3xl font-bold text-foreground mb-2">
+            Gestión de Comandas
+          </h1>
             <p className="text-sm md:text-base text-muted-foreground">
               Selecciona un negocio en el menú de ajustes para visualizar sus órdenes.
             </p>
@@ -1653,7 +1659,7 @@ export default function OrderManager() {
                         !item.cancelled && (item.id === menuItem.id || item.name === menuItem.name)
                       );
                       const currentQuantity = resolveQuantityValue(localEditQuantities, orderItem, menuItem, 0);
-
+                      
                       return (
                         <div key={menuItem.id} className="flex items-center justify-between p-3 border border-border rounded-lg bg-card">
                           <div className="flex items-center gap-3 flex-1">
@@ -1666,13 +1672,39 @@ export default function OrderManager() {
                             size="sm" 
                                 variant="ghost"
                                 onClick={() => {
-                                  setLocalEditQuantities(prev => {
-                                    const newQuantity = Math.max(
-                                      0,
-                                      resolveQuantityValue(prev, orderItem, menuItem, 0) - 1
+                                  // Check if order is in 'cobrando' stage and item is in 'cobrando' status
+                                  const isOrderInCobrando = selectedOrderForEdit.status === 'cobrando';
+                                  const isItemInCobrando = orderItem && orderItem.status === 'cobrando';
+                                  
+                                  // Also check individual items status if available
+                                  let hasItemInCobrando = false;
+                                  if (orderItem && selectedOrderForEdit.individualItemsStatus) {
+                                    const itemKeys = Array.from({ length: orderItem.quantity }, (_, idx) => 
+                                      `${orderItem.id}-${idx}`
                                     );
-                                    return applyQuantityUpdate(prev, newQuantity, orderItem, menuItem);
-                                  });
+                                    hasItemInCobrando = itemKeys.some(key => 
+                                      selectedOrderForEdit.individualItemsStatus?.[key] === 'cobrando'
+                                    );
+                                  }
+                                  
+                                  if (isOrderInCobrando && (isItemInCobrando || hasItemInCobrando)) {
+                                    // Show dialog to ask for reason
+                                    setItemToReduce({
+                                      menuItemId: menuItem.id,
+                                      menuItemName: menuItem.name,
+                                      currentQuantity: currentQuantity
+                                    });
+                                    setIsReduceQuantityDialogOpen(true);
+                                  } else {
+                                    // Directly reduce quantity
+                                    setLocalEditQuantities(prev => {
+                                      const newQuantity = Math.max(
+                                        0,
+                                        resolveQuantityValue(prev, orderItem, menuItem, 0) - 1
+                                      );
+                                      return applyQuantityUpdate(prev, newQuantity, orderItem, menuItem);
+                                    });
+                                  }
                                 }}
                                 disabled={currentQuantity <= 0}
                                 className="h-6 w-6 p-0"
@@ -1740,7 +1772,7 @@ export default function OrderManager() {
                               {grouped.cancelledInStage && (
                                 <span className="text-lg">
                                   {getStatusSymbol(grouped.cancelledInStage)}
-                                </span>
+                              </span>
                               )}
                             </div>
                           </div>
@@ -1762,6 +1794,7 @@ export default function OrderManager() {
                       onClick={() => {
                   setIsEditOrderOpen(false);
                   setLocalEditQuantities({});
+                  setReduceQuantityReasons({});
                 }} 
                 className="px-6"
                     >
@@ -1783,7 +1816,7 @@ export default function OrderManager() {
                         const updatedItems: OrderItem[] = [];
                         const processedItems = new Set<string>();
                         const removedQuantities: OrderItem[] = [];
-
+                        
                         order.items.forEach(item => {
                           const matchingMenuItem = menuItems.find(menuItem =>
                             menuItem.id === item.id || menuItem.name === item.name
@@ -1810,33 +1843,38 @@ export default function OrderManager() {
 
                             const removedQuantity = Math.max(0, item.quantity - newQuantity);
                             if (removedQuantity > 0) {
+                              // Get the reason if it was provided (for items reduced in 'cobrando' stage)
+                              const itemKey = item.id || matchingMenuItem?.id;
+                              const reason = itemKey ? reduceQuantityReasons[itemKey] : undefined;
+                              
                               removedQuantities.push({
                                 ...item,
                                 quantity: removedQuantity,
                                 originalQuantity: removedQuantity,
                                 cancelled: true,
                                 cancelledAt: new Date(),
-                                cancelledInStage: currentStage
+                                cancelledInStage: currentStage,
+                                cancellationReason: reason
                               });
                             }
                           }
                         });
-
+                        
                         menuItems.forEach(menuItem => {
                           const quantity = resolveQuantityValue(localEditQuantities, undefined, menuItem, 0);
                           const keys = collectQuantityKeys(undefined, menuItem);
                           const alreadyProcessed = keys.some(key => processedItems.has(key));
 
                           if (!alreadyProcessed && quantity > 0) {
-                            updatedItems.push({
+                              updatedItems.push({
                               id: menuItem.id,
-                              name: menuItem.name,
-                              price: menuItem.price,
+                                name: menuItem.name,
+                                price: menuItem.price,
                               quantity,
                               originalQuantity: quantity,
-                              status: 'preparando' as const,
-                              cancelled: false
-                            });
+                                status: 'preparando' as const,
+                                cancelled: false
+                              });
 
                             keys.forEach(key => processedItems.add(key));
                           }
@@ -1878,6 +1916,7 @@ export default function OrderManager() {
                     saveOrders(updatedOrders);
                     setIsEditOrderOpen(false);
                     setLocalEditQuantities({});
+                    setReduceQuantityReasons({});
                     toast({
                       title: "Orden actualizada",
                       description: "Los cambios se han aplicado correctamente"
@@ -1947,6 +1986,93 @@ export default function OrderManager() {
               Confirmar Eliminación
             </Button>
               </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reduce Quantity Reason Dialog */}
+      <Dialog open={isReduceQuantityDialogOpen} onOpenChange={setIsReduceQuantityDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Motivo de Reducción</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <span className="text-yellow-600 text-xl">⚠️</span>
+                <div>
+                  <p className="font-semibold text-yellow-900">Advertencia</p>
+                  <p className="text-sm text-yellow-700 mt-1">
+                    Estás reduciendo unidades de un elemento que está en etapa de cobro. Debes indicar el motivo.
+                  </p>
+      </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="reduceQuantityReason" className="text-sm font-medium">Motivo *</Label>
+              <Input
+                id="reduceQuantityReason"
+                placeholder="Ej: Cliente canceló, producto defectuoso, etc."
+                value={reduceQuantityReason}
+                onChange={(e) => setReduceQuantityReason(e.target.value)}
+              />
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              * Campo obligatorio. Explica por qué se reduce la cantidad de este elemento.
+            </p>
+          </div>
+
+          <div className="flex justify-end gap-3 mt-6">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setIsReduceQuantityDialogOpen(false);
+                setReduceQuantityReason('');
+                setItemToReduce(null);
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={() => {
+                if (!reduceQuantityReason.trim() || !itemToReduce) return;
+                
+                // Find the menu item and order item
+                const menuItem = menuItems.find(m => m.id === itemToReduce.menuItemId);
+                const orderItem = selectedOrderForEdit?.items.find(item => 
+                  !item.cancelled && (item.id === menuItem?.id || item.name === menuItem?.name)
+                );
+                
+                // Create a key to identify this item
+                const itemKey = orderItem?.id || menuItem?.id || itemToReduce.menuItemId;
+                
+                // Store the reason
+                setReduceQuantityReasons(prev => ({
+                  ...prev,
+                  [itemKey]: reduceQuantityReason.trim()
+                }));
+                
+                // Reduce quantity
+                setLocalEditQuantities(prev => {
+                  const newQuantity = Math.max(
+                    0,
+                    resolveQuantityValue(prev, orderItem, menuItem, 0) - 1
+                  );
+                  return applyQuantityUpdate(prev, newQuantity, orderItem, menuItem);
+                });
+                
+                setIsReduceQuantityDialogOpen(false);
+                setReduceQuantityReason('');
+                setItemToReduce(null);
+              }}
+              disabled={!reduceQuantityReason.trim()}
+            >
+              Confirmar Reducción
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
