@@ -1087,12 +1087,11 @@ export default function OrderManager() {
                   <div className="flex items-center gap-2">
                     <span>{grouped.quantity}x {grouped.name}</span>
                     {grouped.cancelledInStage && (
-                      <Badge variant="secondary" className="text-[10px]">
-                        Eliminado en {grouped.cancelledInStage}
-                      </Badge>
+                      <span className="text-lg">
+                        {getStatusSymbol(grouped.cancelledInStage)}
+                      </span>
                     )}
                   </div>
-                  <span>${(grouped.price * grouped.quantity).toFixed(2)}</span>
           </div>
               ));
             })()}
@@ -1736,19 +1735,13 @@ export default function OrderManager() {
                             <div className="flex items-center gap-3">
                               <span className="text-lg">❌</span>
                               <div className="line-through text-muted-foreground">
-                                <span className="font-medium">{grouped.name}</span>
+                                <span className="font-medium">{grouped.quantity}x {grouped.name}</span>
                   </div>
-                              <Badge variant="secondary" className="text-xs">
-                                Eliminado en {grouped.cancelledInStage || 'edición'}
-                              </Badge>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold text-muted-foreground">
-                                x{grouped.quantity}
-                              </span>
-                              <span className="font-semibold text-muted-foreground line-through">
-                                ${(grouped.price * grouped.quantity).toFixed(2)}
-                              </span>
+                              {grouped.cancelledInStage && (
+                                <span className="text-lg">
+                                  {getStatusSymbol(grouped.cancelledInStage)}
+                                </span>
+                              )}
                             </div>
                           </div>
                         ));
