@@ -1481,26 +1481,31 @@ export default function OrderManager() {
             {selectedOrderForHistory ? (
               <div className="space-y-3 max-h-[500px] overflow-y-auto">
                 {(() => {
-                  // Group all items (original, added, removed) by item name
-                  const groupedItems: Record<string, {
-                    original: number;
-                    added: Array<{timestamp: Date, quantity: number}>;
-                    removed: Array<{timestamp: Date, quantity: number, reason?: string}>;
-                  }> = {};
+                  const historyEntries: Array<{
+                    type: 'original' | 'added' | 'removed';
+                    itemName: string;
+                    quantity: number;
+                    timestamp: Date;
+                    reason?: string;
+                  }> = [];
                   
-                  // Get original items (non-cancelled items that were not added)
+                  // Get original items (non-cancelled items)
                   selectedOrderForHistory.items.forEach(item => {
-                    if (!groupedItems[item.name]) {
-                      groupedItems[item.name] = { original: 0, added: [], removed: [] };
-                    }
                     if (item.cancelled) {
-                      groupedItems[item.name].removed.push({
-                        timestamp: item.cancelledAt || selectedOrderForHistory.createdAt,
+                      historyEntries.push({
+                        type: 'removed',
+                        itemName: item.name,
                         quantity: item.quantity,
-                        reason: item.cancelledInStage === 'cobrando' ? 'Razón no especificada' : undefined
+                        timestamp: item.cancelledAt || selectedOrderForHistory.createdAt,
+                        reason: item.cancellationReason
                       });
                     } else {
-                      groupedItems[item.name].original += item.quantity;
+                      historyEntries.push({
+                        type: 'original',
+                        itemName: item.name,
+                        quantity: item.quantity,
+                        timestamp: selectedOrderForHistory.createdAt
+                      });
                     }
                   });
                   
@@ -1508,61 +1513,67 @@ export default function OrderManager() {
                   selectedOrderForHistory.editHistory?.forEach(entry => {
                     if (!entry.itemName) return;
                     
-                    if (!groupedItems[entry.itemName]) {
-                      groupedItems[entry.itemName] = { original: 0, added: [], removed: [] };
-                    }
-                    
                     if (entry.action === 'added' && entry.quantity) {
-                      groupedItems[entry.itemName].added.push({
-                        timestamp: entry.timestamp,
-                        quantity: entry.quantity
+                      historyEntries.push({
+                        type: 'added',
+                        itemName: entry.itemName,
+                        quantity: entry.quantity,
+                        timestamp: entry.timestamp
                       });
                     } else if (entry.action === 'removed' && entry.quantity) {
-                      groupedItems[entry.itemName].removed.push({
-                        timestamp: entry.timestamp,
+                      historyEntries.push({
+                        type: 'removed',
+                        itemName: entry.itemName,
                         quantity: entry.quantity,
+                        timestamp: entry.timestamp,
                         reason: entry.details
                       });
                     }
                   });
                   
-                  return Object.entries(groupedItems).map(([itemName, data]) => {
-                    const hasChanges = data.added.length > 0 || data.removed.length > 0;
-                    return (
-                      <div key={itemName} className="border border-border rounded-lg p-3 bg-card">
-                        <h4 className="font-medium mb-2">{itemName}</h4>
-                        
-                        {/* Original items */}
-                        {data.original > 0 && (
-                          <div className="text-sm text-foreground mb-1">
-                            {data.original}x {!hasChanges ? 'originales' : 'original'}
+                  // Sort by timestamp
+                  historyEntries.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+                  
+                  return historyEntries.map((entry, idx) => {
+                    if (entry.type === 'original') {
+                      return (
+                        <div key={`${entry.itemName}-${idx}`} className="border border-border rounded-lg p-3 bg-card">
+                          <div className="text-sm text-foreground">
+                            {entry.quantity}x {entry.itemName} - Original
+                            <span className="text-xs text-muted-foreground ml-2">
+                              {new Date(entry.timestamp).toLocaleString('es-ES')}
+                            </span>
                           </div>
-                        )}
-                        
-                        {/* Added items */}
-                        {data.added.length > 0 && (
-                          <div className="space-y-1 mb-2">
-                            {data.added.map((add, idx) => (
-                              <div key={idx} className="text-sm text-green-600">
-                                +{add.quantity} - {new Date(add.timestamp).toLocaleString('es-ES')}
                         </div>
-                            ))}
+                      );
+                    } else if (entry.type === 'added') {
+                      return (
+                        <div key={`${entry.itemName}-${idx}`} className="border border-border rounded-lg p-3 bg-card">
+                          <div className="text-sm text-green-600">
+                            +{entry.quantity}x {entry.itemName}
+                            <span className="text-xs text-muted-foreground ml-2">
+                              {new Date(entry.timestamp).toLocaleString('es-ES')}
+                            </span>
                       </div>
-                        )}
-                        
-                        {/* Removed items */}
-                        {data.removed.length > 0 && (
-                          <div className="space-y-1">
-                            {data.removed.map((rem, idx) => (
-                              <div key={idx} className="text-sm text-red-600 line-through">
-                                -{rem.quantity} - {new Date(rem.timestamp).toLocaleString('es-ES')}
-                                {rem.reason && <span className="text-xs"> - {rem.reason}</span>}
                               </div>
-                            ))}
+                      );
+                    } else {
+                      return (
+                        <div key={`${entry.itemName}-${idx}`} className="border border-border rounded-lg p-3 bg-card">
+                          <div className="text-sm text-red-600 line-through">
+                            -{entry.quantity}x {entry.itemName}
+                            <span className="text-xs text-muted-foreground ml-2">
+                              {new Date(entry.timestamp).toLocaleString('es-ES')}
+                            </span>
+                          </div>
+                          {entry.reason && (
+                            <div className="text-xs text-muted-foreground mt-1 ml-4">
+                              Motivo: {entry.reason}
                           </div>
                         )}
                       </div>
                     );
+                    }
                   });
                 })()}
               </div>
