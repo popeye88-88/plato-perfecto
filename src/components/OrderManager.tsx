@@ -905,7 +905,7 @@ export default function OrderManager() {
                   <History className="h-4 w-4" />
                   {hasDeletedItems && (
                     <span
-                      className="absolute -bottom-1 -right-1 h-4 w-4 rounded-full bg-red-600 text-white flex items-center justify-center text-[10px] font-bold leading-none"
+                      className="absolute bottom-0 right-0 translate-x-1/2 translate-y-1/2 h-4 w-4 rounded-full bg-white border border-red-600 text-red-600 flex items-center justify-center text-[10px] font-bold leading-none"
                       aria-label="Hay elementos eliminados"
                     >
                       X
@@ -913,7 +913,7 @@ export default function OrderManager() {
                   )}
                   {hasAddedItems && (
                     <span
-                      className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-white border border-blue-600 text-blue-600 flex items-center justify-center text-[10px] font-bold leading-none"
+                      className="absolute top-0 right-0 translate-x-1/2 -translate-y-1/2 h-4 w-4 rounded-full bg-white border border-blue-600 text-blue-600 flex items-center justify-center text-[10px] font-bold leading-none"
                       aria-label="Hay elementos añadidos"
                     >
                       +
