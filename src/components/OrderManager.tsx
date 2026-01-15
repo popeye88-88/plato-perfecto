@@ -39,6 +39,7 @@ interface Order {
   number: string;
   customerName: string;
   items: OrderItem[];
+  initialItems?: Array<Pick<OrderItem, 'id' | 'name' | 'price' | 'quantity'>>;
   total: number;
   status: 'preparando' | 'entregando' | 'cobrando' | 'pagado';
   createdAt: Date;
@@ -118,7 +119,19 @@ export default function OrderManager() {
           
           return {
             ...order,
-            createdAt: new Date(order.createdAt)
+            createdAt: new Date(order.createdAt),
+            initialItems: Array.isArray(order.initialItems)
+              ? order.initialItems
+              : Array.isArray(order.items)
+                ? order.items
+                    .filter((i: any) => !i?.cancelled)
+                    .map((i: any) => ({
+                      id: i.id,
+                      name: i.name,
+                      price: i.price,
+                      quantity: i.originalQuantity ?? i.quantity
+                    }))
+                : []
           };
         });
 
@@ -401,6 +414,12 @@ export default function OrderManager() {
         ...item,
         originalQuantity: item.quantity,
         status: 'preparando' as const
+      })),
+      initialItems: newOrderForm.selectedItems.map(item => ({
+        id: item.id,
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity
       })),
       total: calculateTotal(),
       status: 'preparando',
@@ -722,6 +741,7 @@ export default function OrderManager() {
   const removeItemFromExistingOrder = (orderId: string, itemId: string, currentStage: string) => {
     const updatedOrders = orders.map(order => {
       if (order.id === orderId) {
+        const itemToCancelNow = order.items.find(i => i.id === itemId);
         const updatedItems = order.items.map(item => {
           if (item.id === itemId) {
             return {
@@ -742,7 +762,20 @@ export default function OrderManager() {
           ...order,
           items: updatedItems,
           total: newTotal,
-          edited: true
+          edited: true,
+          editHistory: [
+            ...(order.editHistory || []),
+            ...(itemToCancelNow
+              ? [{
+                  timestamp: new Date(),
+                  action: 'removed' as const,
+                  stage: currentStage as 'preparando' | 'entregando' | 'cobrando',
+                  itemName: itemToCancelNow.name,
+                  quantity: itemToCancelNow.quantity,
+                  details: itemToCancelNow.cancellationReason
+                }]
+              : [])
+          ]
         };
       }
       return order;
@@ -830,7 +863,8 @@ export default function OrderManager() {
     
     // Group items for Cobrando and Pagado tabs
     const activeItems = order.items.filter(item => !item.cancelled && item.quantity > 0);
-    const cancelledItems = order.items.filter(item => item.cancelled && item.quantity > 0);
+    const hasDeletedItems = order.items.some(item => item.cancelled && item.quantity > 0);
+    const hasAddedItems = (order.editHistory || []).some(entry => entry.action === 'added');
 
     const groupedItems = isCobrandoOrPagado
       ? activeItems.reduce((acc, item) => {
@@ -865,10 +899,26 @@ export default function OrderManager() {
                     setSelectedOrderForHistory(order);
                     setIsHistoryOpen(true);
                   }}
-                  className="h-8 w-8 p-0"
+                  className="h-8 w-8 p-0 relative"
                   title="Ver historial"
                 >
                   <History className="h-4 w-4" />
+                  {hasDeletedItems && (
+                    <span
+                      className="absolute -bottom-1 -left-1 h-4 w-4 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center text-[10px] font-bold leading-none"
+                      aria-label="Hay elementos eliminados"
+                    >
+                      ×
+                    </span>
+                  )}
+                  {hasAddedItems && (
+                    <span
+                      className="absolute -bottom-1 -right-1 h-4 w-4 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px] font-bold leading-none"
+                      aria-label="Hay elementos añadidos"
+                    >
+                      +
+                    </span>
+                  )}
                 </Button>
               )}
               {order.status !== 'pagado' && (
@@ -1070,39 +1120,6 @@ export default function OrderManager() {
             })
           )}
         </div>
-        
-        {/* Cancelled Items Section */}
-        {cancelledItems.length > 0 && (
-          <div className="mt-2 pt-2 border-t border-red-200">
-            {(() => {
-              const groupedCancelled = cancelledItems.reduce((acc, item) => {
-                    if (!acc[item.name]) {
-                      acc[item.name] = {
-                        name: item.name,
-                    quantity: 0,
-                    price: item.price,
-                    cancelledInStage: item.cancelledInStage
-                      };
-                    }
-                acc[item.name].quantity += item.quantity;
-                  return acc;
-              }, {} as Record<string, {name: string; quantity: number; price: number; cancelledInStage?: string}>);
-
-              return Object.values(groupedCancelled).map((grouped, idx) => (
-                <div key={idx} className="flex justify-between items-center text-xs text-muted-foreground line-through">
-                  <div className="flex items-center gap-2">
-                  <span>{grouped.quantity}x {grouped.name}</span>
-                    {grouped.cancelledInStage && (
-                      <span className="text-lg">
-                        {getStatusSymbol(grouped.cancelledInStage)}
-                      </span>
-                    )}
-                  </div>
-          </div>
-              ));
-            })()}
-        </div>
-        )}
         
         {/* Footer with total and actions */}
         <div className="flex items-center justify-between pt-3 border-t border-border">
@@ -1486,28 +1503,33 @@ export default function OrderManager() {
                     itemName: string;
                     quantity: number;
                     timestamp: Date;
+                    stage?: 'preparando' | 'entregando' | 'cobrando';
                     reason?: string;
                   }> = [];
                   
-                  // Get original items (non-cancelled items)
-                  selectedOrderForHistory.items.forEach(item => {
-                    if (item.cancelled) {
+                  // Initial items (at order creation)
+                  (selectedOrderForHistory.initialItems || []).forEach(item => {
+                    historyEntries.push({
+                      type: 'original',
+                      itemName: item.name,
+                      quantity: item.quantity,
+                      timestamp: selectedOrderForHistory.createdAt
+                    });
+                  });
+
+                  // Removed items (from cancelled items)
+                  selectedOrderForHistory.items
+                    .filter(item => item.cancelled && item.quantity > 0)
+                    .forEach(item => {
                       historyEntries.push({
                         type: 'removed',
                         itemName: item.name,
                         quantity: item.quantity,
                         timestamp: item.cancelledAt || selectedOrderForHistory.createdAt,
+                        stage: item.cancelledInStage,
                         reason: item.cancellationReason
                       });
-                    } else {
-                      historyEntries.push({
-                        type: 'original',
-                        itemName: item.name,
-                        quantity: item.quantity,
-                        timestamp: selectedOrderForHistory.createdAt
-                      });
-                    }
-                  });
+                    });
                   
                   // Process edit history
                   selectedOrderForHistory.editHistory?.forEach(entry => {
@@ -1518,7 +1540,8 @@ export default function OrderManager() {
                         type: 'added',
                         itemName: entry.itemName,
                         quantity: entry.quantity,
-                        timestamp: entry.timestamp
+                        timestamp: entry.timestamp,
+                        stage: entry.stage
                       });
                     } else if (entry.action === 'removed' && entry.quantity) {
                       historyEntries.push({
@@ -1526,6 +1549,7 @@ export default function OrderManager() {
                         itemName: entry.itemName,
                         quantity: entry.quantity,
                         timestamp: entry.timestamp,
+                        stage: entry.stage,
                         reason: entry.details
                       });
                     }
@@ -1538,10 +1562,12 @@ export default function OrderManager() {
                     if (entry.type === 'original') {
                       return (
                         <div key={`${entry.itemName}-${idx}`} className="border border-border rounded-lg p-3 bg-card">
-                          <div className="text-sm text-foreground">
-                            {entry.quantity}x {entry.itemName} - Original
+                          <div className="text-sm text-foreground flex items-center justify-between gap-3">
+                            <span className="font-medium">
+                              {entry.quantity}x {entry.itemName}
+                            </span>
                             <span className="text-xs text-muted-foreground ml-2">
-                              {new Date(entry.timestamp).toLocaleString('es-ES')}
+                              {formatDateTime(new Date(entry.timestamp))}
                             </span>
                           </div>
                         </div>
@@ -1549,10 +1575,19 @@ export default function OrderManager() {
                     } else if (entry.type === 'added') {
                       return (
                         <div key={`${entry.itemName}-${idx}`} className="border border-border rounded-lg p-3 bg-card">
-                          <div className="text-sm text-green-600">
-                            +{entry.quantity}x {entry.itemName}
-                            <span className="text-xs text-muted-foreground ml-2">
-                              {new Date(entry.timestamp).toLocaleString('es-ES')}
+                          <div className="text-sm text-blue-600 flex items-center justify-between gap-3">
+                            <span className="font-medium">
+                              +{entry.quantity}x {entry.itemName}
+                            </span>
+                            <span className="flex items-center gap-2">
+                              {entry.stage && (
+                                <span className="text-base" title={entry.stage}>
+                                  {getStatusSymbol(entry.stage)}
+                                </span>
+                              )}
+                              <span className="text-xs text-muted-foreground">
+                                {formatDateTime(new Date(entry.timestamp))}
+                              </span>
                             </span>
                       </div>
                               </div>
@@ -1560,10 +1595,19 @@ export default function OrderManager() {
                     } else {
                       return (
                         <div key={`${entry.itemName}-${idx}`} className="border border-border rounded-lg p-3 bg-card">
-                          <div className="text-sm text-red-600 line-through">
-                            -{entry.quantity}x {entry.itemName}
-                            <span className="text-xs text-muted-foreground ml-2">
-                              {new Date(entry.timestamp).toLocaleString('es-ES')}
+                          <div className="text-sm text-red-600 flex items-center justify-between gap-3">
+                            <span className="font-medium line-through">
+                              -{entry.quantity}x {entry.itemName}
+                            </span>
+                            <span className="flex items-center gap-2">
+                              {entry.stage && (
+                                <span className="text-base" title={entry.stage}>
+                                  {getStatusSymbol(entry.stage)}
+                                </span>
+                              )}
+                              <span className="text-xs text-muted-foreground">
+                                {formatDateTime(new Date(entry.timestamp))}
+                              </span>
                             </span>
                           </div>
                           {entry.reason && (
@@ -1827,6 +1871,7 @@ export default function OrderManager() {
                         const updatedItems: OrderItem[] = [];
                         const processedItems = new Set<string>();
                         const removedQuantities: OrderItem[] = [];
+                        const editHistoryDelta: EditHistoryEntry[] = [];
                         
                         order.items.forEach(item => {
                           const matchingMenuItem = menuItems.find(menuItem =>
@@ -1867,6 +1912,15 @@ export default function OrderManager() {
                                 cancelledInStage: currentStage,
                                 cancellationReason: reason
                               });
+
+                              editHistoryDelta.push({
+                                timestamp: new Date(),
+                                action: 'removed',
+                                stage: currentStage,
+                                itemName: item.name,
+                                quantity: removedQuantity,
+                                details: reason
+                              });
                             }
                           }
                         });
@@ -1886,6 +1940,14 @@ export default function OrderManager() {
                                 status: 'preparando' as const,
                                 cancelled: false
                               });
+
+                            editHistoryDelta.push({
+                              timestamp: new Date(),
+                              action: 'added',
+                              stage: currentStage,
+                              itemName: menuItem.name,
+                              quantity
+                            });
 
                             keys.forEach(key => processedItems.add(key));
                           }
@@ -1918,7 +1980,8 @@ export default function OrderManager() {
                           items: finalItems,
                           individualItemsStatus: rebuiltIndividualStatus,
                           total: newTotal,
-                          edited: true
+                          edited: true,
+                          editHistory: [...(order.editHistory || []), ...editHistoryDelta]
                         };
                       }
                       return order;
