@@ -905,15 +905,15 @@ export default function OrderManager() {
                   <History className="h-4 w-4" />
                   {hasDeletedItems && (
                     <span
-                      className="absolute -bottom-1 -left-1 h-4 w-4 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center text-[10px] font-bold leading-none"
+                      className="absolute -bottom-1 -right-1 h-4 w-4 rounded-full bg-red-600 text-white flex items-center justify-center text-[10px] font-bold leading-none"
                       aria-label="Hay elementos eliminados"
                     >
-                      ×
+                      X
                     </span>
                   )}
                   {hasAddedItems && (
                     <span
-                      className="absolute -bottom-1 -right-1 h-4 w-4 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px] font-bold leading-none"
+                      className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-white border border-blue-600 text-blue-600 flex items-center justify-center text-[10px] font-bold leading-none"
                       aria-label="Hay elementos añadidos"
                     >
                       +
