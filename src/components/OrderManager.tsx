@@ -1830,50 +1830,134 @@ export default function OrderManager() {
                 </div>
 
                 {/* Cancelled Items (if any) */}
-                {selectedOrderForEdit.items.filter(item => item.cancelled || item.quantity === 0).length > 0 && (
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-muted-foreground">Elementos Previamente Eliminados</h3>
-                    <div className="space-y-2">
-                      {(() => {
-                        // Group cancelled items by name
-                        const groupedCancelled = selectedOrderForEdit.items
-                          .filter(item => item.cancelled || item.quantity === 0)
-                          .reduce((acc, item) => {
-                            const originalQuantity = item.quantity;
-                            const cancelledQuantity = item.cancelled ? originalQuantity : originalQuantity;
-                            
-                            if (!acc[item.name]) {
-                              acc[item.name] = {
-                                name: item.name,
-                                price: item.price,
-                                quantity: cancelledQuantity,
-                                cancelledInStage: item.cancelledInStage
-                              };
-                            } else {
-                              acc[item.name].quantity += cancelledQuantity;
-                            }
-                            return acc;
-                          }, {} as Record<string, {name: string, price: number, quantity: number, cancelledInStage?: string}>);
+                {(() => {
+                  type ChangeEntry = {
+                    type: 'added' | 'removed';
+                    itemName: string;
+                    quantity: number;
+                    timestamp: Date;
+                    stage?: 'preparando' | 'entregando' | 'cobrando';
+                    reason?: string;
+                  };
 
-                        return Object.values(groupedCancelled).map((grouped, index) => (
-                          <div key={`cancelled-${index}`} className="flex items-center justify-between p-3 border border-red-200 rounded-lg bg-red-50">
-                            <div className="flex items-center gap-3">
-                              <span className="text-lg">❌</span>
-                              <div className="line-through text-muted-foreground">
-                                <span className="font-medium">{grouped.quantity}x {grouped.name}</span>
-                  </div>
-                              {grouped.cancelledInStage && (
-                                <span className="text-lg">
-                                  {getStatusSymbol(grouped.cancelledInStage)}
-                              </span>
+                  const changeEntries: ChangeEntry[] = [];
+                  const seen = new Set<string>();
+                  const pushUnique = (e: ChangeEntry) => {
+                    const key = [
+                      e.type,
+                      e.itemName,
+                      e.quantity,
+                      e.timestamp.getTime(),
+                      e.stage || '',
+                      e.reason || ''
+                    ].join('|');
+                    if (seen.has(key)) return;
+                    seen.add(key);
+                    changeEntries.push(e);
+                  };
+
+                  selectedOrderForEdit.editHistory?.forEach(entry => {
+                    if (!entry.itemName || !entry.quantity) return;
+                    if (entry.action === 'added') {
+                      pushUnique({
+                        type: 'added',
+                        itemName: entry.itemName,
+                        quantity: entry.quantity,
+                        timestamp: entry.timestamp,
+                        stage: entry.stage
+                      });
+                    }
+                    if (entry.action === 'removed') {
+                      pushUnique({
+                        type: 'removed',
+                        itemName: entry.itemName,
+                        quantity: entry.quantity,
+                        timestamp: entry.timestamp,
+                        stage: entry.stage,
+                        reason: entry.details
+                      });
+                    }
+                  });
+
+                  // Fallback for legacy cancelled items without removed history
+                  const hasAnyRemovedInHistory = (selectedOrderForEdit.editHistory || []).some(e => e.action === 'removed');
+                  if (!hasAnyRemovedInHistory) {
+                    selectedOrderForEdit.items
+                      .filter(item => item.cancelled && item.quantity > 0)
+                      .forEach(item => {
+                        pushUnique({
+                          type: 'removed',
+                          itemName: item.name,
+                          quantity: item.quantity,
+                          timestamp: item.cancelledAt || selectedOrderForEdit.createdAt,
+                          stage: item.cancelledInStage,
+                          reason: item.cancellationReason
+                        });
+                      });
+                  }
+
+                  // Sort chronologically
+                  changeEntries.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+
+                  if (changeEntries.length === 0) return null;
+
+                  return (
+                    <div className="space-y-3">
+                      {/* Replace heading with a simple divider line */}
+                      <div className="border-t border-border/70" />
+                      <div className="space-y-2">
+                        {changeEntries.map((entry, idx) => {
+                          if (entry.type === 'added') {
+                            return (
+                              <div key={`chg-${idx}`} className="border border-border rounded-lg p-3 bg-card">
+                                <div className="text-sm text-blue-600 flex items-center justify-between gap-3">
+                                  <span className="font-medium">
+                                    +{entry.quantity}x {entry.itemName}
+                                  </span>
+                                  <span className="flex items-center gap-2">
+                                    {entry.stage && (
+                                      <span className="text-base" title={entry.stage}>
+                                        {getStatusSymbol(entry.stage)}
+                                      </span>
+                                    )}
+                                    <span className="text-xs text-muted-foreground">
+                                      {formatDateTime(new Date(entry.timestamp))}
+                                    </span>
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <div key={`chg-${idx}`} className="border border-border rounded-lg p-3 bg-card">
+                              <div className="text-sm text-red-600 flex items-center justify-between gap-3">
+                                <span className="font-medium line-through">
+                                  -{entry.quantity}x {entry.itemName}
+                                </span>
+                                <span className="flex items-center gap-2">
+                                  {entry.stage && (
+                                    <span className="text-base" title={entry.stage}>
+                                      {getStatusSymbol(entry.stage)}
+                                    </span>
+                                  )}
+                                  <span className="text-xs text-muted-foreground">
+                                    {formatDateTime(new Date(entry.timestamp))}
+                                  </span>
+                                </span>
+                              </div>
+                              {entry.reason && (
+                                <div className="text-xs text-muted-foreground mt-1 ml-4">
+                                  Motivo: {entry.reason}
+                                </div>
                               )}
                             </div>
-                          </div>
-                        ));
-                      })()}
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
               </>
             )}
