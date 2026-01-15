@@ -908,7 +908,7 @@ export default function OrderManager() {
                       className="absolute -bottom-1 -right-1 h-4 w-4 rounded-full bg-white border border-red-600 text-red-600 flex items-center justify-center text-[10px] font-bold leading-none"
                       aria-label="Hay elementos eliminados"
                     >
-                      X
+                      ×
                     </span>
                   )}
                   {hasAddedItems && (
