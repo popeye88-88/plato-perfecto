@@ -649,6 +649,8 @@ export default function OrderManager() {
   const increaseItemQuantity = (orderId: string, itemId: string, price: number) => {
     const updatedOrders = orders.map(order => {
       if (order.id === orderId) {
+        const currentStage = (order.status === 'pagado' ? 'cobrando' : order.status) as 'preparando' | 'entregando' | 'cobrando';
+        const changedItem = order.items.find(i => i.id === itemId);
         const updatedItems = order.items.map(item => {
           if (item.id === itemId) {
             return {
@@ -667,7 +669,19 @@ export default function OrderManager() {
           ...order,
           items: updatedItems,
           total: newTotal,
-          edited: true
+          edited: true,
+          editHistory: [
+            ...(order.editHistory || []),
+            ...(changedItem
+              ? [{
+                  timestamp: new Date(),
+                  action: 'added' as const,
+                  stage: currentStage,
+                  itemName: changedItem.name,
+                  quantity: 1
+                }]
+              : [])
+          ]
         };
       }
       return order;
@@ -1506,37 +1520,44 @@ export default function OrderManager() {
                     stage?: 'preparando' | 'entregando' | 'cobrando';
                     reason?: string;
                   }> = [];
+                  const seen = new Set<string>();
+                  const pushUnique = (entry: {
+                    type: 'original' | 'added' | 'removed';
+                    itemName: string;
+                    quantity: number;
+                    timestamp: Date;
+                    stage?: 'preparando' | 'entregando' | 'cobrando';
+                    reason?: string;
+                  }) => {
+                    const key = [
+                      entry.type,
+                      entry.itemName,
+                      entry.quantity,
+                      entry.timestamp.getTime(),
+                      entry.stage || '',
+                      entry.reason || ''
+                    ].join('|');
+                    if (seen.has(key)) return;
+                    seen.add(key);
+                    historyEntries.push(entry);
+                  };
                   
                   // Initial items (at order creation)
                   (selectedOrderForHistory.initialItems || []).forEach(item => {
-                    historyEntries.push({
+                    pushUnique({
                       type: 'original',
                       itemName: item.name,
                       quantity: item.quantity,
                       timestamp: selectedOrderForHistory.createdAt
                     });
                   });
-
-                  // Removed items (from cancelled items)
-                  selectedOrderForHistory.items
-                    .filter(item => item.cancelled && item.quantity > 0)
-                    .forEach(item => {
-                      historyEntries.push({
-                        type: 'removed',
-                        itemName: item.name,
-                        quantity: item.quantity,
-                        timestamp: item.cancelledAt || selectedOrderForHistory.createdAt,
-                        stage: item.cancelledInStage,
-                        reason: item.cancellationReason
-                      });
-                    });
                   
                   // Process edit history
                   selectedOrderForHistory.editHistory?.forEach(entry => {
                     if (!entry.itemName) return;
                     
                     if (entry.action === 'added' && entry.quantity) {
-                      historyEntries.push({
+                      pushUnique({
                         type: 'added',
                         itemName: entry.itemName,
                         quantity: entry.quantity,
@@ -1544,7 +1565,7 @@ export default function OrderManager() {
                         stage: entry.stage
                       });
                     } else if (entry.action === 'removed' && entry.quantity) {
-                      historyEntries.push({
+                      pushUnique({
                         type: 'removed',
                         itemName: entry.itemName,
                         quantity: entry.quantity,
@@ -1554,6 +1575,23 @@ export default function OrderManager() {
                       });
                     }
                   });
+
+                  // Fallback for legacy cancelled items without editHistory entries
+                  const hasAnyRemovedInHistory = (selectedOrderForHistory.editHistory || []).some(e => e.action === 'removed');
+                  if (!hasAnyRemovedInHistory) {
+                    selectedOrderForHistory.items
+                      .filter(item => item.cancelled && item.quantity > 0)
+                      .forEach(item => {
+                        pushUnique({
+                          type: 'removed',
+                          itemName: item.name,
+                          quantity: item.quantity,
+                          timestamp: item.cancelledAt || selectedOrderForHistory.createdAt,
+                          stage: item.cancelledInStage,
+                          reason: item.cancellationReason
+                        });
+                      });
+                  }
                   
                   // Sort by timestamp
                   historyEntries.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
@@ -1894,6 +1932,17 @@ export default function OrderManager() {
                                 quantity: newQuantity,
                                 originalQuantity: newQuantity,
                                 cancelled: false
+                              });
+                            }
+
+                            const addedQuantity = Math.max(0, newQuantity - item.quantity);
+                            if (addedQuantity > 0) {
+                              editHistoryDelta.push({
+                                timestamp: new Date(),
+                                action: 'added',
+                                stage: currentStage,
+                                itemName: item.name,
+                                quantity: addedQuantity
                               });
                             }
 
