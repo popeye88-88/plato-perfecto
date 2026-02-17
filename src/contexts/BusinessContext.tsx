@@ -222,7 +222,7 @@ export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     const newBusiness: Business = {
       ...businessData,
-      id: `business-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: `business-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
       createdAt: new Date()
     };
     

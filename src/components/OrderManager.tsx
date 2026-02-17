@@ -157,7 +157,7 @@ export default function OrderManager() {
 
     // Fallback to legacy key if present, then migrate (only for default business)
     const legacyOrders = localStorage.getItem('orders');
-    if (legacyOrders && currentBusiness?.id === 'default-business') {
+    if (legacyOrders && currentBusiness?.id === 'business-mi-restaurante') {
       const migratedOrders = parseStoredOrders(legacyOrders);
       setOrders(migratedOrders);
       localStorage.setItem(ordersStorageKey, JSON.stringify(migratedOrders));
@@ -522,7 +522,7 @@ export default function OrderManager() {
     }
 
     const discountAmount = selectedOrderForDiscount.items
-      .filter(item => discountItems.has(item.id))
+      .filter(item => !item.cancelled && item.quantity > 0 && discountItems.has(item.id))
       .reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
     const newTotal = selectedOrderForDiscount.total - discountAmount;
@@ -693,6 +693,8 @@ export default function OrderManager() {
   const decreaseItemQuantity = (orderId: string, itemId: string) => {
     const updatedOrders = orders.map(order => {
       if (order.id === orderId) {
+        const currentStage = (order.status === 'pagado' ? 'cobrando' : order.status) as 'preparando' | 'entregando' | 'cobrando';
+        const changedItem = order.items.find(i => i.id === itemId);
         const updatedItems = order.items.map(item => {
           if (item.id === itemId && item.quantity > 0) {
             return {
@@ -711,7 +713,19 @@ export default function OrderManager() {
           ...order,
           items: updatedItems,
           total: newTotal,
-          edited: true
+          edited: true,
+          editHistory: [
+            ...(order.editHistory || []),
+            ...(changedItem && changedItem.quantity > 0
+              ? [{
+                  timestamp: new Date(),
+                  action: 'removed' as const,
+                  stage: currentStage,
+                  itemName: changedItem.name,
+                  quantity: 1
+                }]
+              : [])
+          ]
         };
       }
       return order;
@@ -1456,7 +1470,9 @@ export default function OrderManager() {
               <div>
               <Label>Seleccionar productos para descuento:</Label>
               <div className="space-y-2 mt-2">
-                {selectedOrderForDiscount?.items.map((item) => (
+                {selectedOrderForDiscount?.items
+                  .filter((item) => !item.cancelled && item.quantity > 0)
+                  .map((item) => (
                   <div key={item.id} className="flex items-center space-x-2">
                     <Checkbox
                       checked={discountItems.has(item.id)}

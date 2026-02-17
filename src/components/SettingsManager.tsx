@@ -306,6 +306,7 @@ export default function SettingsManager() {
                                   <SelectContent>
                                     {allUsers
                                       .filter(user => user.id !== currentUser?.id)
+                                      .filter(user => !currentBusiness || !getBusinessUsers(currentBusiness.id).includes(user.id))
                                       .map((user) => (
                                         <SelectItem key={user.id} value={user.id}>
                                           {user.username}
@@ -313,6 +314,14 @@ export default function SettingsManager() {
                                       ))}
                                   </SelectContent>
                                 </Select>
+                                {currentBusiness && allUsers
+                                  .filter(user => user.id !== currentUser?.id)
+                                  .filter(user => !getBusinessUsers(currentBusiness.id).includes(user.id))
+                                  .length === 0 && (
+                                  <p className="text-sm text-muted-foreground mt-2">
+                                    Todos los usuarios ya tienen acceso a este negocio.
+                                  </p>
+                                )}
                               </div>
                               <div className="flex justify-end space-x-2">
                                 <Button variant="outline" onClick={() => setIsShareDialogOpen(false)}>

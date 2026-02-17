@@ -81,16 +81,9 @@ export default function MenuManager() {
   const syncMenuItems = (items: MenuItem[]) => {
     setMenuItems(items);
     if (currentBusiness) {
-      const currentItemsString = JSON.stringify(currentBusiness.menuItems || []);
-      const itemsString = JSON.stringify(items);
-      if (currentItemsString !== itemsString) {
-        updateBusiness(currentBusiness.id, { menuItems: items });
-      }
-    }
-    persistMenuItems(items);
-    if (currentBusiness) {
       updateBusiness(currentBusiness.id, { menuItems: items });
     }
+    persistMenuItems(items);
   };
 
   useEffect(() => {
