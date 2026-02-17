@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Settings, Users, Globe, DollarSign, UserPlus, ChefHat, Building2, Plus, Edit2, Trash2, LogOut, Share2 } from 'lucide-react';
-import { useBusinessContext } from '@/contexts/BusinessContext';
+import { useBusinessContext, type BusinessRole } from '@/contexts/BusinessContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { User } from '@/contexts/AuthContext';
@@ -31,8 +31,8 @@ const languageLabels = {
 };
 
 export default function SettingsManager() {
-  const { currentBusiness, businesses, setCurrentBusiness, addBusiness, updateBusiness, deleteBusiness, shareBusinessWithUser, getBusinessUsers } = useBusinessContext();
-  const { currentUser, logout } = useAuth();
+  const { currentBusiness, businesses, setCurrentBusiness, addBusiness, updateBusiness, deleteBusiness, shareBusinessWithUser, getBusinessUsersWithRoles, getUserRole } = useBusinessContext();
+  const { currentUser, logout, getUsers } = useAuth();
   const { toast } = useToast();
   const [settings, setSettings] = useState<AppSettings>({
     language: 'es',
@@ -47,6 +47,8 @@ export default function SettingsManager() {
   });
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const [selectedUserForShare, setSelectedUserForShare] = useState<string>('');
+  const [selectedBusinessForShare, setSelectedBusinessForShare] = useState<string>('');
+  const [selectedRoleForShare, setSelectedRoleForShare] = useState<BusinessRole>('staff');
   const [allUsers, setAllUsers] = useState<User[]>([]);
 
   const handleSettingChange = (key: keyof AppSettings, value: string | boolean) => {
@@ -92,27 +94,17 @@ export default function SettingsManager() {
     }
   };
 
-  // Load all users
+  // Load all users (Supabase or localStorage)
   useEffect(() => {
-    const savedUsers = localStorage.getItem('users');
-    if (savedUsers) {
-      try {
-        const users = JSON.parse(savedUsers).map((user: any) => ({
-          ...user,
-          createdAt: new Date(user.createdAt)
-        }));
-        setAllUsers(users);
-      } catch (error) {
-        console.error('Error parsing users:', error);
-      }
-    }
-  }, []);
+    getUsers().then(setAllUsers).catch(() => setAllUsers([]));
+  }, [getUsers]);
 
   const handleShareBusiness = () => {
-    if (!currentBusiness || !selectedUserForShare) {
+    const businessId = selectedBusinessForShare || currentBusiness?.id;
+    if (!businessId || !selectedUserForShare) {
       toast({
         title: "Error",
-        description: "Debes seleccionar un usuario",
+        description: "Debes seleccionar usuario y negocio",
         variant: "destructive"
       });
       return;
@@ -127,15 +119,20 @@ export default function SettingsManager() {
       return;
     }
 
-    shareBusinessWithUser(currentBusiness.id, selectedUserForShare);
+    shareBusinessWithUser(businessId, selectedUserForShare, selectedRoleForShare);
     setSelectedUserForShare('');
+    setSelectedBusinessForShare('');
+    setSelectedRoleForShare('staff');
     setIsShareDialogOpen(false);
     
     toast({
       title: "Negocio compartido",
-      description: "El negocio ha sido compartido exitosamente con el usuario seleccionado"
+      description: `Acceso asignado como ${selectedRoleForShare === 'owner' ? 'propietario' : 'personal'}`
     });
   };
+
+  const isOwnerOfCurrentBusiness = currentBusiness && currentUser && getUserRole(currentBusiness.id, currentUser.id) === 'owner';
+  const businessesWhereOwner = businesses.filter(b => currentUser && getUserRole(b.id, currentUser.id) === 'owner');
 
   const handleLogout = () => {
     logout();
@@ -281,24 +278,49 @@ export default function SettingsManager() {
                       </p>
                     </div>
 
-                    {/* Share Business Section */}
+                    {/* Share Business Section - solo para owners */}
+                    {isOwnerOfCurrentBusiness && (
                     <div className="p-4 border border-border rounded-lg bg-card">
                       <div className="flex items-center justify-between mb-3">
-                        <h4 className="font-semibold text-foreground">Compartir Negocio</h4>
-                        <Dialog open={isShareDialogOpen} onOpenChange={setIsShareDialogOpen}>
+                        <h4 className="font-semibold text-foreground">Invitar Usuario</h4>
+                        <Dialog open={isShareDialogOpen} onOpenChange={(open) => {
+                          setIsShareDialogOpen(open);
+                          if (!open) {
+                            setSelectedUserForShare('');
+                            setSelectedBusinessForShare(currentBusiness?.id || '');
+                            setSelectedRoleForShare('staff');
+                          } else {
+                            setSelectedBusinessForShare(currentBusiness?.id || '');
+                          }
+                        }}>
                           <DialogTrigger asChild>
                             <Button variant="outline" size="sm">
                               <Share2 className="h-4 w-4 mr-2" />
-                              Compartir
+                              Invitar
                             </Button>
                           </DialogTrigger>
                           <DialogContent>
                             <DialogHeader>
-                              <DialogTitle>Compartir Negocio con Usuario</DialogTitle>
+                              <DialogTitle>Invitar Usuario al Negocio</DialogTitle>
                             </DialogHeader>
                             <div className="space-y-4">
                               <div>
-                                <Label htmlFor="shareUser">Seleccionar Usuario</Label>
+                                <Label htmlFor="shareBusiness">Negocio</Label>
+                                <Select value={selectedBusinessForShare || currentBusiness?.id} onValueChange={setSelectedBusinessForShare}>
+                                  <SelectTrigger id="shareBusiness">
+                                    <SelectValue placeholder="Selecciona un negocio" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {businessesWhereOwner.map((b) => (
+                                      <SelectItem key={b.id} value={b.id}>
+                                        {b.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div>
+                                <Label htmlFor="shareUser">Usuario</Label>
                                 <Select value={selectedUserForShare} onValueChange={setSelectedUserForShare}>
                                   <SelectTrigger id="shareUser">
                                     <SelectValue placeholder="Selecciona un usuario" />
@@ -306,7 +328,12 @@ export default function SettingsManager() {
                                   <SelectContent>
                                     {allUsers
                                       .filter(user => user.id !== currentUser?.id)
-                                      .filter(user => !currentBusiness || !getBusinessUsers(currentBusiness.id).includes(user.id))
+                                      .filter(user => {
+                                        const bizId = selectedBusinessForShare || currentBusiness?.id;
+                                        if (!bizId) return true;
+                                        const usersWithAccess = getBusinessUsersWithRoles(bizId).map(u => u.userId);
+                                        return !usersWithAccess.includes(user.id);
+                                      })
                                       .map((user) => (
                                         <SelectItem key={user.id} value={user.id}>
                                           {user.username}
@@ -314,21 +341,38 @@ export default function SettingsManager() {
                                       ))}
                                   </SelectContent>
                                 </Select>
-                                {currentBusiness && allUsers
+                                {(selectedBusinessForShare || currentBusiness?.id) && allUsers
                                   .filter(user => user.id !== currentUser?.id)
-                                  .filter(user => !getBusinessUsers(currentBusiness.id).includes(user.id))
+                                  .filter(user => {
+                                    const bizId = selectedBusinessForShare || currentBusiness?.id;
+                                    if (!bizId) return true;
+                                    const usersWithAccess = getBusinessUsersWithRoles(bizId).map(u => u.userId);
+                                    return !usersWithAccess.includes(user.id);
+                                  })
                                   .length === 0 && (
                                   <p className="text-sm text-muted-foreground mt-2">
                                     Todos los usuarios ya tienen acceso a este negocio.
                                   </p>
                                 )}
                               </div>
+                              <div>
+                                <Label htmlFor="shareRole">Tipo de permiso</Label>
+                                <Select value={selectedRoleForShare} onValueChange={(v) => setSelectedRoleForShare(v as BusinessRole)}>
+                                  <SelectTrigger id="shareRole">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="owner">Propietario (acceso total)</SelectItem>
+                                    <SelectItem value="staff">Personal (sin dashboard ni invitar)</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
                               <div className="flex justify-end space-x-2">
                                 <Button variant="outline" onClick={() => setIsShareDialogOpen(false)}>
                                   Cancelar
                                 </Button>
                                 <Button onClick={handleShareBusiness} className="bg-gradient-primary hover:opacity-90">
-                                  Compartir
+                                  Invitar
                                 </Button>
                               </div>
                             </div>
@@ -338,13 +382,16 @@ export default function SettingsManager() {
                       <div className="space-y-2">
                         <Label className="text-sm font-medium">Usuarios con acceso:</Label>
                         <div className="space-y-1">
-                          {getBusinessUsers(currentBusiness.id).length > 0 ? (
-                            getBusinessUsers(currentBusiness.id).map((userId) => {
+                          {getBusinessUsersWithRoles(currentBusiness.id).length > 0 ? (
+                            getBusinessUsersWithRoles(currentBusiness.id).map(({ userId, role }) => {
                               const user = allUsers.find(u => u.id === userId);
                               return (
                                 <div key={userId} className="text-sm text-muted-foreground flex items-center gap-2">
                                   <Users className="h-4 w-4" />
                                   <span>{user?.username || userId}</span>
+                                  <span className="text-xs font-medium text-primary">
+                                    ({role === 'owner' ? 'Propietario' : 'Personal'})
+                                  </span>
                                   {userId === currentUser?.id && (
                                     <span className="text-xs text-primary">(Tú)</span>
                                   )}
@@ -357,6 +404,7 @@ export default function SettingsManager() {
                         </div>
                       </div>
                     </div>
+                    )}
                   </div>
                 )}
               </div>

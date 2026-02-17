@@ -12,6 +12,7 @@ import { Plus, Minus, Clock, Truck, DollarSign, X, Edit2, History, Percent, Chec
 import { useToast } from '@/hooks/use-toast';
 import { useBusinessContext } from '@/contexts/BusinessContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { isSupabaseConfigured, fetchOrders as fetchOrdersDb, saveOrders as persistOrdersDb, generateOrderId } from '@/lib/supabase';
 
 interface OrderItem {
   id: string;
@@ -145,30 +146,35 @@ export default function OrderManager() {
     }
   };
 
-  // Load orders for the current business from localStorage
+  // Load orders for the current business (Supabase or localStorage)
   useEffect(() => {
-    if (!ordersStorageKey) {
+    if (!ordersStorageKey || !currentBusiness?.id) {
       setOrders([]);
       return;
     }
 
-    const savedOrders = localStorage.getItem(ordersStorageKey);
-    if (savedOrders) {
-      setOrders(parseStoredOrders(savedOrders));
-      return;
-    }
-
-    // Fallback to legacy key if present, then migrate (only for default business)
-    const legacyOrders = localStorage.getItem('orders');
-    if (legacyOrders && currentBusiness?.id === 'business-mi-restaurante') {
-      const migratedOrders = parseStoredOrders(legacyOrders);
-      setOrders(migratedOrders);
-      localStorage.setItem(ordersStorageKey, JSON.stringify(migratedOrders));
-      localStorage.removeItem('orders');
-      return;
-    }
-
-    setOrders([]);
+    const load = async () => {
+      if (isSupabaseConfigured()) {
+        const data = await fetchOrdersDb(currentBusiness!.id);
+        setOrders(data);
+        return;
+      }
+      const savedOrders = localStorage.getItem(ordersStorageKey);
+      if (savedOrders) {
+        setOrders(parseStoredOrders(savedOrders));
+        return;
+      }
+      const legacyOrders = localStorage.getItem('orders');
+      if (legacyOrders && currentBusiness?.id === 'business-mi-restaurante') {
+        const migratedOrders = parseStoredOrders(legacyOrders);
+        setOrders(migratedOrders);
+        localStorage.setItem(ordersStorageKey, JSON.stringify(migratedOrders));
+        localStorage.removeItem('orders');
+        return;
+      }
+      setOrders([]);
+    };
+    load();
   }, [ordersStorageKey, currentBusiness?.id]);
 
   // Update selectedOrderForEdit when orders change
@@ -195,10 +201,13 @@ export default function OrderManager() {
     setReduceQuantityReasons({});
   }, [ordersStorageKey]);
 
-  // Save orders to localStorage
+  // Save orders (Supabase or localStorage)
   const saveOrders = (newOrders: Order[]) => {
     setOrders(newOrders);
-    if (ordersStorageKey) {
+    if (!ordersStorageKey || !currentBusiness?.id) return;
+    if (isSupabaseConfigured()) {
+      persistOrdersDb(currentBusiness.id, newOrders);
+    } else {
       localStorage.setItem(ordersStorageKey, JSON.stringify(newOrders));
     }
   };
@@ -408,7 +417,7 @@ export default function OrderManager() {
     });
 
     const newOrder: Order = {
-      id: Date.now().toString(),
+      id: isSupabaseConfigured() ? generateOrderId() : Date.now().toString(),
       number: `ORD-${orders.length + 1}`,
       customerName: newOrderForm.customerName,
       serviceType: newOrderForm.serviceType,

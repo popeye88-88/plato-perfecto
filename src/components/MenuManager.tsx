@@ -10,6 +10,7 @@ import { Plus, Edit2, Trash2, Settings } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import CategoryManager from './CategoryManager';
 import { useBusinessContext } from '@/contexts/BusinessContext';
+import { isSupabaseConfigured, fetchCategories, upsertMenuItems, upsertCategories } from '@/lib/supabase';
 
 interface MenuItem {
   id: string;
@@ -61,9 +62,13 @@ export default function MenuManager() {
   };
 
   const persistCategories = (cats: Category[]) => {
-    if (!categoriesStorageKey) return;
+    if (!categoriesStorageKey || !currentBusiness?.id) return;
     const categoriesToStore: StoredCategory[] = cats.map(({ id, name }) => ({ id, name }));
-    localStorage.setItem(categoriesStorageKey, JSON.stringify(categoriesToStore));
+    if (isSupabaseConfigured()) {
+      upsertCategories(currentBusiness.id, categoriesToStore);
+    } else {
+      localStorage.setItem(categoriesStorageKey, JSON.stringify(categoriesToStore));
+    }
   };
 
   const updateCategories = (newCategories: Category[], items: MenuItem[] = menuItems) => {
@@ -74,8 +79,12 @@ export default function MenuManager() {
   };
 
   const persistMenuItems = (items: MenuItem[]) => {
-    if (!menuItemsStorageKey) return;
-    localStorage.setItem(menuItemsStorageKey, JSON.stringify(items));
+    if (!menuItemsStorageKey || !currentBusiness?.id) return;
+    if (isSupabaseConfigured()) {
+      upsertMenuItems(currentBusiness.id, items);
+    } else {
+      localStorage.setItem(menuItemsStorageKey, JSON.stringify(items));
+    }
   };
 
   const syncMenuItems = (items: MenuItem[]) => {
@@ -91,15 +100,19 @@ export default function MenuManager() {
     let items = fallbackItems;
 
     if (menuItemsStorageKey) {
-      const storedItems = localStorage.getItem(menuItemsStorageKey);
-      if (storedItems) {
-        try {
-          items = JSON.parse(storedItems);
-        } catch (error) {
-          console.error('Error parsing stored menu items:', error);
+      if (isSupabaseConfigured()) {
+        items = fallbackItems;
+      } else {
+        const storedItems = localStorage.getItem(menuItemsStorageKey);
+        if (storedItems) {
+          try {
+            items = JSON.parse(storedItems);
+          } catch (error) {
+            console.error('Error parsing stored menu items:', error);
+          }
+        } else if (fallbackItems.length > 0) {
+          localStorage.setItem(menuItemsStorageKey, JSON.stringify(fallbackItems));
         }
-      } else if (fallbackItems.length > 0) {
-        localStorage.setItem(menuItemsStorageKey, JSON.stringify(fallbackItems));
       }
     }
 
@@ -111,32 +124,44 @@ export default function MenuManager() {
   }, [currentBusiness, menuItemsStorageKey]);
 
   useEffect(() => {
-    if (!categoriesStorageKey) {
+    if (!categoriesStorageKey || !currentBusiness?.id) {
       setCategories([]);
       return;
     }
 
     const baseItems = menuItems;
-    const savedCategories = localStorage.getItem(categoriesStorageKey);
-
-    if (savedCategories) {
-      try {
-        const parsed: StoredCategory[] = JSON.parse(savedCategories);
-        const recalculated = recalcCategoryCounts(parsed, baseItems);
+    const loadCategories = async () => {
+      if (isSupabaseConfigured()) {
+        const dbCats = await fetchCategories(currentBusiness!.id);
+        let stored: StoredCategory[] = dbCats.map((c) => ({ id: c.id, name: c.name }));
+        if (stored.length === 0 && baseItems.length > 0) {
+          const derivedNames = Array.from(new Set(baseItems.map((item) => item.category)));
+          stored = derivedNames.map((name) => ({ id: name, name }));
+        }
+        const recalculated = recalcCategoryCounts(stored, baseItems);
         setCategories(recalculated);
         return;
-      } catch (error) {
-        console.error('Error parsing saved categories:', error);
       }
-    }
-
-    const derivedNames = Array.from(new Set(baseItems.map(item => item.category)));
-    const derivedCategories = recalcCategoryCounts(
-      derivedNames.map(name => ({ id: name, name })),
-      baseItems
-    );
-    setCategories(derivedCategories);
-    persistCategories(derivedCategories);
+      const savedCategories = localStorage.getItem(categoriesStorageKey);
+      if (savedCategories) {
+        try {
+          const parsed: StoredCategory[] = JSON.parse(savedCategories);
+          const recalculated = recalcCategoryCounts(parsed, baseItems);
+          setCategories(recalculated);
+          return;
+        } catch (error) {
+          console.error('Error parsing saved categories:', error);
+        }
+      }
+      const derivedNames = Array.from(new Set(baseItems.map((item) => item.category)));
+      const derivedCategories = recalcCategoryCounts(
+        derivedNames.map((name) => ({ id: name, name })),
+        baseItems
+      );
+      setCategories(derivedCategories);
+      persistCategories(derivedCategories);
+    };
+    loadCategories();
   }, [categoriesStorageKey, currentBusiness, menuItems]);
 
   useEffect(() => {

@@ -14,7 +14,7 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!username.trim() || !password.trim()) {
@@ -27,7 +27,7 @@ export default function Login() {
     }
 
     setIsLoading(true);
-    const success = login(username.trim(), password);
+    const success = await login(username.trim(), password);
     setIsLoading(false);
 
     if (success) {

@@ -2,22 +2,26 @@ import { ReactNode, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Menu, Settings, ClipboardList, BarChart3, ChefHat } from 'lucide-react';
+import type { BusinessRole } from '@/contexts/BusinessContext';
 
 interface LayoutProps {
   children: ReactNode;
   currentPage: string;
   onPageChange: (page: string) => void;
+  currentUserRole?: BusinessRole;
+  isStaff?: boolean;
 }
 
-const navigation = [
-  { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
-  { id: 'menu', label: 'Menú', icon: ChefHat },
-  { id: 'orders', label: 'Comandas', icon: ClipboardList },
-  { id: 'settings', label: 'Ajustes', icon: Settings },
+const allNavItems = [
+  { id: 'dashboard', label: 'Dashboard', icon: BarChart3, staffHidden: true },
+  { id: 'menu', label: 'Menú', icon: ChefHat, staffHidden: false },
+  { id: 'orders', label: 'Comandas', icon: ClipboardList, staffHidden: false },
+  { id: 'settings', label: 'Ajustes', icon: Settings, staffHidden: false },
 ];
 
-export default function Layout({ children, currentPage, onPageChange }: LayoutProps) {
+export default function Layout({ children, currentPage, onPageChange, isStaff }: LayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Start closed on mobile
+  const navigation = isStaff ? allNavItems.filter(item => !item.staffHidden) : allNavItems;
 
   return (
     <div className="min-h-screen bg-gradient-subtle">
