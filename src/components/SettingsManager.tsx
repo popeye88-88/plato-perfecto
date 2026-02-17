@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -7,8 +7,11 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Settings, Users, Globe, DollarSign, UserPlus, ChefHat, Building2, Plus, Edit2, Trash2 } from 'lucide-react';
+import { Settings, Users, Globe, DollarSign, UserPlus, ChefHat, Building2, Plus, Edit2, Trash2, LogOut, Share2 } from 'lucide-react';
 import { useBusinessContext } from '@/contexts/BusinessContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+import { User } from '@/contexts/AuthContext';
 
 interface AppSettings {
   language: 'es' | 'en';
@@ -28,7 +31,9 @@ const languageLabels = {
 };
 
 export default function SettingsManager() {
-  const { currentBusiness, businesses, setCurrentBusiness, addBusiness, updateBusiness, deleteBusiness } = useBusinessContext();
+  const { currentBusiness, businesses, setCurrentBusiness, addBusiness, updateBusiness, deleteBusiness, shareBusinessWithUser, getBusinessUsers } = useBusinessContext();
+  const { currentUser, logout } = useAuth();
+  const { toast } = useToast();
   const [settings, setSettings] = useState<AppSettings>({
     language: 'es',
     currency: 'MXN',
@@ -40,6 +45,9 @@ export default function SettingsManager() {
     name: '',
     description: ''
   });
+  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
+  const [selectedUserForShare, setSelectedUserForShare] = useState<string>('');
+  const [allUsers, setAllUsers] = useState<User[]>([]);
 
   const handleSettingChange = (key: keyof AppSettings, value: string | boolean) => {
     setSettings(prev => ({
@@ -84,11 +92,70 @@ export default function SettingsManager() {
     }
   };
 
+  // Load all users
+  useEffect(() => {
+    const savedUsers = localStorage.getItem('users');
+    if (savedUsers) {
+      try {
+        const users = JSON.parse(savedUsers).map((user: any) => ({
+          ...user,
+          createdAt: new Date(user.createdAt)
+        }));
+        setAllUsers(users);
+      } catch (error) {
+        console.error('Error parsing users:', error);
+      }
+    }
+  }, []);
+
+  const handleShareBusiness = () => {
+    if (!currentBusiness || !selectedUserForShare) {
+      toast({
+        title: "Error",
+        description: "Debes seleccionar un usuario",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (selectedUserForShare === currentUser?.id) {
+      toast({
+        title: "Error",
+        description: "No puedes compartir el negocio contigo mismo",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    shareBusinessWithUser(currentBusiness.id, selectedUserForShare);
+    setSelectedUserForShare('');
+    setIsShareDialogOpen(false);
+    
+    toast({
+      title: "Negocio compartido",
+      description: "El negocio ha sido compartido exitosamente con el usuario seleccionado"
+    });
+  };
+
+  const handleLogout = () => {
+    logout();
+    toast({
+      title: "Sesión cerrada",
+      description: "Has cerrado sesión correctamente"
+    });
+  };
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-lg md:text-2xl lg:text-3xl font-bold text-foreground mb-2">Ajustes</h1>
-        <p className="text-sm md:text-base text-muted-foreground">Configura las opciones de tu restaurante</p>
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <div>
+          <h1 className="text-lg md:text-2xl lg:text-3xl font-bold text-foreground mb-2">Ajustes</h1>
+          <p className="text-sm md:text-base text-muted-foreground">Configura las opciones de tu restaurante</p>
+        </div>
+        <Button variant="outline" onClick={handleLogout}>
+          <LogOut className="h-4 w-4 mr-2" />
+          Cerrar Sesión
+        </Button>
       </div>
 
       <Tabs defaultValue="business" className="space-y-6">
@@ -200,17 +267,87 @@ export default function SettingsManager() {
                 </div>
                 
                 {currentBusiness && (
-                  <div className="p-4 border border-border rounded-lg bg-card">
-                    <h3 className="font-semibold text-foreground mb-2">{currentBusiness.name}</h3>
-                    {currentBusiness.description && (
-                      <p className="text-sm text-muted-foreground mb-2">{currentBusiness.description}</p>
-                    )}
-                    <p className="text-xs text-muted-foreground">
-                      Creado: {currentBusiness.createdAt.toLocaleDateString('es-ES')}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Elementos del menú: {currentBusiness.menuItems.length}
-                    </p>
+                  <div className="space-y-4">
+                    <div className="p-4 border border-border rounded-lg bg-card">
+                      <h3 className="font-semibold text-foreground mb-2">{currentBusiness.name}</h3>
+                      {currentBusiness.description && (
+                        <p className="text-sm text-muted-foreground mb-2">{currentBusiness.description}</p>
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        Creado: {currentBusiness.createdAt.toLocaleDateString('es-ES')}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Elementos del menú: {currentBusiness.menuItems.length}
+                      </p>
+                    </div>
+
+                    {/* Share Business Section */}
+                    <div className="p-4 border border-border rounded-lg bg-card">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="font-semibold text-foreground">Compartir Negocio</h4>
+                        <Dialog open={isShareDialogOpen} onOpenChange={setIsShareDialogOpen}>
+                          <DialogTrigger asChild>
+                            <Button variant="outline" size="sm">
+                              <Share2 className="h-4 w-4 mr-2" />
+                              Compartir
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Compartir Negocio con Usuario</DialogTitle>
+                            </DialogHeader>
+                            <div className="space-y-4">
+                              <div>
+                                <Label htmlFor="shareUser">Seleccionar Usuario</Label>
+                                <Select value={selectedUserForShare} onValueChange={setSelectedUserForShare}>
+                                  <SelectTrigger id="shareUser">
+                                    <SelectValue placeholder="Selecciona un usuario" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {allUsers
+                                      .filter(user => user.id !== currentUser?.id)
+                                      .map((user) => (
+                                        <SelectItem key={user.id} value={user.id}>
+                                          {user.username}
+                                        </SelectItem>
+                                      ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="flex justify-end space-x-2">
+                                <Button variant="outline" onClick={() => setIsShareDialogOpen(false)}>
+                                  Cancelar
+                                </Button>
+                                <Button onClick={handleShareBusiness} className="bg-gradient-primary hover:opacity-90">
+                                  Compartir
+                                </Button>
+                              </div>
+                            </div>
+                          </DialogContent>
+                        </Dialog>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">Usuarios con acceso:</Label>
+                        <div className="space-y-1">
+                          {getBusinessUsers(currentBusiness.id).length > 0 ? (
+                            getBusinessUsers(currentBusiness.id).map((userId) => {
+                              const user = allUsers.find(u => u.id === userId);
+                              return (
+                                <div key={userId} className="text-sm text-muted-foreground flex items-center gap-2">
+                                  <Users className="h-4 w-4" />
+                                  <span>{user?.username || userId}</span>
+                                  {userId === currentUser?.id && (
+                                    <span className="text-xs text-primary">(Tú)</span>
+                                  )}
+                                </div>
+                              );
+                            })
+                          ) : (
+                            <div className="text-sm text-muted-foreground">Solo tú tienes acceso</div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
