@@ -6,36 +6,6 @@ const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 export const isSupabaseConfigured = () =>
   !!SUPABASE_URL && !!SUPABASE_KEY && SUPABASE_URL !== 'https://your-project.supabase.co';
 
-// App Users
-export async function fetchUserByCredentials(username: string, password: string) {
-  if (!isSupabaseConfigured()) return null;
-  const { data, error } = await supabase
-    .from('app_users')
-    .select('*')
-    .eq('username', username)
-    .eq('password', password)
-    .single();
-  if (error || !data) return null;
-  return {
-    id: data.id,
-    username: data.username,
-    password: data.password,
-    createdAt: new Date(data.created_at)
-  };
-}
-
-export async function fetchAllUsers() {
-  if (!isSupabaseConfigured()) return [];
-  const { data, error } = await supabase.from('app_users').select('*');
-  if (error) return [];
-  return (data || []).map((u: any) => ({
-    id: u.id,
-    username: u.username,
-    password: u.password,
-    createdAt: new Date(u.created_at)
-  }));
-}
-
 // Businesses
 export async function fetchBusinesses() {
   if (!isSupabaseConfigured()) return [];
