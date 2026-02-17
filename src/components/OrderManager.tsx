@@ -11,6 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Plus, Minus, Clock, Truck, DollarSign, X, Edit2, History, Percent, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useBusinessContext } from '@/contexts/BusinessContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface OrderItem {
   id: string;
@@ -32,6 +33,7 @@ interface EditHistoryEntry {
   itemName?: string;
   quantity?: number;
   details?: string;
+  userId?: string;
 }
 
 interface Order {
@@ -57,6 +59,7 @@ interface Order {
 export default function OrderManager() {
   const { toast } = useToast();
   const { currentBusiness } = useBusinessContext();
+  const { currentUser } = useAuth();
   
   // Get menu items from current business
   const menuItems = currentBusiness?.menuItems || [];
@@ -625,7 +628,8 @@ export default function OrderManager() {
           action: 'added',
           stage: currentStage,
           itemName: item.name,
-          quantity: 1
+          quantity: 1,
+          userId: currentUser?.username
         };
         
         return {
@@ -678,7 +682,8 @@ export default function OrderManager() {
                   action: 'added' as const,
                   stage: currentStage,
                   itemName: changedItem.name,
-                  quantity: 1
+                  quantity: 1,
+                  userId: currentUser?.username
                 }]
               : [])
           ]
@@ -722,7 +727,8 @@ export default function OrderManager() {
                   action: 'removed' as const,
                   stage: currentStage,
                   itemName: changedItem.name,
-                  quantity: 1
+                  quantity: 1,
+                  userId: currentUser?.username
                 }]
               : [])
           ]
@@ -800,7 +806,8 @@ export default function OrderManager() {
                   stage: currentStage as 'preparando' | 'entregando' | 'cobrando',
                   itemName: itemToCancelNow.name,
                   quantity: itemToCancelNow.quantity,
-                  details: itemToCancelNow.cancellationReason
+                  details: itemToCancelNow.cancellationReason,
+                  userId: currentUser?.username
                 }]
               : [])
           ]
@@ -824,6 +831,9 @@ export default function OrderManager() {
       default: return 'En Puesto';
     }
   };
+
+  const toDate = (t: Date | string | number): Date => t instanceof Date ? t : new Date(t);
+  const getTimestamp = (t: Date | string | number): number => toDate(t).getTime();
 
   const formatDateTime = (date: Date) => {
     return date.toLocaleString('es-ES', {
@@ -1532,24 +1542,26 @@ export default function OrderManager() {
                     type: 'original' | 'added' | 'removed';
                     itemName: string;
                     quantity: number;
-                    timestamp: Date;
+                    timestamp: Date | string | number;
                     stage?: 'preparando' | 'entregando' | 'cobrando';
                     reason?: string;
+                    userId?: string;
                   }> = [];
                   const seen = new Set<string>();
                   const pushUnique = (entry: {
                     type: 'original' | 'added' | 'removed';
                     itemName: string;
                     quantity: number;
-                    timestamp: Date;
+                    timestamp: Date | string | number;
                     stage?: 'preparando' | 'entregando' | 'cobrando';
                     reason?: string;
+                    userId?: string;
                   }) => {
                     const key = [
                       entry.type,
                       entry.itemName,
                       entry.quantity,
-                      entry.timestamp.getTime(),
+                      getTimestamp(entry.timestamp),
                       entry.stage || '',
                       entry.reason || ''
                     ].join('|');
@@ -1578,7 +1590,8 @@ export default function OrderManager() {
                         itemName: entry.itemName,
                         quantity: entry.quantity,
                         timestamp: entry.timestamp,
-                        stage: entry.stage
+                        stage: entry.stage,
+                        userId: entry.userId
                       });
                     } else if (entry.action === 'removed' && entry.quantity) {
                       pushUnique({
@@ -1587,7 +1600,8 @@ export default function OrderManager() {
                         quantity: entry.quantity,
                         timestamp: entry.timestamp,
                         stage: entry.stage,
-                        reason: entry.details
+                        reason: entry.details,
+                        userId: entry.userId
                       });
                     }
                   });
@@ -1610,7 +1624,7 @@ export default function OrderManager() {
                   }
                   
                   // Sort by timestamp
-                  historyEntries.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+                  historyEntries.sort((a, b) => getTimestamp(a.timestamp) - getTimestamp(b.timestamp));
                   
                   return historyEntries.map((entry, idx) => {
                     if (entry.type === 'original') {
@@ -1639,6 +1653,9 @@ export default function OrderManager() {
                                   {getStatusSymbol(entry.stage)}
                                 </span>
                               )}
+                              {entry.userId && (
+                                <span className="text-xs font-medium text-foreground">{entry.userId}</span>
+                              )}
                               <span className="text-xs text-muted-foreground">
                                 {formatDateTime(new Date(entry.timestamp))}
                               </span>
@@ -1658,6 +1675,9 @@ export default function OrderManager() {
                                 <span className="text-base" title={entry.stage}>
                                   {getStatusSymbol(entry.stage)}
                                 </span>
+                              )}
+                              {entry.userId && (
+                                <span className="text-xs font-medium text-foreground">{entry.userId}</span>
                               )}
                               <span className="text-xs text-muted-foreground">
                                 {formatDateTime(new Date(entry.timestamp))}
@@ -1851,9 +1871,10 @@ export default function OrderManager() {
                     type: 'added' | 'removed';
                     itemName: string;
                     quantity: number;
-                    timestamp: Date;
+                    timestamp: Date | string | number;
                     stage?: 'preparando' | 'entregando' | 'cobrando';
                     reason?: string;
+                    userId?: string;
                   };
 
                   const changeEntries: ChangeEntry[] = [];
@@ -1863,7 +1884,7 @@ export default function OrderManager() {
                       e.type,
                       e.itemName,
                       e.quantity,
-                      e.timestamp.getTime(),
+                      getTimestamp(e.timestamp),
                       e.stage || '',
                       e.reason || ''
                     ].join('|');
@@ -1880,7 +1901,8 @@ export default function OrderManager() {
                         itemName: entry.itemName,
                         quantity: entry.quantity,
                         timestamp: entry.timestamp,
-                        stage: entry.stage
+                        stage: entry.stage,
+                        userId: entry.userId
                       });
                     }
                     if (entry.action === 'removed') {
@@ -1890,7 +1912,8 @@ export default function OrderManager() {
                         quantity: entry.quantity,
                         timestamp: entry.timestamp,
                         stage: entry.stage,
-                        reason: entry.details
+                        reason: entry.details,
+                        userId: entry.userId
                       });
                     }
                   });
@@ -1913,7 +1936,7 @@ export default function OrderManager() {
                   }
 
                   // Sort chronologically
-                  changeEntries.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+                  changeEntries.sort((a, b) => getTimestamp(a.timestamp) - getTimestamp(b.timestamp));
 
                   if (changeEntries.length === 0) return null;
 
@@ -1936,6 +1959,9 @@ export default function OrderManager() {
                                         {getStatusSymbol(entry.stage)}
                                       </span>
                                     )}
+                                    {entry.userId && (
+                                      <span className="text-xs font-medium text-foreground">{entry.userId}</span>
+                                    )}
                                     <span className="text-xs text-muted-foreground">
                                       {formatDateTime(new Date(entry.timestamp))}
                                     </span>
@@ -1956,6 +1982,9 @@ export default function OrderManager() {
                                     <span className="text-base" title={entry.stage}>
                                       {getStatusSymbol(entry.stage)}
                                     </span>
+                                  )}
+                                  {entry.userId && (
+                                    <span className="text-xs font-medium text-foreground">{entry.userId}</span>
                                   )}
                                   <span className="text-xs text-muted-foreground">
                                     {formatDateTime(new Date(entry.timestamp))}
@@ -2042,7 +2071,8 @@ export default function OrderManager() {
                                 action: 'added',
                                 stage: currentStage,
                                 itemName: item.name,
-                                quantity: addedQuantity
+                                quantity: addedQuantity,
+                                userId: currentUser?.username
                               });
                             }
 
@@ -2068,7 +2098,8 @@ export default function OrderManager() {
                                 stage: currentStage,
                                 itemName: item.name,
                                 quantity: removedQuantity,
-                                details: reason
+                                details: reason,
+                                userId: currentUser?.username
                               });
                             }
                           }
@@ -2095,7 +2126,8 @@ export default function OrderManager() {
                               action: 'added',
                               stage: currentStage,
                               itemName: menuItem.name,
-                              quantity
+                              quantity,
+                              userId: currentUser?.username
                             });
 
                             keys.forEach(key => processedItems.add(key));
