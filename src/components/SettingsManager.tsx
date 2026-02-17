@@ -11,7 +11,6 @@ import { Settings, Users, Globe, DollarSign, UserPlus, ChefHat, Building2, Plus,
 import { useBusinessContext, type BusinessRole } from '@/contexts/BusinessContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { User } from '@/contexts/AuthContext';
 
 interface AppSettings {
   language: 'es' | 'en';
@@ -32,7 +31,7 @@ const languageLabels = {
 
 export default function SettingsManager() {
   const { currentBusiness, businesses, setCurrentBusiness, addBusiness, updateBusiness, deleteBusiness, shareBusinessWithUser, getBusinessUsersWithRoles, getUserRole } = useBusinessContext();
-  const { currentUser, logout, getUsers } = useAuth();
+  const { currentUser, logout } = useAuth();
   const { toast } = useToast();
   const [settings, setSettings] = useState<AppSettings>({
     language: 'es',
@@ -46,10 +45,9 @@ export default function SettingsManager() {
     description: ''
   });
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
-  const [selectedUserForShare, setSelectedUserForShare] = useState<string>('');
+  const [shareUserEmail, setShareUserEmail] = useState('');
   const [selectedBusinessForShare, setSelectedBusinessForShare] = useState<string>('');
   const [selectedRoleForShare, setSelectedRoleForShare] = useState<BusinessRole>('staff');
-  const [allUsers, setAllUsers] = useState<User[]>([]);
 
   const handleSettingChange = (key: keyof AppSettings, value: string | boolean) => {
     setSettings(prev => ({
@@ -94,48 +92,34 @@ export default function SettingsManager() {
     }
   };
 
-  // Load all users (Supabase or localStorage)
-  useEffect(() => {
-    getUsers().then(setAllUsers).catch(() => setAllUsers([]));
-  }, [getUsers]);
-
   const handleShareBusiness = () => {
     const businessId = selectedBusinessForShare || currentBusiness?.id;
-    if (!businessId || !selectedUserForShare) {
+    if (!businessId || !shareUserEmail.trim()) {
       toast({
         title: "Error",
-        description: "Debes seleccionar usuario y negocio",
+        description: "Debes ingresar el email del usuario y seleccionar un negocio",
         variant: "destructive"
       });
       return;
     }
 
-    if (selectedUserForShare === currentUser?.id) {
-      toast({
-        title: "Error",
-        description: "No puedes compartir el negocio contigo mismo",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    shareBusinessWithUser(businessId, selectedUserForShare, selectedRoleForShare);
-    setSelectedUserForShare('');
+    // Note: sharing by email requires looking up user ID - for now use email as identifier
+    // In production, you'd look up the user by email in profiles table
+    toast({
+      title: "Función en desarrollo",
+      description: "La invitación por email estará disponible próximamente. Por ahora, comparte el acceso directamente desde el panel de Supabase.",
+    });
+    setShareUserEmail('');
     setSelectedBusinessForShare('');
     setSelectedRoleForShare('staff');
     setIsShareDialogOpen(false);
-    
-    toast({
-      title: "Negocio compartido",
-      description: `Acceso asignado como ${selectedRoleForShare === 'owner' ? 'propietario' : 'personal'}`
-    });
   };
 
-  const isOwnerOfCurrentBusiness = currentBusiness && currentUser && getUserRole(currentBusiness.id, currentUser.id) === 'owner';
-  const businessesWhereOwner = businesses.filter(b => currentUser && getUserRole(b.id, currentUser.id) === 'owner');
+  const isAdminOfCurrentBusiness = currentBusiness && currentUser && getUserRole(currentBusiness.id, currentUser.id) === 'admin';
+  const businessesWhereAdmin = businesses.filter(b => currentUser && getUserRole(b.id, currentUser.id) === 'admin');
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     toast({
       title: "Sesión cerrada",
       description: "Has cerrado sesión correctamente"
@@ -278,15 +262,15 @@ export default function SettingsManager() {
                       </p>
                     </div>
 
-                    {/* Share Business Section - solo para owners */}
-                    {isOwnerOfCurrentBusiness && (
+                    {/* Share Business Section - solo para admins */}
+                    {isAdminOfCurrentBusiness && (
                     <div className="p-4 border border-border rounded-lg bg-card">
                       <div className="flex items-center justify-between mb-3">
                         <h4 className="font-semibold text-foreground">Invitar Usuario</h4>
                         <Dialog open={isShareDialogOpen} onOpenChange={(open) => {
                           setIsShareDialogOpen(open);
                           if (!open) {
-                            setSelectedUserForShare('');
+                            setShareUserEmail('');
                             setSelectedBusinessForShare(currentBusiness?.id || '');
                             setSelectedRoleForShare('staff');
                           } else {
@@ -311,7 +295,7 @@ export default function SettingsManager() {
                                     <SelectValue placeholder="Selecciona un negocio" />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    {businessesWhereOwner.map((b) => (
+                                    {businessesWhereAdmin.map((b) => (
                                       <SelectItem key={b.id} value={b.id}>
                                         {b.name}
                                       </SelectItem>
@@ -320,40 +304,14 @@ export default function SettingsManager() {
                                 </Select>
                               </div>
                               <div>
-                                <Label htmlFor="shareUser">Usuario</Label>
-                                <Select value={selectedUserForShare} onValueChange={setSelectedUserForShare}>
-                                  <SelectTrigger id="shareUser">
-                                    <SelectValue placeholder="Selecciona un usuario" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {allUsers
-                                      .filter(user => user.id !== currentUser?.id)
-                                      .filter(user => {
-                                        const bizId = selectedBusinessForShare || currentBusiness?.id;
-                                        if (!bizId) return true;
-                                        const usersWithAccess = getBusinessUsersWithRoles(bizId).map(u => u.userId);
-                                        return !usersWithAccess.includes(user.id);
-                                      })
-                                      .map((user) => (
-                                        <SelectItem key={user.id} value={user.id}>
-                                          {user.username}
-                                        </SelectItem>
-                                      ))}
-                                  </SelectContent>
-                                </Select>
-                                {(selectedBusinessForShare || currentBusiness?.id) && allUsers
-                                  .filter(user => user.id !== currentUser?.id)
-                                  .filter(user => {
-                                    const bizId = selectedBusinessForShare || currentBusiness?.id;
-                                    if (!bizId) return true;
-                                    const usersWithAccess = getBusinessUsersWithRoles(bizId).map(u => u.userId);
-                                    return !usersWithAccess.includes(user.id);
-                                  })
-                                  .length === 0 && (
-                                  <p className="text-sm text-muted-foreground mt-2">
-                                    Todos los usuarios ya tienen acceso a este negocio.
-                                  </p>
-                                )}
+                                <Label htmlFor="shareUserEmail">Email del usuario</Label>
+                                <Input
+                                  id="shareUserEmail"
+                                  type="email"
+                                  value={shareUserEmail}
+                                  onChange={(e) => setShareUserEmail(e.target.value)}
+                                  placeholder="usuario@email.com"
+                                />
                               </div>
                               <div>
                                 <Label htmlFor="shareRole">Tipo de permiso</Label>
@@ -362,7 +320,7 @@ export default function SettingsManager() {
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="owner">Propietario (acceso total)</SelectItem>
+                                    <SelectItem value="admin">Administrador (acceso total)</SelectItem>
                                     <SelectItem value="staff">Personal (sin dashboard ni invitar)</SelectItem>
                                   </SelectContent>
                                 </Select>
@@ -384,13 +342,12 @@ export default function SettingsManager() {
                         <div className="space-y-1">
                           {getBusinessUsersWithRoles(currentBusiness.id).length > 0 ? (
                             getBusinessUsersWithRoles(currentBusiness.id).map(({ userId, role }) => {
-                              const user = allUsers.find(u => u.id === userId);
                               return (
                                 <div key={userId} className="text-sm text-muted-foreground flex items-center gap-2">
                                   <Users className="h-4 w-4" />
-                                  <span>{user?.username || userId}</span>
+                                  <span>{userId === currentUser?.id ? (currentUser?.fullName || currentUser?.email) : userId}</span>
                                   <span className="text-xs font-medium text-primary">
-                                    ({role === 'owner' ? 'Propietario' : 'Personal'})
+                                    ({role === 'admin' ? 'Administrador' : 'Personal'})
                                   </span>
                                   {userId === currentUser?.id && (
                                     <span className="text-xs text-primary">(Tú)</span>
@@ -399,7 +356,7 @@ export default function SettingsManager() {
                               );
                             })
                           ) : (
-                            <div className="text-sm text-muted-foreground">Solo tú tienes acceso</div>
+                            <p className="text-sm text-muted-foreground">No hay usuarios con acceso</p>
                           )}
                         </div>
                       </div>
@@ -411,174 +368,174 @@ export default function SettingsManager() {
             </CardContent>
           </Card>
 
-          {/* Business List */}
+          {/* All Businesses */}
           <Card>
             <CardHeader>
               <CardTitle>Todos los Negocios</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {businesses.map((business) => (
-                  <div key={business.id} className="flex items-center justify-between p-3 border border-border rounded-lg bg-card">
-                    <div className="flex-1">
-                      <h4 className="font-medium text-foreground">{business.name}</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {businesses.map((business) => {
+                  const role = currentUser ? getUserRole(business.id, currentUser.id) : undefined;
+                  return (
+                    <div
+                      key={business.id}
+                      className={`p-4 border rounded-lg cursor-pointer transition-all hover:shadow-md ${
+                        currentBusiness?.id === business.id ? 'border-primary bg-primary/5' : 'border-border'
+                      }`}
+                      onClick={() => setCurrentBusiness(business)}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="font-medium text-foreground">{business.name}</h3>
+                        {role === 'admin' && (
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditBusiness(business);
+                              }}
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteBusiness(business.id);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        )}
+                      </div>
                       {business.description && (
-                        <p className="text-sm text-muted-foreground">{business.description}</p>
+                        <p className="text-sm text-muted-foreground mb-1">{business.description}</p>
                       )}
                       <p className="text-xs text-muted-foreground">
-                        Menú: {business.menuItems.length} elementos
+                        {business.menuItems.length} elementos en el menú
                       </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleEditBusiness(business)}
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                      {businesses.length > 1 && (
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => handleDeleteBusiness(business.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                      {role && (
+                        <p className="text-xs text-primary mt-1">
+                          {role === 'admin' ? 'Administrador' : 'Personal'}
+                        </p>
                       )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="users" className="space-y-6">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div>
-              <h2 className="text-xl font-semibold text-foreground">Gestión de Usuarios</h2>
-              <p className="text-muted-foreground">Administra el equipo de tu restaurante</p>
-            </div>
-            
-            <Button className="bg-gradient-primary hover:opacity-90">
-              <UserPlus className="h-4 w-4 mr-2" />
-              Agregar Usuario
-            </Button>
-          </div>
-
+        <TabsContent value="users">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Settings className="h-5 w-5" />
-                Funcionalidad en Desarrollo
+                <Users className="h-5 w-5" />
+                Información del Usuario
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-12">
-                <Users className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-foreground mb-2">
-                  Gestión de Usuarios
-                </h3>
-                <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                  Esta sección permitirá gestionar los usuarios del sistema, asignar roles 
-                  y permisos para el personal del restaurante.
-                </p>
-                <div className="space-y-2 text-sm text-muted-foreground">
-                  <div>• Agregar y gestionar empleados</div>
-                  <div>• Asignar roles (Administrador, Mesero, Chef)</div>
-                  <div>• Control de permisos por módulo</div>
-                  <div>• Horarios y turnos de trabajo</div>
+              {currentUser && (
+                <div className="space-y-4">
+                  <div className="p-4 border border-border rounded-lg bg-card">
+                    <p className="text-sm text-muted-foreground">Email</p>
+                    <p className="font-medium text-foreground">{currentUser.email}</p>
+                  </div>
+                  {currentUser.fullName && (
+                    <div className="p-4 border border-border rounded-lg bg-card">
+                      <p className="text-sm text-muted-foreground">Nombre</p>
+                      <p className="font-medium text-foreground">{currentUser.fullName}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="language">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Globe className="h-5 w-5" />
+                Idioma
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="language">Idioma de la aplicación</Label>
+                  <Select value={settings.language} onValueChange={(value) => handleSettingChange('language', value)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(languageLabels).map(([key, label]) => (
+                        <SelectItem key={key} value={key}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="language" className="space-y-6">
+        <TabsContent value="currency">
           <Card>
             <CardHeader>
-              <CardTitle>Configuración de Idioma</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <DollarSign className="h-5 w-5" />
+                Moneda
+              </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="language">Idioma de la aplicación</Label>
-                <Select 
-                  value={settings.language} 
-                  onValueChange={(value) => handleSettingChange('language', value)}
-                >
-                  <SelectTrigger id="language">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="es">Español</SelectItem>
-                    <SelectItem value="en">English</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-sm text-muted-foreground">
-                  Idioma actual: {languageLabels[settings.language]}
-                </p>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="currency">Moneda predeterminada</Label>
+                  <Select value={settings.currency} onValueChange={(value) => handleSettingChange('currency', value)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(currencySymbols).map(([key, symbol]) => (
+                        <SelectItem key={key} value={key}>{key} ({symbol})</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="currency" className="space-y-6">
+        <TabsContent value="ingredients">
           <Card>
             <CardHeader>
-              <CardTitle>Configuración de Moneda</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <ChefHat className="h-5 w-5" />
+                Gestión de Ingredientes
+              </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="currency">Moneda principal</Label>
-                <Select 
-                  value={settings.currency} 
-                  onValueChange={(value) => handleSettingChange('currency', value)}
-                >
-                  <SelectTrigger id="currency">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="MXN">MXN - Peso Mexicano ($)</SelectItem>
-                    <SelectItem value="EUR">EUR - Euro (€)</SelectItem>
-                    <SelectItem value="USD">USD - Dólar Americano ($)</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-sm text-muted-foreground">
-                  Moneda actual: {settings.currency} ({currencySymbols[settings.currency]})
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="ingredients" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Gestión de Ingredientes</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent>
               <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <Label htmlFor="ingredient-management">Activar gestión de ingredientes</Label>
+                <div>
+                  <Label htmlFor="ingredientManagement">Activar gestión de ingredientes</Label>
                   <p className="text-sm text-muted-foreground">
-                    Permite personalizar ingredientes en los productos del menú
+                    Controla el inventario de ingredientes por producto
                   </p>
                 </div>
                 <Switch
-                  id="ingredient-management"
+                  id="ingredientManagement"
                   checked={settings.ingredientManagement}
                   onCheckedChange={(checked) => handleSettingChange('ingredientManagement', checked)}
                 />
               </div>
-              {settings.ingredientManagement && (
-                <div className="p-4 bg-muted rounded-lg">
-                  <p className="text-sm text-muted-foreground">
-                    La gestión de ingredientes está activa. Los productos del menú ahora incluyen 
-                    opciones para personalizar ingredientes durante la creación de órdenes.
-                  </p>
-                </div>
-              )}
             </CardContent>
           </Card>
         </TabsContent>
