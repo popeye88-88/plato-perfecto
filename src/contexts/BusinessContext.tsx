@@ -71,80 +71,100 @@ export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     localStorage.setItem('businessUserAccess', JSON.stringify(access));
   };
 
-  // Initialize default businesses and access for default users
-  const initializeDefaultBusinesses = () => {
-    // Create businesses for default users
-    const business1: Business = {
-      id: 'business-mi-restaurante',
-      name: 'mi restaurante',
-      description: 'Negocio de user1',
-      createdAt: new Date(),
-      menuItems: []
-    };
+  // Ensure default businesses exist
+  const ensureDefaultBusinesses = (): Business[] => {
+    const savedBusinesses = localStorage.getItem('businesses');
+    let allBusinessesData: Business[] = [];
 
-    const business2: Business = {
-      id: 'business-n1',
-      name: 'N1',
-      description: 'Negocio compartido',
-      createdAt: new Date(),
-      menuItems: []
-    };
+    if (savedBusinesses) {
+      try {
+        allBusinessesData = JSON.parse(savedBusinesses).map((business: any) => ({
+          ...business,
+          createdAt: new Date(business.createdAt)
+        }));
+      } catch (error) {
+        console.error('Error parsing saved businesses:', error);
+      }
+    }
 
-    const business3: Business = {
-      id: 'business-n2',
-      name: 'N2',
-      description: 'Negocio de user2',
-      createdAt: new Date(),
-      menuItems: []
-    };
+    // Define default businesses
+    const defaultBusinesses: Business[] = [
+      {
+        id: 'business-mi-restaurante',
+        name: 'mi restaurante',
+        description: 'Negocio de user1',
+        createdAt: new Date(),
+        menuItems: []
+      },
+      {
+        id: 'business-n1',
+        name: 'N1',
+        description: 'Negocio compartido',
+        createdAt: new Date(),
+        menuItems: []
+      },
+      {
+        id: 'business-n2',
+        name: 'N2',
+        description: 'Negocio de user2',
+        createdAt: new Date(),
+        menuItems: []
+      }
+    ];
 
-    const newBusinesses = [business1, business2, business3];
-    setAllBusinesses(newBusinesses);
-    localStorage.setItem('businesses', JSON.stringify(newBusinesses));
+    // Merge: add default businesses if they don't exist
+    const mergedBusinesses = [...allBusinessesData];
+    defaultBusinesses.forEach(defaultBusiness => {
+      if (!mergedBusinesses.find(b => b.id === defaultBusiness.id)) {
+        mergedBusinesses.push(defaultBusiness);
+      }
+    });
 
-    // Set up access: user1 -> mi restaurante, N1; user2 -> N1, N2
-    const newAccess: BusinessUserAccess[] = [
+    // Update state and localStorage
+    if (mergedBusinesses.length !== allBusinessesData.length) {
+      setAllBusinesses(mergedBusinesses);
+      localStorage.setItem('businesses', JSON.stringify(mergedBusinesses));
+    } else {
+      setAllBusinesses(mergedBusinesses);
+    }
+
+    return mergedBusinesses;
+  };
+
+  // Ensure default access is set for user1 and user2
+  const ensureDefaultAccess = () => {
+    const access = getBusinessAccess();
+    
+    // Required access: user1 -> mi restaurante, N1; user2 -> N1, N2
+    const requiredAccess: BusinessUserAccess[] = [
       { businessId: 'business-mi-restaurante', userId: 'user1' },
       { businessId: 'business-n1', userId: 'user1' },
       { businessId: 'business-n1', userId: 'user2' },
       { businessId: 'business-n2', userId: 'user2' }
     ];
     
-    // Merge with existing access (avoid duplicates)
-    const existingAccess = getBusinessAccess();
-    const mergedAccess = [...existingAccess];
-    newAccess.forEach(newItem => {
-      if (!mergedAccess.find(item => item.businessId === newItem.businessId && item.userId === newItem.userId)) {
-        mergedAccess.push(newItem);
+    // Add missing access entries
+    let hasChanges = false;
+    requiredAccess.forEach(required => {
+      if (!access.find(a => a.businessId === required.businessId && a.userId === required.userId)) {
+        access.push(required);
+        hasChanges = true;
       }
     });
-    saveBusinessAccess(mergedAccess);
 
-    return newBusinesses;
+    if (hasChanges) {
+      saveBusinessAccess(access);
+    }
   };
 
   // Load businesses and filter by current user
   useEffect(() => {
     if (currentUser) {
-      const savedBusinesses = localStorage.getItem('businesses');
-      let allBusinessesData: Business[] = [];
-
-      if (savedBusinesses) {
-        try {
-          allBusinessesData = JSON.parse(savedBusinesses).map((business: any) => ({
-            ...business,
-            createdAt: new Date(business.createdAt)
-          }));
-        } catch (error) {
-          console.error('Error parsing saved businesses:', error);
-        }
-      }
-
-      // Initialize if needed
-      if (allBusinessesData.length === 0) {
-        allBusinessesData = initializeDefaultBusinesses();
-      }
-      setAllBusinesses(allBusinessesData);
+      // Ensure default businesses exist
+      const allBusinessesData = ensureDefaultBusinesses();
+      
+      // Ensure default access is set
+      ensureDefaultAccess();
 
       // Get user's accessible businesses
       const access = getBusinessAccess();
