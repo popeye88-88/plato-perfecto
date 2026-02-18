@@ -638,7 +638,7 @@ export default function OrderManager() {
           stage: currentStage,
           itemName: item.name,
           quantity: 1,
-          userId: currentUser?.email
+          userId: currentUser?.username
         };
         
         return {
@@ -692,7 +692,7 @@ export default function OrderManager() {
                   stage: currentStage,
                   itemName: changedItem.name,
                   quantity: 1,
-                  userId: currentUser?.email
+                  userId: currentUser?.username
                 }]
               : [])
           ]
@@ -737,7 +737,7 @@ export default function OrderManager() {
                   stage: currentStage,
                   itemName: changedItem.name,
                   quantity: 1,
-                  userId: currentUser?.email
+                  userId: currentUser?.username
                 }]
               : [])
           ]
@@ -816,7 +816,7 @@ export default function OrderManager() {
                   itemName: itemToCancelNow.name,
                   quantity: itemToCancelNow.quantity,
                   details: itemToCancelNow.cancellationReason,
-                  userId: currentUser?.email
+                  userId: currentUser?.username
                 }]
               : [])
           ]
@@ -2081,7 +2081,7 @@ export default function OrderManager() {
                                 stage: currentStage,
                                 itemName: item.name,
                                 quantity: addedQuantity,
-                                userId: currentUser?.email
+                                userId: currentUser?.username
                               });
                             }
 
@@ -2108,7 +2108,7 @@ export default function OrderManager() {
                                 itemName: item.name,
                                 quantity: removedQuantity,
                                 details: reason,
-                                userId: currentUser?.email
+                                userId: currentUser?.username
                               });
                             }
                           }
@@ -2136,7 +2136,7 @@ export default function OrderManager() {
                               stage: currentStage,
                               itemName: menuItem.name,
                               quantity,
-                              userId: currentUser?.email
+                              userId: currentUser?.username
                             });
 
                             keys.forEach(key => processedItems.add(key));

@@ -14,125 +14,8 @@ export type Database = {
   }
   public: {
     Tables: {
-      business_members: {
-        Row: {
-          business_id: string
-          created_at: string
-          id: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
-        Insert: {
-          business_id: string
-          created_at?: string
-          id?: string
-          role?: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
-        Update: {
-          business_id?: string
-          created_at?: string
-          id?: string
-          role?: Database["public"]["Enums"]["app_role"]
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "business_members_business_id_fkey"
-            columns: ["business_id"]
-            isOneToOne: false
-            referencedRelation: "businesses"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      businesses: {
-        Row: {
-          created_at: string
-          description: string | null
-          id: string
-          name: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          description?: string | null
-          id?: string
-          name: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          description?: string | null
-          id?: string
-          name?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      categories: {
-        Row: {
-          business_id: string
-          created_at: string
-          id: string
-          name: string
-          updated_at: string
-        }
-        Insert: {
-          business_id: string
-          created_at?: string
-          id?: string
-          name: string
-          updated_at?: string
-        }
-        Update: {
-          business_id?: string
-          created_at?: string
-          id?: string
-          name?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      menu_items: {
-        Row: {
-          available: boolean
-          business_id: string
-          category: string
-          created_at: string
-          description: string | null
-          id: string
-          name: string
-          price: number
-          updated_at: string
-        }
-        Insert: {
-          available?: boolean
-          business_id: string
-          category: string
-          created_at?: string
-          description?: string | null
-          id?: string
-          name: string
-          price: number
-          updated_at?: string
-        }
-        Update: {
-          available?: boolean
-          business_id?: string
-          category?: string
-          created_at?: string
-          description?: string | null
-          id?: string
-          name?: string
-          price?: number
-          updated_at?: string
-        }
-        Relationships: []
-      }
       order_edit_history: {
         Row: {
-          business_id: string | null
           changes: Json
           created_at: string | null
           edit_type: string
@@ -141,7 +24,6 @@ export type Database = {
           order_id: string
         }
         Insert: {
-          business_id?: string | null
           changes: Json
           created_at?: string | null
           edit_type: string
@@ -150,7 +32,6 @@ export type Database = {
           order_id: string
         }
         Update: {
-          business_id?: string | null
           changes?: Json
           created_at?: string | null
           edit_type?: string
@@ -158,47 +39,117 @@ export type Database = {
           id?: string
           order_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "order_edit_history_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
       }
-      profiles: {
+      order_items: {
         Row: {
+          cancellation_reason: string | null
+          cancelled: boolean | null
           created_at: string
-          full_name: string | null
           id: string
+          ingredients: Json | null
+          name: string
+          order_id: string
+          price: number
+          quantity: number
+          status: string
           updated_at: string
         }
         Insert: {
+          cancellation_reason?: string | null
+          cancelled?: boolean | null
           created_at?: string
-          full_name?: string | null
-          id: string
+          id?: string
+          ingredients?: Json | null
+          name: string
+          order_id: string
+          price: number
+          quantity?: number
+          status?: string
           updated_at?: string
         }
         Update: {
+          cancellation_reason?: string | null
+          cancelled?: boolean | null
           created_at?: string
-          full_name?: string | null
           id?: string
+          ingredients?: Json | null
+          name?: string
+          order_id?: string
+          price?: number
+          quantity?: number
+          status?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
       }
-      user_roles: {
+      orders: {
         Row: {
           created_at: string
+          customer_name: string
+          delivery_charge: number | null
+          diners: number | null
+          discount_amount: number | null
+          discount_reason: string | null
+          edited: boolean | null
           id: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
+          number: string
+          payment_method: string | null
+          service_type: string | null
+          status: string
+          total: number
+          updated_at: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
+          customer_name: string
+          delivery_charge?: number | null
+          diners?: number | null
+          discount_amount?: number | null
+          discount_reason?: string | null
+          edited?: boolean | null
           id?: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
+          number: string
+          payment_method?: string | null
+          service_type?: string | null
+          status: string
+          total: number
+          updated_at?: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
+          customer_name?: string
+          delivery_charge?: number | null
+          diners?: number | null
+          discount_amount?: number | null
+          discount_reason?: string | null
+          edited?: boolean | null
           id?: string
-          role?: Database["public"]["Enums"]["app_role"]
-          user_id?: string
+          number?: string
+          payment_method?: string | null
+          service_type?: string | null
+          status?: string
+          total?: number
+          updated_at?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -207,29 +158,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      get_user_role_in_business: {
-        Args: { _business_id: string; _user_id: string }
-        Returns: Database["public"]["Enums"]["app_role"]
-      }
-      has_role: {
-        Args: {
-          _role: Database["public"]["Enums"]["app_role"]
-          _user_id: string
-        }
-        Returns: boolean
-      }
-      is_business_admin: {
-        Args: { _business_id: string; _user_id: string }
-        Returns: boolean
-      }
-      is_business_member: {
-        Args: { _business_id: string; _user_id: string }
-        Returns: boolean
-      }
-      is_staff: { Args: { _user_id: string }; Returns: boolean }
+      [_ in never]: never
     }
     Enums: {
-      app_role: "admin" | "staff"
+      [_ in never]: never
     }
     CompositeTypes: {
       [_ in never]: never
@@ -356,8 +288,6 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {
-      app_role: ["admin", "staff"],
-    },
+    Enums: {},
   },
 } as const

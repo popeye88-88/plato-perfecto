@@ -1,6 +1,16 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import {
+  isSupabaseConfigured,
+  fetchBusinesses as fetchBusinessesDb,
+  fetchBusinessAccess,
+  insertBusiness as insertBusinessDb,
+  updateBusinessDb,
+  deleteBusinessDb,
+  upsertBusinessAccess,
+  deleteBusinessAccess,
+  fetchMenuItems
+} from '@/lib/supabase';
 
 interface Business {
   id: string;
@@ -18,9 +28,10 @@ interface MenuItem {
   description?: string;
 }
 
-export type BusinessRole = 'admin' | 'staff';
+export type BusinessRole = 'owner' | 'staff';
 
-interface BusinessMember {
+// Store which users have access to which businesses and their role
+interface BusinessUserAccess {
   businessId: string;
   userId: string;
   role: BusinessRole;
@@ -53,11 +64,82 @@ export const useBusinessContext = () => {
 export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { currentUser } = useAuth();
   const [currentBusiness, setCurrentBusiness] = useState<Business | null>(null);
+  const [allBusinesses, setAllBusinesses] = useState<Business[]>([]);
   const [businesses, setBusinesses] = useState<Business[]>([]);
-  const [members, setMembers] = useState<BusinessMember[]>([]);
+  const [access, setAccess] = useState<BusinessUserAccess[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Load businesses for current user
+  const getBusinessAccessLocal = useCallback((): BusinessUserAccess[] => {
+    const saved = localStorage.getItem('businessUserAccess');
+    if (saved) {
+      try {
+        const parsed: BusinessUserAccess[] = JSON.parse(saved);
+        return parsed.map((a) => ({ ...a, role: a.role || 'staff' }));
+      } catch (error) {
+        console.error('Error parsing business access:', error);
+        return [];
+      }
+    }
+    return [];
+  }, []);
+
+  const saveBusinessAccessLocal = useCallback((access: BusinessUserAccess[]) => {
+    localStorage.setItem('businessUserAccess', JSON.stringify(access));
+  }, []);
+
+  const ensureDefaultBusinessesLocal = useCallback((): Business[] => {
+    const savedBusinesses = localStorage.getItem('businesses');
+    let allBusinessesData: Business[] = [];
+    if (savedBusinesses) {
+      try {
+        allBusinessesData = JSON.parse(savedBusinesses).map((business: any) => ({
+          ...business,
+          createdAt: new Date(business.createdAt)
+        }));
+      } catch (error) {
+        console.error('Error parsing saved businesses:', error);
+      }
+    }
+    const defaultBusinesses: Business[] = [
+      { id: 'business-mi-restaurante', name: 'mi restaurante', description: 'Negocio de user1', createdAt: new Date(), menuItems: [] },
+      { id: 'business-n1', name: 'N1', description: 'Negocio compartido', createdAt: new Date(), menuItems: [] },
+      { id: 'business-n2', name: 'N2', description: 'Negocio de user2', createdAt: new Date(), menuItems: [] }
+    ];
+    const mergedBusinesses = [...allBusinessesData];
+    defaultBusinesses.forEach((defaultBusiness) => {
+      if (!mergedBusinesses.find((b) => b.id === defaultBusiness.id)) {
+        mergedBusinesses.push(defaultBusiness);
+      }
+    });
+    if (mergedBusinesses.length !== allBusinessesData.length) {
+      localStorage.setItem('businesses', JSON.stringify(mergedBusinesses));
+    }
+    return mergedBusinesses;
+  }, []);
+
+  const ensureDefaultAccessLocal = useCallback(() => {
+    const access = getBusinessAccessLocal();
+    const requiredAccess: BusinessUserAccess[] = [
+      { businessId: 'business-mi-restaurante', userId: 'user1', role: 'owner' },
+      { businessId: 'business-n1', userId: 'user1', role: 'owner' },
+      { businessId: 'business-n1', userId: 'user2', role: 'staff' },
+      { businessId: 'business-n2', userId: 'user2', role: 'owner' }
+    ];
+    let hasChanges = false;
+    requiredAccess.forEach((required) => {
+      const existing = access.find((a) => a.businessId === required.businessId && a.userId === required.userId);
+      if (!existing) {
+        access.push(required);
+        hasChanges = true;
+      } else if (existing.role !== required.role) {
+        existing.role = required.role;
+        hasChanges = true;
+      }
+    });
+    if (hasChanges) saveBusinessAccessLocal(access);
+  }, [getBusinessAccessLocal, saveBusinessAccessLocal]);
+
+  // Load businesses and filter by current user
   useEffect(() => {
     if (!currentUser) {
       setBusinesses([]);
@@ -67,137 +149,116 @@ export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
 
     const load = async () => {
-      try {
-        // Fetch businesses (RLS filters to user's businesses)
-        const { data: businessesData, error: bizError } = await supabase
-          .from('businesses')
-          .select('*')
-          .order('created_at', { ascending: true });
-
-        if (bizError) {
-          console.error('Error fetching businesses:', bizError);
-          setLoading(false);
-          return;
-        }
-
-        // Fetch business members
-        const { data: membersData } = await supabase
-          .from('business_members')
-          .select('*');
-
-        const membersList: BusinessMember[] = (membersData || []).map((m: any) => ({
-          businessId: m.business_id,
-          userId: m.user_id,
-          role: m.role as BusinessRole
-        }));
-        setMembers(membersList);
-
-        // Fetch menu items for each business
-        const businessList: Business[] = [];
-        for (const b of businessesData || []) {
-          const { data: menuData } = await supabase
-            .from('menu_items')
-            .select('*')
-            .eq('business_id', b.id)
-            .order('name');
-
-          const menuItems = (menuData || []).map((m: any) => ({
-            id: m.id,
-            name: m.name,
-            price: parseFloat(m.price),
-            category: m.category,
-            description: m.description
-          }));
-
-          businessList.push({
-            id: b.id,
-            name: b.name,
-            description: b.description,
-            createdAt: new Date(b.created_at),
-            menuItems
-          });
-        }
-
-        setBusinesses(businessList);
-
-        // Restore current business
+      if (isSupabaseConfigured()) {
+        const [businessesData, accessData] = await Promise.all([fetchBusinessesDb(), fetchBusinessAccess()]);
+        setAccess(accessData.map((a) => ({ businessId: a.businessId, userId: a.userId, role: a.role })));
+        const userBusinessIds = accessData.filter((a) => a.userId === currentUser.id).map((a) => a.businessId);
+        const userBizData = businessesData.filter((b) => userBusinessIds.includes(b.id));
+        const withMenuItems = await Promise.all(
+          userBizData.map(async (b) => {
+            const items = await fetchMenuItems(b.id);
+            return { ...b, menuItems: items };
+          })
+        );
+        setAllBusinesses(withMenuItems);
+        setBusinesses(withMenuItems);
         const savedCurrent = localStorage.getItem(`currentBusiness_${currentUser.id}`);
         const parsed = savedCurrent ? (() => { try { return JSON.parse(savedCurrent); } catch { return null; } })() : null;
-        const found = businessList.find((b) => b.id === parsed?.id);
-        setCurrentBusiness(found ?? businessList[0] ?? null);
-      } catch (error) {
-        console.error('Error loading businesses:', error);
+        const found = withMenuItems.find((b) => b.id === parsed?.id);
+        setCurrentBusiness(found ?? withMenuItems[0] ?? null);
+      } else {
+        const allBusinessesData = ensureDefaultBusinessesLocal();
+        ensureDefaultAccessLocal();
+        const accessLocal = getBusinessAccessLocal();
+        setAccess(accessLocal);
+        const userBusinessIds = accessLocal.filter((a) => a.userId === currentUser.id).map((a) => a.businessId);
+        const userBusinesses = allBusinessesData.filter((b) => userBusinessIds.includes(b.id));
+        setAllBusinesses(allBusinessesData);
+        setBusinesses(userBusinesses);
+        const savedCurrentBusiness = localStorage.getItem(`currentBusiness_${currentUser.id}`);
+        if (savedCurrentBusiness) {
+          try {
+            const parsed = JSON.parse(savedCurrentBusiness);
+            const found = userBusinesses.find((b) => b.id === parsed.id);
+            setCurrentBusiness(found ?? userBusinesses[0] ?? null);
+          } catch {
+            setCurrentBusiness(userBusinesses[0] ?? null);
+          }
+        } else {
+          setCurrentBusiness(userBusinesses[0] ?? null);
+        }
       }
       setLoading(false);
     };
     load();
-  }, [currentUser]);
+  }, [currentUser, ensureDefaultBusinessesLocal, ensureDefaultAccessLocal, getBusinessAccessLocal]);
 
-  // Save current business to localStorage when it changes
+  // Save current business to localStorage when it changes (per user)
   useEffect(() => {
     if (currentBusiness && currentUser) {
-      localStorage.setItem(`currentBusiness_${currentUser.id}`, JSON.stringify({ id: currentBusiness.id }));
+      localStorage.setItem(`currentBusiness_${currentUser.id}`, JSON.stringify(currentBusiness));
     }
   }, [currentBusiness, currentUser]);
 
-  const addBusiness = async (businessData: Omit<Business, 'id' | 'createdAt'>) => {
-    if (!currentUser) return null;
-
-    const { data, error } = await supabase
-      .from('businesses')
-      .insert({ name: businessData.name, description: businessData.description || null })
-      .select()
-      .single();
-
-    if (error || !data) {
-      console.error('Error creating business:', error);
-      return null;
+  useEffect(() => {
+    if (!isSupabaseConfigured() && allBusinesses.length > 0) {
+      localStorage.setItem('businesses', JSON.stringify(allBusinesses));
     }
+  }, [allBusinesses]);
 
-    // Add self as admin
-    await supabase
-      .from('business_members')
-      .insert({ business_id: data.id, user_id: currentUser.id, role: 'admin' });
+  const getAccess = useCallback(async (): Promise<BusinessUserAccess[]> => {
+    if (isSupabaseConfigured()) {
+      const data = await fetchBusinessAccess();
+      return data.map((a) => ({ businessId: a.businessId, userId: a.userId, role: a.role }));
+    }
+    return getBusinessAccessLocal();
+  }, [getBusinessAccessLocal]);
 
+  const addBusiness = (businessData: Omit<Business, 'id' | 'createdAt'>) => {
+    if (!currentUser) return null;
     const newBusiness: Business = {
-      id: data.id,
-      name: data.name,
-      description: data.description,
-      createdAt: new Date(data.created_at),
-      menuItems: businessData.menuItems || []
+      ...businessData,
+      id: `business-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+      createdAt: new Date()
     };
-
-    setMembers((prev) => [...prev, { businessId: data.id, userId: currentUser.id, role: 'admin' }]);
+    const newAccess = { businessId: newBusiness.id, userId: currentUser.id, role: 'owner' as BusinessRole };
+    if (isSupabaseConfigured()) {
+      insertBusinessDb({ id: newBusiness.id, name: newBusiness.name, description: newBusiness.description });
+      upsertBusinessAccess(newBusiness.id, currentUser.id, 'owner');
+    } else {
+      const accessLocal = getBusinessAccessLocal();
+      accessLocal.push(newAccess);
+      saveBusinessAccessLocal(accessLocal);
+    }
+    setAccess((prev) => [...prev, newAccess]);
+    setAllBusinesses((prev) => [...prev, newBusiness]);
     setBusinesses((prev) => [...prev, newBusiness]);
     return newBusiness;
   };
 
-  const updateBusiness = async (id: string, updates: Partial<Business>) => {
-    const { error } = await supabase
-      .from('businesses')
-      .update({ name: updates.name, description: updates.description })
-      .eq('id', id);
-
-    if (error) {
-      console.error('Error updating business:', error);
-      return;
+  const updateBusiness = (id: string, updates: Partial<Business>) => {
+    if (isSupabaseConfigured()) {
+      updateBusinessDb(id, { name: updates.name, description: updates.description });
     }
-
     const apply = (b: Business) => (b.id === id ? { ...b, ...updates } : b);
+    setAllBusinesses((prev) => prev.map(apply));
     setBusinesses((prev) => prev.map(apply));
     if (currentBusiness?.id === id) {
       setCurrentBusiness((prev) => (prev ? { ...prev, ...updates } : null));
     }
   };
 
-  const deleteBusiness = async (id: string) => {
-    const { error } = await supabase.from('businesses').delete().eq('id', id);
-    if (error) {
-      console.error('Error deleting business:', error);
-      return;
+  const deleteBusiness = (id: string) => {
+    if (isSupabaseConfigured()) {
+      deleteBusinessAccess(id);
+      deleteBusinessDb(id);
+    } else {
+      const accessLocal = getBusinessAccessLocal();
+      const filtered = accessLocal.filter((a) => a.businessId !== id);
+      saveBusinessAccessLocal(filtered);
     }
-
-    setMembers((prev) => prev.filter((m) => m.businessId !== id));
+    setAccess((prev) => prev.filter((a) => a.businessId !== id));
+    setAllBusinesses((prev) => prev.filter((b) => b.id !== id));
     setBusinesses((prev) => prev.filter((b) => b.id !== id));
     if (currentBusiness?.id === id) {
       const remaining = businesses.filter((b) => b.id !== id);
@@ -205,34 +266,32 @@ export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   };
 
-  const shareBusinessWithUser = async (businessId: string, userId: string, role: BusinessRole) => {
-    const { error } = await supabase
-      .from('business_members')
-      .upsert(
-        { business_id: businessId, user_id: userId, role },
-        { onConflict: 'business_id,user_id' }
-      );
-
-    if (error) {
-      console.error('Error sharing business:', error);
-      return;
+  const shareBusinessWithUser = (businessId: string, userId: string, role: BusinessRole) => {
+    if (isSupabaseConfigured()) {
+      upsertBusinessAccess(businessId, userId, role);
+      setAccess((prev) => {
+        const existing = prev.find((a) => a.businessId === businessId && a.userId === userId);
+        if (existing) return prev.map((a) => (a === existing ? { ...a, role } : a));
+        return [...prev, { businessId, userId, role }];
+      });
+    } else {
+      const accessLocal = getBusinessAccessLocal();
+      const existing = accessLocal.find((a) => a.businessId === businessId && a.userId === userId);
+      if (existing) existing.role = role;
+      else accessLocal.push({ businessId, userId, role });
+      saveBusinessAccessLocal(accessLocal);
+      setAccess([...accessLocal]);
     }
-
-    setMembers((prev) => {
-      const existing = prev.find((m) => m.businessId === businessId && m.userId === userId);
-      if (existing) return prev.map((m) => (m === existing ? { ...m, role } : m));
-      return [...prev, { businessId, userId, role }];
-    });
   };
 
   const getBusinessUsers = (businessId: string): string[] =>
-    members.filter((m) => m.businessId === businessId).map((m) => m.userId);
+    access.filter((a) => a.businessId === businessId).map((a) => a.userId);
 
   const getBusinessUsersWithRoles = (businessId: string): { userId: string; role: BusinessRole }[] =>
-    members.filter((m) => m.businessId === businessId).map((m) => ({ userId: m.userId, role: m.role }));
+    access.filter((a) => a.businessId === businessId).map((a) => ({ userId: a.userId, role: a.role }));
 
   const getUserRole = (businessId: string, userId: string): BusinessRole | undefined =>
-    members.find((m) => m.businessId === businessId && m.userId === userId)?.role;
+    access.find((a) => a.businessId === businessId && a.userId === userId)?.role;
 
   const value: BusinessContextType = {
     currentBusiness,

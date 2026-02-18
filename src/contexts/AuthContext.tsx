@@ -1,20 +1,20 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import type { User as SupabaseUser, Session } from '@supabase/supabase-js';
+import { fetchUserByCredentials, fetchAllUsers, isSupabaseConfigured } from '@/lib/supabase';
 
 export interface User {
   id: string;
-  email: string;
-  fullName?: string;
+  username: string;
+  password: string;
+  createdAt: Date;
 }
 
 interface AuthContextType {
   currentUser: User | null;
-  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  signup: (email: string, password: string, fullName?: string, businessName?: string) => Promise<{ success: boolean; error?: string }>;
-  logout: () => Promise<void>;
+  login: (username: string, password: string) => Promise<boolean>;
+  logout: () => void;
   isAuthenticated: boolean;
   loading: boolean;
+  getUsers: () => Promise<User[]>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -27,87 +27,89 @@ export const useAuth = () => {
   return context;
 };
 
-function mapSupabaseUser(user: SupabaseUser): User {
-  return {
-    id: user.id,
-    email: user.email || '',
-    fullName: user.user_metadata?.full_name || user.email,
-  };
-}
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        if (session?.user) {
-          setCurrentUser(mapSupabaseUser(session.user));
-        } else {
-          setCurrentUser(null);
-        }
-        setLoading(false);
+  const getUsers = useCallback(async (): Promise<User[]> => {
+    if (isSupabaseConfigured()) {
+      const users = await fetchAllUsers();
+      return users.map((u) => ({ ...u, createdAt: u.createdAt }));
+    }
+    const savedUsers = localStorage.getItem('users');
+    if (savedUsers) {
+      try {
+        return JSON.parse(savedUsers).map((user: any) => ({
+          ...user,
+          createdAt: new Date(user.createdAt)
+        }));
+      } catch (error) {
+        console.error('Error parsing users:', error);
+        return [];
       }
-    );
-
-    // THEN check current session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        setCurrentUser(mapSupabaseUser(session.user));
-      }
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    }
+    return [];
   }, []);
 
-  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      return { success: false, error: error.message };
-    }
-    if (data.user) {
-      setCurrentUser(mapSupabaseUser(data.user));
-      return { success: true };
-    }
-    return { success: false, error: 'Error desconocido' };
-  };
-
-  const signup = async (email: string, password: string, fullName?: string, businessName?: string): Promise<{ success: boolean; error?: string }> => {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: fullName || email,
-          business_name: businessName,
-        },
-        emailRedirectTo: window.location.origin,
+  // Load current user from sessionStorage on mount
+  useEffect(() => {
+    const savedUser = sessionStorage.getItem('currentUser');
+    if (savedUser) {
+      try {
+        const user = JSON.parse(savedUser);
+        setCurrentUser({ ...user, createdAt: new Date(user.createdAt) });
+      } catch (error) {
+        console.error('Error parsing saved user:', error);
+        sessionStorage.removeItem('currentUser');
       }
-    });
-    if (error) {
-      return { success: false, error: error.message };
     }
-    if (data.user) {
-      return { success: true };
+    setLoading(false);
+  }, []);
+
+  // Initialize default users in localStorage if Supabase not configured
+  useEffect(() => {
+    if (isSupabaseConfigured()) return;
+    const savedUsers = localStorage.getItem('users');
+    if (savedUsers) return;
+    const defaultUsers: User[] = [
+      { id: 'user1', username: 'user1', password: '1234', createdAt: new Date() },
+      { id: 'user2', username: 'user2', password: '5678', createdAt: new Date() }
+    ];
+    localStorage.setItem('users', JSON.stringify(defaultUsers));
+  }, []);
+
+  const login = async (username: string, password: string): Promise<boolean> => {
+    if (isSupabaseConfigured()) {
+      const user = await fetchUserByCredentials(username, password);
+      if (user) {
+        const u = { ...user, createdAt: user.createdAt };
+        setCurrentUser(u);
+        sessionStorage.setItem('currentUser', JSON.stringify(u));
+        return true;
+      }
+      return false;
     }
-    return { success: false, error: 'Error desconocido' };
+    const users = await getUsers();
+    const user = users.find((u) => u.username === username && u.password === password);
+    if (user) {
+      setCurrentUser(user);
+      sessionStorage.setItem('currentUser', JSON.stringify(user));
+      return true;
+    }
+    return false;
   };
 
-  const logout = async () => {
-    await supabase.auth.signOut();
+  const logout = () => {
     setCurrentUser(null);
+    sessionStorage.removeItem('currentUser');
   };
 
   const value: AuthContextType = {
     currentUser,
     login,
-    signup,
     logout,
     isAuthenticated: !!currentUser,
-    loading,
+    loading
   };
 
   return (
