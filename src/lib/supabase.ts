@@ -6,35 +6,7 @@ const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 export const isSupabaseConfigured = () =>
   !!SUPABASE_URL && !!SUPABASE_KEY && SUPABASE_URL !== 'https://your-project.supabase.co';
 
-// App Users
-export async function fetchUserByCredentials(username: string, password: string) {
-  if (!isSupabaseConfigured()) return null;
-  const { data, error } = await supabase
-    .from('app_users')
-    .select('*')
-    .eq('username', username)
-    .eq('password', password)
-    .single();
-  if (error || !data) return null;
-  return {
-    id: data.id,
-    username: data.username,
-    password: data.password,
-    createdAt: new Date(data.created_at)
-  };
-}
-
-export async function fetchAllUsers() {
-  if (!isSupabaseConfigured()) return [];
-  const { data, error } = await supabase.from('app_users').select('*');
-  if (error) return [];
-  return (data || []).map((u: any) => ({
-    id: u.id,
-    username: u.username,
-    password: u.password,
-    createdAt: new Date(u.created_at)
-  }));
-}
+// App Users - removed: now using Supabase Auth (supabase.auth.signInWithPassword)
 
 // Businesses
 export async function fetchBusinesses() {
@@ -72,26 +44,7 @@ export async function deleteBusinessDb(id: string) {
   return !error;
 }
 
-// Business User Access
-export async function fetchBusinessAccess() {
-  if (!isSupabaseConfigured()) return [];
-  const { data, error } = await supabase.from('business_user_access').select('*');
-  if (error) return [];
-  return (data || []).map((a: any) => ({
-    businessId: a.business_id,
-    userId: a.user_id,
-    role: a.role as 'owner' | 'staff'
-  }));
-}
-
-export async function upsertBusinessAccess(businessId: string, userId: string, role: 'owner' | 'staff') {
-  if (!isSupabaseConfigured()) return false;
-  const { error } = await supabase.from('business_user_access').upsert(
-    { business_id: businessId, user_id: userId, role },
-    { onConflict: 'business_id,user_id' }
-  );
-  return !error;
-}
+// Business User Access - removed: now using business_members table directly
 
 // Orders - types for serialization
 interface OrderRow {
@@ -261,11 +214,7 @@ export function generateOrderId() {
   return crypto.randomUUID?.() || `order-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-export async function deleteBusinessAccess(businessId: string) {
-  if (!isSupabaseConfigured()) return false;
-  const { error } = await supabase.from('business_user_access').delete().eq('business_id', businessId);
-  return !error;
-}
+// deleteBusinessAccess - removed: now using business_members table directly
 
 // Menu Items
 export async function fetchMenuItems(businessId: string) {

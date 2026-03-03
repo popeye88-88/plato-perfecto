@@ -134,8 +134,8 @@ export default function SettingsManager() {
   const isOwnerOfCurrentBusiness = currentBusiness && currentUser && getUserRole(currentBusiness.id, currentUser.id) === 'owner';
   const businessesWhereOwner = businesses.filter(b => currentUser && getUserRole(b.id, currentUser.id) === 'owner');
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     toast({
       title: "Sesión cerrada",
       description: "Has cerrado sesión correctamente"
@@ -388,7 +388,7 @@ export default function SettingsManager() {
                               return (
                                 <div key={userId} className="text-sm text-muted-foreground flex items-center gap-2">
                                   <Users className="h-4 w-4" />
-                                  <span>{user?.username || userId}</span>
+                                  <span>{user?.username || user?.email || userId}</span>
                                   <span className="text-xs font-medium text-primary">
                                     ({role === 'owner' ? 'Propietario' : 'Personal'})
                                   </span>
