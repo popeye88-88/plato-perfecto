@@ -3,14 +3,12 @@ import { useAuth } from './AuthContext';
 import {
   isSupabaseConfigured,
   fetchBusinesses as fetchBusinessesDb,
-  fetchBusinessAccess,
   insertBusiness as insertBusinessDb,
   updateBusinessDb,
   deleteBusinessDb,
-  upsertBusinessAccess,
-  deleteBusinessAccess,
   fetchMenuItems
 } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Business {
   id: string;
@@ -150,8 +148,18 @@ export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     const load = async () => {
       if (isSupabaseConfigured()) {
-        const [businessesData, accessData] = await Promise.all([fetchBusinessesDb(), fetchBusinessAccess()]);
-        setAccess(accessData.map((a) => ({ businessId: a.businessId, userId: a.userId, role: a.role })));
+        // Use business_members with Supabase Auth - RLS filters automatically
+        const { data: memberships } = await supabase
+          .from('business_members')
+          .select('business_id, user_id, role');
+        const accessData = (memberships || []).map((m) => ({
+          businessId: m.business_id,
+          userId: m.user_id,
+          role: m.role as 'owner' | 'staff',
+        }));
+        setAccess(accessData);
+
+        const businessesData = await fetchBusinessesDb();
         const userBusinessIds = accessData.filter((a) => a.userId === currentUser.id).map((a) => a.businessId);
         const userBizData = businessesData.filter((b) => userBusinessIds.includes(b.id));
         const withMenuItems = await Promise.all(
@@ -208,8 +216,14 @@ export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const getAccess = useCallback(async (): Promise<BusinessUserAccess[]> => {
     if (isSupabaseConfigured()) {
-      const data = await fetchBusinessAccess();
-      return data.map((a) => ({ businessId: a.businessId, userId: a.userId, role: a.role }));
+      const { data } = await supabase
+        .from('business_members')
+        .select('business_id, user_id, role');
+      return (data || []).map((m) => ({
+        businessId: m.business_id,
+        userId: m.user_id,
+        role: m.role as 'owner' | 'staff',
+      }));
     }
     return getBusinessAccessLocal();
   }, [getBusinessAccessLocal]);
@@ -224,7 +238,10 @@ export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const newAccess = { businessId: newBusiness.id, userId: currentUser.id, role: 'owner' as BusinessRole };
     if (isSupabaseConfigured()) {
       insertBusinessDb({ id: newBusiness.id, name: newBusiness.name, description: newBusiness.description });
-      upsertBusinessAccess(newBusiness.id, currentUser.id, 'owner');
+      supabase.from('business_members').upsert(
+        { business_id: newBusiness.id, user_id: currentUser.id, role: 'admin' as const },
+        { onConflict: 'business_id,user_id' }
+      );
     } else {
       const accessLocal = getBusinessAccessLocal();
       accessLocal.push(newAccess);
@@ -250,7 +267,7 @@ export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const deleteBusiness = (id: string) => {
     if (isSupabaseConfigured()) {
-      deleteBusinessAccess(id);
+      supabase.from('business_members').delete().eq('business_id', id);
       deleteBusinessDb(id);
     } else {
       const accessLocal = getBusinessAccessLocal();
@@ -267,8 +284,12 @@ export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const shareBusinessWithUser = (businessId: string, userId: string, role: BusinessRole) => {
+    const supaRole = role === 'owner' ? 'admin' : 'staff';
     if (isSupabaseConfigured()) {
-      upsertBusinessAccess(businessId, userId, role);
+      supabase.from('business_members').upsert(
+        { business_id: businessId, user_id: userId, role: supaRole as 'admin' | 'staff' },
+        { onConflict: 'business_id,user_id' }
+      );
       setAccess((prev) => {
         const existing = prev.find((a) => a.businessId === businessId && a.userId === userId);
         if (existing) return prev.map((a) => (a === existing ? { ...a, role } : a));
