@@ -62,6 +62,30 @@ export default function OrderManager() {
   const { currentBusiness } = useBusinessContext();
   const { currentUser } = useAuth();
   
+  // Read entregando stage setting
+  const [enableEntregandoStage, setEnableEntregandoStage] = useState(() => {
+    const stored = localStorage.getItem('enableEntregandoStage');
+    return stored === null ? true : stored === 'true';
+  });
+
+  // Listen for changes to the setting (from SettingsManager)
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const stored = localStorage.getItem('enableEntregandoStage');
+      setEnableEntregandoStage(stored === null ? true : stored === 'true');
+    };
+    window.addEventListener('storage', handleStorageChange);
+    // Also poll for same-tab changes
+    const interval = setInterval(handleStorageChange, 500);
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
+    };
+  }, []);
+
+  // Helper: resolve the effective next status after 'preparando'
+  const nextStatusAfterPreparando = enableEntregandoStage ? 'entregando' as const : 'cobrando' as const;
+  
   // Get menu items from current business
   const menuItems = currentBusiness?.menuItems || [];
   const ordersStorageKey = useMemo(() => {
@@ -69,6 +93,13 @@ export default function OrderManager() {
   }, [currentBusiness?.id]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [activeTab, setActiveTab] = useState('resumen');
+
+  // If entregando stage is disabled and user is on that tab, redirect
+  useEffect(() => {
+    if (!enableEntregandoStage && activeTab === 'entregando') {
+      setActiveTab('preparando');
+    }
+  }, [enableEntregandoStage, activeTab]);
   const [isNewOrderDialogOpen, setIsNewOrderDialogOpen] = useState(false);
   const [newOrderForm, setNewOrderForm] = useState({
     customerName: '',
@@ -247,17 +278,20 @@ export default function OrderManager() {
     }
     if (status === 'preparando') {
       // Show orders that have at least one individual item in 'preparando' status AND order is not paid
+      // When entregando is disabled, also include orders with 'entregando' individual items
       return orders.filter(order => {
         if (order.status === 'pagado') return false;
         
         const activeItems = order.items.filter(item => !item.cancelled);
         return activeItems.some(item => {
-          // Check if there are any individual items still in 'preparando' status
           return Array.from({ length: item.quantity }, (_, idx) => 
             `${item.id}-${idx}`
           ).some(id => {
             const individualStatus = order.individualItemsStatus?.[id];
-            return !individualStatus || individualStatus === 'preparando';
+            if (!individualStatus || individualStatus === 'preparando') return true;
+            // When entregando is disabled, treat 'entregando' items as belonging to preparando tab
+            if (!enableEntregandoStage && individualStatus === 'entregando') return true;
+            return false;
           });
         });
       });
@@ -496,9 +530,9 @@ export default function OrderManager() {
             return 'cobrando';
           }
           
-          // If any item is in 'entregando' or 'cobrando', order is in 'entregando'
+          // If any item is in 'entregando' or 'cobrando', order is in 'entregando' (or 'preparando' if stage disabled)
           if (activeItems.some(item => item.status === 'entregando' || item.status === 'cobrando')) {
-            return 'entregando';
+            return enableEntregandoStage ? 'entregando' : 'preparando';
           }
           
           // If any item is in 'preparando', order is in 'preparando'
@@ -1058,8 +1092,9 @@ export default function OrderManager() {
                 let individualItemChecked = false;
                 
                 if (isPreparandoTab) {
-                  // In preparando tab: can only check items that are in 'preparando' status
-                  individualItemEnabled = individualItemStatus === 'preparando' && !item.cancelled;
+                  // In preparando tab: can check items in 'preparando' status
+                  // When entregando is disabled, also allow checking 'entregando' items (legacy data)
+                  individualItemEnabled = (individualItemStatus === 'preparando' || (!enableEntregandoStage && individualItemStatus === 'entregando')) && !item.cancelled;
                   individualItemChecked = false; // Never checked in preparando tab
                 } else if (isEntregandoTab) {
                   // In entregando tab: can only check items that are in 'entregando' status
@@ -1082,7 +1117,7 @@ export default function OrderManager() {
                                 if (o.id === order.id) {
                                   const updatedIndividualItemsStatus: Record<string, 'preparando' | 'entregando' | 'cobrando'> = {
                                     ...o.individualItemsStatus,
-                                    [individualItemId]: isPreparandoTab ? 'entregando' : 'cobrando'
+                                    [individualItemId]: isPreparandoTab ? nextStatusAfterPreparando : 'cobrando'
                                   };
                                   
                                   // Check if all individual items of this product are in the same status
@@ -1151,6 +1186,12 @@ export default function OrderManager() {
                       <span className="font-medium text-foreground">
                         {item.name}
                 </span>
+                      {/* Warning badge for legacy 'entregando' items when stage is disabled */}
+                      {!enableEntregandoStage && individualItemStatus === 'entregando' && isPreparandoTab && (
+                        <Badge variant="outline" className="ml-2 text-xs bg-yellow-50 text-yellow-700 border-yellow-300">
+                          Pendiente de asignar
+                        </Badge>
+                      )}
               </div>
                     
                     {/* Right column - Status symbol */}
@@ -1385,16 +1426,18 @@ export default function OrderManager() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className={`grid w-full ${enableEntregandoStage ? 'grid-cols-5' : 'grid-cols-4'}`}>
           <TabsTrigger value="resumen" className="flex items-center gap-2">
             Resumen ({getStatusCount('resumen')})
           </TabsTrigger>
           <TabsTrigger value="preparando" className="flex items-center gap-2">
             Preparando ({getStatusCount('preparando')})
           </TabsTrigger>
-          <TabsTrigger value="entregando" className="flex items-center gap-2">
-            Entregando ({getStatusCount('entregando')})
-          </TabsTrigger>
+          {enableEntregandoStage && (
+            <TabsTrigger value="entregando" className="flex items-center gap-2">
+              Entregando ({getStatusCount('entregando')})
+            </TabsTrigger>
+          )}
           <TabsTrigger value="cobrando" className="flex items-center gap-2">
             Cobrando ({getStatusCount('cobrando')})
           </TabsTrigger>
@@ -1404,7 +1447,7 @@ export default function OrderManager() {
         </TabsList>
 
         <TabsContent value="resumen" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className={`grid grid-cols-1 ${enableEntregandoStage ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-6`}>
           <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Preparando</CardTitle>
@@ -1415,6 +1458,7 @@ export default function OrderManager() {
             </CardContent>
           </Card>
 
+          {enableEntregandoStage && (
           <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Entregando</CardTitle>
@@ -1424,6 +1468,7 @@ export default function OrderManager() {
                 <div className="text-2xl font-bold">{getStatusCount('entregando')}</div>
             </CardContent>
           </Card>
+          )}
 
           <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -1456,7 +1501,7 @@ export default function OrderManager() {
           </div>
         </TabsContent>
 
-        {['preparando', 'entregando', 'cobrando', 'pagado'].map((status) => (
+        {(['preparando', ...(enableEntregandoStage ? ['entregando'] : []), 'cobrando', 'pagado'] as const).map((status) => (
           <TabsContent key={status} value={status} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {getOrdersByStatus(status).map((order) => renderOrderCard(order, status))}

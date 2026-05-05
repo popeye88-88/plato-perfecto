@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Settings, Users, Globe, DollarSign, UserPlus, ChefHat, Building2, Plus, Edit2, Trash2, LogOut, Share2 } from 'lucide-react';
+import { Settings, Users, Globe, DollarSign, UserPlus, ChefHat, Building2, Plus, Edit2, Trash2, LogOut, Share2, Truck } from 'lucide-react';
 import { useBusinessContext, type BusinessRole } from '@/contexts/BusinessContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -407,6 +407,43 @@ export default function SettingsManager() {
                     )}
                   </div>
                 )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Workflow Settings */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Truck className="h-5 w-5" />
+                Flujo de Órdenes
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between p-3 border border-border rounded-lg bg-card">
+                <div className="flex-1">
+                  <h4 className="font-medium text-foreground">Etapa de Entrega</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Activa o desactiva la etapa 'Entregando' en el flujo de órdenes
+                  </p>
+                </div>
+                <Switch
+                  checked={(() => {
+                    const stored = localStorage.getItem('enableEntregandoStage');
+                    return stored === null ? true : stored === 'true';
+                  })()}
+                  onCheckedChange={(checked) => {
+                    localStorage.setItem('enableEntregandoStage', String(checked));
+                    // Force re-render
+                    setSettings(prev => ({ ...prev }));
+                    toast({
+                      title: checked ? "Etapa activada" : "Etapa desactivada",
+                      description: checked
+                        ? "La etapa 'Entregando' está habilitada en el flujo de órdenes"
+                        : "Las órdenes pasarán directamente de 'Preparando' a 'Cobrando'"
+                    });
+                  }}
+                />
               </div>
             </CardContent>
           </Card>
