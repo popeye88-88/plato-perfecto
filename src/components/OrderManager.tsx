@@ -1085,8 +1085,9 @@ export default function OrderManager() {
                 let individualItemChecked = false;
                 
                 if (isPreparandoTab) {
-                  // In preparando tab: can only check items that are in 'preparando' status
-                  individualItemEnabled = individualItemStatus === 'preparando' && !item.cancelled;
+                  // In preparando tab: can check items in 'preparando' status
+                  // When entregando is disabled, also allow checking 'entregando' items (legacy data)
+                  individualItemEnabled = (individualItemStatus === 'preparando' || (!enableEntregandoStage && individualItemStatus === 'entregando')) && !item.cancelled;
                   individualItemChecked = false; // Never checked in preparando tab
                 } else if (isEntregandoTab) {
                   // In entregando tab: can only check items that are in 'entregando' status
