@@ -1413,16 +1413,18 @@ export default function OrderManager() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className={`grid w-full ${enableEntregandoStage ? 'grid-cols-5' : 'grid-cols-4'}`}>
           <TabsTrigger value="resumen" className="flex items-center gap-2">
             Resumen ({getStatusCount('resumen')})
           </TabsTrigger>
           <TabsTrigger value="preparando" className="flex items-center gap-2">
             Preparando ({getStatusCount('preparando')})
           </TabsTrigger>
-          <TabsTrigger value="entregando" className="flex items-center gap-2">
-            Entregando ({getStatusCount('entregando')})
-          </TabsTrigger>
+          {enableEntregandoStage && (
+            <TabsTrigger value="entregando" className="flex items-center gap-2">
+              Entregando ({getStatusCount('entregando')})
+            </TabsTrigger>
+          )}
           <TabsTrigger value="cobrando" className="flex items-center gap-2">
             Cobrando ({getStatusCount('cobrando')})
           </TabsTrigger>
@@ -1432,7 +1434,7 @@ export default function OrderManager() {
         </TabsList>
 
         <TabsContent value="resumen" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className={`grid grid-cols-1 ${enableEntregandoStage ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-6`}>
           <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Preparando</CardTitle>
@@ -1443,6 +1445,7 @@ export default function OrderManager() {
             </CardContent>
           </Card>
 
+          {enableEntregandoStage && (
           <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Entregando</CardTitle>
@@ -1452,6 +1455,7 @@ export default function OrderManager() {
                 <div className="text-2xl font-bold">{getStatusCount('entregando')}</div>
             </CardContent>
           </Card>
+          )}
 
           <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
