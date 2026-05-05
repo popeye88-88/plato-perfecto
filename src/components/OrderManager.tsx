@@ -1179,6 +1179,12 @@ export default function OrderManager() {
                       <span className="font-medium text-foreground">
                         {item.name}
                 </span>
+                      {/* Warning badge for legacy 'entregando' items when stage is disabled */}
+                      {!enableEntregandoStage && individualItemStatus === 'entregando' && isPreparandoTab && (
+                        <Badge variant="outline" className="ml-2 text-xs bg-yellow-50 text-yellow-700 border-yellow-300">
+                          Pendiente de asignar
+                        </Badge>
+                      )}
               </div>
                     
                     {/* Right column - Status symbol */}
