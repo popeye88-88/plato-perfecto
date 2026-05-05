@@ -271,17 +271,20 @@ export default function OrderManager() {
     }
     if (status === 'preparando') {
       // Show orders that have at least one individual item in 'preparando' status AND order is not paid
+      // When entregando is disabled, also include orders with 'entregando' individual items
       return orders.filter(order => {
         if (order.status === 'pagado') return false;
         
         const activeItems = order.items.filter(item => !item.cancelled);
         return activeItems.some(item => {
-          // Check if there are any individual items still in 'preparando' status
           return Array.from({ length: item.quantity }, (_, idx) => 
             `${item.id}-${idx}`
           ).some(id => {
             const individualStatus = order.individualItemsStatus?.[id];
-            return !individualStatus || individualStatus === 'preparando';
+            if (!individualStatus || individualStatus === 'preparando') return true;
+            // When entregando is disabled, treat 'entregando' items as belonging to preparando tab
+            if (!enableEntregandoStage && individualStatus === 'entregando') return true;
+            return false;
           });
         });
       });
