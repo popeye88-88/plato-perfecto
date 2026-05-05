@@ -523,9 +523,9 @@ export default function OrderManager() {
             return 'cobrando';
           }
           
-          // If any item is in 'entregando' or 'cobrando', order is in 'entregando'
+          // If any item is in 'entregando' or 'cobrando', order is in 'entregando' (or 'preparando' if stage disabled)
           if (activeItems.some(item => item.status === 'entregando' || item.status === 'cobrando')) {
-            return 'entregando';
+            return enableEntregandoStage ? 'entregando' : 'preparando';
           }
           
           // If any item is in 'preparando', order is in 'preparando'
