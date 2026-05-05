@@ -93,6 +93,13 @@ export default function OrderManager() {
   }, [currentBusiness?.id]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [activeTab, setActiveTab] = useState('resumen');
+
+  // If entregando stage is disabled and user is on that tab, redirect
+  useEffect(() => {
+    if (!enableEntregandoStage && activeTab === 'entregando') {
+      setActiveTab('preparando');
+    }
+  }, [enableEntregandoStage, activeTab]);
   const [isNewOrderDialogOpen, setIsNewOrderDialogOpen] = useState(false);
   const [newOrderForm, setNewOrderForm] = useState({
     customerName: '',
