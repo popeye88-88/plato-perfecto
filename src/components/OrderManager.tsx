@@ -1109,7 +1109,7 @@ export default function OrderManager() {
                                 if (o.id === order.id) {
                                   const updatedIndividualItemsStatus: Record<string, 'preparando' | 'entregando' | 'cobrando'> = {
                                     ...o.individualItemsStatus,
-                                    [individualItemId]: isPreparandoTab ? 'entregando' : 'cobrando'
+                                    [individualItemId]: isPreparandoTab ? nextStatusAfterPreparando : 'cobrando'
                                   };
                                   
                                   // Check if all individual items of this product are in the same status
