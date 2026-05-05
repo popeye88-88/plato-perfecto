@@ -1488,7 +1488,7 @@ export default function OrderManager() {
           </div>
         </TabsContent>
 
-        {['preparando', 'entregando', 'cobrando', 'pagado'].map((status) => (
+        {(['preparando', ...(enableEntregandoStage ? ['entregando'] : []), 'cobrando', 'pagado'] as const).map((status) => (
           <TabsContent key={status} value={status} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {getOrdersByStatus(status).map((order) => renderOrderCard(order, status))}
