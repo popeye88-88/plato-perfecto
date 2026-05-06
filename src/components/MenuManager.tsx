@@ -279,6 +279,8 @@ export default function MenuManager() {
       category: item.category,
       description: item.description || ''
     });
+    setHasSizes(item.hasSizes || false);
+    setSizes(item.sizes || []);
     setNewCategoryName('');
     setIsDialogOpen(true);
   };
