@@ -18,6 +18,8 @@ interface MenuItem {
   price: number;
   category: string;
   description?: string;
+  hasSizes: boolean;
+  sizes?: { id: string; name: string; price: number }[];
 }
 
 interface Category {
