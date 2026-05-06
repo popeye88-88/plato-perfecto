@@ -124,6 +124,8 @@ export default function MenuManager() {
     setMenuItems(items);
     setEditingItem(null);
     setFormData({ name: '', price: '', category: '', description: '' });
+    setHasSizes(false);
+    setSizes([]);
     setNewCategoryName('');
     setIsDialogOpen(false);
   }, [currentBusiness, menuItemsStorageKey]);
