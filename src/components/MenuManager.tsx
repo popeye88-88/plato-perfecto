@@ -212,12 +212,23 @@ export default function MenuManager() {
       return;
     }
 
+    if (hasSizes && sizes.length < 2) {
+      toast({
+        title: "Error",
+        description: "Debes agregar al menos 2 tamaños cuando la opción de tamaños está activa",
+        variant: "destructive"
+      });
+      return;
+    }
+
     const newItem: MenuItem = {
       id: editingItem?.id || Date.now().toString(),
       name: formData.name,
       price: parseFloat(formData.price),
       category: categoryName,
-      description: formData.description
+      description: formData.description,
+      hasSizes,
+      sizes: hasSizes ? sizes : undefined
     };
 
     let updatedMenuItems: MenuItem[] = [];
