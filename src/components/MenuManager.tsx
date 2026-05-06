@@ -264,6 +264,8 @@ export default function MenuManager() {
     updateCategories(updatedCategories, updatedMenuItems);
 
     setFormData({ name: '', price: '', category: '', description: '' });
+    setHasSizes(false);
+    setSizes([]);
     setNewCategoryName('');
     setEditingItem(null);
     setIsDialogOpen(false);
