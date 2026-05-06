@@ -560,9 +560,20 @@ export default function MenuManager() {
                           {item.description && (
                             <p className="text-sm text-muted-foreground">{item.description}</p>
                           )}
+                          {item.hasSizes && item.sizes && item.sizes.length > 0 && (
+                            <p className="text-xs text-muted-foreground">
+                              Tamaños: {item.sizes.map(s => `${s.name} ($${s.price.toFixed(2)})`).join(', ')}
+                            </p>
+                          )}
                         </div>
                         <div className="text-right">
-                          <p className="text-lg font-bold text-primary">${item.price.toFixed(2)}</p>
+                          {item.hasSizes && item.sizes && item.sizes.length > 0 ? (
+                            <p className="text-sm font-bold text-primary">
+                              ${Math.min(...item.sizes.map(s => s.price)).toFixed(2)} - ${Math.max(...item.sizes.map(s => s.price)).toFixed(2)}
+                            </p>
+                          ) : (
+                            <p className="text-lg font-bold text-primary">${item.price.toFixed(2)}</p>
+                          )}
                         </div>
                       </div>
                     </div>
