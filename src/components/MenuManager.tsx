@@ -47,6 +47,8 @@ export default function MenuManager() {
     category: '',
     description: ''
   });
+  const [hasSizes, setHasSizes] = useState(false);
+  const [sizes, setSizes] = useState<{ id: string; name: string; price: number }[]>([]);
   const [newCategoryName, setNewCategoryName] = useState('');
 
   const categoriesStorageKey = useMemo(() => {
