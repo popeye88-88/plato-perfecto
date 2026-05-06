@@ -434,6 +434,81 @@ export default function MenuManager() {
                 placeholder="Descripción del producto"
               />
             </div>
+
+            {/* Sizes Section */}
+            <div className="space-y-3 border-t border-border pt-4">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="hasSizes" className="cursor-pointer">¿Este producto tiene tamaños?</Label>
+                <Switch
+                  id="hasSizes"
+                  checked={hasSizes}
+                  onCheckedChange={(checked) => {
+                    setHasSizes(checked);
+                    if (checked && sizes.length === 0) {
+                      setSizes([
+                        { id: Date.now().toString(), name: '', price: 0 },
+                        { id: (Date.now() + 1).toString(), name: '', price: 0 }
+                      ]);
+                    }
+                  }}
+                />
+              </div>
+              {hasSizes && (
+                <div className="space-y-2">
+                  {sizes.map((size, index) => (
+                    <div key={size.id} className="flex items-center gap-2">
+                      <Input
+                        placeholder="Nombre (ej: Chico)"
+                        value={size.name}
+                        onChange={(e) => {
+                          const updated = [...sizes];
+                          updated[index] = { ...updated[index], name: e.target.value };
+                          setSizes(updated);
+                        }}
+                        className="flex-1"
+                      />
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="Precio"
+                        value={size.price || ''}
+                        onChange={(e) => {
+                          const updated = [...sizes];
+                          updated[index] = { ...updated[index], price: parseFloat(e.target.value) || 0 };
+                          setSizes(updated);
+                        }}
+                        className="w-24"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSizes(sizes.filter((_, i) => i !== index))}
+                        className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  {sizes.length >= 10 ? (
+                    <p className="text-xs text-muted-foreground">Máximo 10 tamaños</p>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSizes([...sizes, { id: Date.now().toString(), name: '', price: 0 }])}
+                    >
+                      <Plus className="h-4 w-4 mr-1" /> Agregar Tamaño
+                    </Button>
+                  )}
+                  {hasSizes && sizes.length < 2 && (
+                    <p className="text-xs text-destructive">Se requieren al menos 2 tamaños</p>
+                  )}
+                </div>
+              )}
+            </div>
+
             <div className="flex gap-2 pt-4">
               <Button type="submit" className="bg-gradient-primary hover:opacity-90 flex-1">
                 {editingItem ? 'Actualizar' : 'Agregar'}
