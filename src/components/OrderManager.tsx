@@ -1903,6 +1903,82 @@ export default function OrderManager() {
                   <h3 className="text-lg font-semibold text-foreground">Elementos del Menú</h3>
                   <div className="space-y-2">
                     {menuItems.map((menuItem) => {
+                      const hasSizes = menuItem.hasSizes && menuItem.sizes && menuItem.sizes.length >= 2;
+                      
+                      if (hasSizes) {
+                        // For sized products, render each size as a separate row
+                        return menuItem.sizes!.map(size => {
+                          const sizeItemId = `${menuItem.id}-size-${size.id}`;
+                          const sizeItemName = `${menuItem.name} — ${size.name}`;
+                          const orderItem = selectedOrderForEdit.items.find(item =>
+                            !item.cancelled && (item.id === sizeItemId || item.name === sizeItemName)
+                          );
+                          const fakeMenuItem = { id: sizeItemId, name: sizeItemName, category: menuItem.category, price: size.price };
+                          const currentQuantity = resolveQuantityValue(localEditQuantities, orderItem, fakeMenuItem, 0);
+                          
+                          return (
+                            <div key={sizeItemId} className="flex items-center justify-between p-3 border border-border rounded-lg bg-card">
+                              <div className="flex items-center gap-3 flex-1">
+                                <span className="font-medium">{sizeItemName}</span>
+                                <span className="text-xs text-muted-foreground">{menuItem.category}</span>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-2 border border-border rounded-md">
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => {
+                                      const isOrderInCobrando = selectedOrderForEdit.status === 'cobrando';
+                                      const isItemInCobrando = orderItem && orderItem.status === 'cobrando';
+                                      let hasItemInCobrando = false;
+                                      if (orderItem && selectedOrderForEdit.individualItemsStatus) {
+                                        const itemKeys = Array.from({ length: orderItem.quantity }, (_, idx) =>
+                                          `${orderItem.id}-${idx}`
+                                        );
+                                        hasItemInCobrando = itemKeys.some(key =>
+                                          selectedOrderForEdit.individualItemsStatus?.[key] === 'cobrando'
+                                        );
+                                      }
+                                      if (isOrderInCobrando && (isItemInCobrando || hasItemInCobrando)) {
+                                        setItemToReduce({ menuItemId: sizeItemId, menuItemName: sizeItemName, currentQuantity });
+                                        setIsReduceQuantityDialogOpen(true);
+                                      } else {
+                                        setLocalEditQuantities(prev => {
+                                          const newQuantity = Math.max(0, resolveQuantityValue(prev, orderItem, fakeMenuItem, 0) - 1);
+                                          return applyQuantityUpdate(prev, newQuantity, orderItem, fakeMenuItem);
+                                        });
+                                      }
+                                    }}
+                                    disabled={currentQuantity <= 0}
+                                    className="h-6 w-6 p-0"
+                                  >
+                                    <Minus className="h-3 w-3" />
+                                  </Button>
+                                  <span className="text-sm font-medium w-8 text-center">{currentQuantity}</span>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => {
+                                      setLocalEditQuantities(prev => {
+                                        const newQuantity = resolveQuantityValue(prev, orderItem, fakeMenuItem, 0) + 1;
+                                        return applyQuantityUpdate(prev, newQuantity, orderItem, fakeMenuItem);
+                                      });
+                                    }}
+                                    className="h-6 w-6 p-0"
+                                  >
+                                    <Plus className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                                <span className="font-semibold text-primary min-w-[70px] text-right">
+                                  ${(size.price * currentQuantity).toFixed(2)}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        });
+                      }
+                      
+                      // Products without sizes: original behavior
                       const orderItem = selectedOrderForEdit.items.find(item => 
                         !item.cancelled && (item.id === menuItem.id || item.name === menuItem.name)
                       );
@@ -1920,11 +1996,8 @@ export default function OrderManager() {
                             size="sm" 
                                 variant="ghost"
                                 onClick={() => {
-                                  // Check if order is in 'cobrando' stage and item is in 'cobrando' status
                                   const isOrderInCobrando = selectedOrderForEdit.status === 'cobrando';
                                   const isItemInCobrando = orderItem && orderItem.status === 'cobrando';
-                                  
-                                  // Also check individual items status if available
                                   let hasItemInCobrando = false;
                                   if (orderItem && selectedOrderForEdit.individualItemsStatus) {
                                     const itemKeys = Array.from({ length: orderItem.quantity }, (_, idx) => 
@@ -1934,9 +2007,7 @@ export default function OrderManager() {
                                       selectedOrderForEdit.individualItemsStatus?.[key] === 'cobrando'
                                     );
                                   }
-                                  
                                   if (isOrderInCobrando && (isItemInCobrando || hasItemInCobrando)) {
-                                    // Show dialog to ask for reason
                                     setItemToReduce({
                                       menuItemId: menuItem.id,
                                       menuItemName: menuItem.name,
@@ -1944,7 +2015,6 @@ export default function OrderManager() {
                                     });
                                     setIsReduceQuantityDialogOpen(true);
                                   } else {
-                                    // Directly reduce quantity
                                     setLocalEditQuantities(prev => {
                                       const newQuantity = Math.max(
                                         0,
