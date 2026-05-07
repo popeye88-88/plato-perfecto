@@ -4,12 +4,23 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent } from '@/components/ui/card';
-import { Plus, Minus, X } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Plus, Minus } from 'lucide-react';
+
+interface MenuItem {
+  id: string;
+  name: string;
+  price: number;
+  category: string;
+  description?: string;
+  hasSizes: boolean;
+  sizes?: { id: string; name: string; price: number }[];
+}
 
 interface NewOrderDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  menuItems: MenuItem[];
   onCreateOrder: (orderData: {
     items: Array<{menuItem: any, quantity: number, customIngredients?: string[]}>;
     serviceType: 'puesto' | 'takeaway' | 'delivery';
@@ -19,33 +30,31 @@ interface NewOrderDialogProps {
   }) => void;
 }
 
-const menuItems = [
-  { id: '1', name: 'Pizza Margherita', price: 15.00, category: 'Pizzas' },
-  { id: '2', name: 'Hamburguesa Clásica', price: 12.50, category: 'Hamburguesas' },
-  { id: '3', name: 'Pasta Carbonara', price: 14.00, category: 'Pastas' },
-  { id: '4', name: 'Ensalada César', price: 10.00, category: 'Ensaladas' },
-];
-
-export default function NewOrderDialog({ open, onOpenChange, onCreateOrder }: NewOrderDialogProps) {
+export default function NewOrderDialog({ open, onOpenChange, menuItems, onCreateOrder }: NewOrderDialogProps) {
   const [customerName, setCustomerName] = useState('');
   const [serviceType, setServiceType] = useState<'puesto' | 'takeaway' | 'delivery'>('puesto');
   const [diners, setDiners] = useState(1);
   const [deliveryCharge, setDeliveryCharge] = useState(0);
-  const [selectedItems, setSelectedItems] = useState<Array<{menuItem: any, quantity: number, customIngredients?: string[]}>>([]);
+  const [selectedItems, setSelectedItems] = useState<Array<{menuItem: {id: string; name: string; price: number; category: string}, quantity: number, customIngredients?: string[]}>>([]);
+  const [sizePickerOpen, setSizePickerOpen] = useState<string | null>(null);
 
-  const addItem = (menuItem: any) => {
-    const existingItem = selectedItems.find(item => item.menuItem.id === menuItem.id);
+  const addItem = (menuItem: MenuItem, size?: { id: string; name: string; price: number }) => {
+    const itemId = size ? `${menuItem.id}-size-${size.id}` : menuItem.id;
+    const itemName = size ? `${menuItem.name} — ${size.name}` : menuItem.name;
+    const itemPrice = size ? size.price : menuItem.price;
+    const virtualItem = { id: itemId, name: itemName, price: itemPrice, category: menuItem.category };
+
+    const existingItem = selectedItems.find(item => item.menuItem.id === itemId);
     if (existingItem) {
-      setSelectedItems(prev => 
-        prev.map(item => 
-          item.menuItem.id === menuItem.id 
-              ? { ...item, quantity: item.quantity + 1 }
-              : item
+      setSelectedItems(prev =>
+        prev.map(item =>
+          item.menuItem.id === itemId ? { ...item, quantity: item.quantity + 1 } : item
         )
       );
     } else {
-      setSelectedItems(prev => [...prev, { menuItem, quantity: 1, customIngredients: [] }]);
+      setSelectedItems(prev => [...prev, { menuItem: virtualItem, quantity: 1, customIngredients: [] }]);
     }
+    setSizePickerOpen(null);
   };
 
   const removeItem = (menuItemId: string) => {
@@ -57,11 +66,9 @@ export default function NewOrderDialog({ open, onOpenChange, onCreateOrder }: Ne
       removeItem(menuItemId);
       return;
     }
-    setSelectedItems(prev => 
+    setSelectedItems(prev =>
       prev.map(item =>
-        item.menuItem.id === menuItemId
-          ? { ...item, quantity }
-          : item
+        item.menuItem.id === menuItemId ? { ...item, quantity } : item
       )
     );
   };
@@ -72,19 +79,8 @@ export default function NewOrderDialog({ open, onOpenChange, onCreateOrder }: Ne
   };
 
   const handleSubmit = () => {
-    if (!customerName.trim()) {
-      return;
-    }
-
-    onCreateOrder({
-      items: selectedItems,
-      serviceType,
-      diners,
-      customerName: customerName.trim(),
-      deliveryCharge
-    });
-
-    // Reset form
+    if (!customerName.trim()) return;
+    onCreateOrder({ items: selectedItems, serviceType, diners, customerName: customerName.trim(), deliveryCharge });
     setCustomerName('');
     setServiceType('puesto');
     setDiners(1);
@@ -101,23 +97,15 @@ export default function NewOrderDialog({ open, onOpenChange, onCreateOrder }: Ne
         </DialogHeader>
 
         <div className="space-y-6">
-          {/* Customer Info */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
             <div>
               <Label htmlFor="customerName">Nombre del Cliente</Label>
-              <Input
-                id="customerName"
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                placeholder="Ingresa el nombre"
-              />
+              <Input id="customerName" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Ingresa el nombre" />
             </div>
             <div>
               <Label htmlFor="serviceType">Tipo de Servicio</Label>
               <Select value={serviceType} onValueChange={(value: any) => setServiceType(value)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="puesto">En Puesto</SelectItem>
                   <SelectItem value="takeaway">Take Away</SelectItem>
@@ -127,39 +115,78 @@ export default function NewOrderDialog({ open, onOpenChange, onCreateOrder }: Ne
             </div>
             <div>
               <Label htmlFor="diners">Comensales</Label>
-              <Input 
-                id="diners"
-                type="number"
-                min="1"
-                value={diners}
-                onChange={(e) => setDiners(parseInt(e.target.value) || 1)}
-              />
+              <Input id="diners" type="number" min="1" value={diners} onChange={(e) => setDiners(parseInt(e.target.value) || 1)} />
             </div>
           </div>
 
-          {/* Delivery Charge */}
           {serviceType === 'delivery' && (
             <div>
               <Label htmlFor="deliveryCharge">Cargo por Entrega</Label>
-              <Input
-                id="deliveryCharge"
-                type="number"
-                min="0"
-                step="0.01"
-                value={deliveryCharge}
-                onChange={(e) => setDeliveryCharge(parseFloat(e.target.value) || 0)}
-              />
+              <Input id="deliveryCharge" type="number" min="0" step="0.01" value={deliveryCharge} onChange={(e) => setDeliveryCharge(parseFloat(e.target.value) || 0)} />
             </div>
           )}
 
-          {/* Menu Items */}
           <div>
             <h3 className="text-lg font-semibold mb-4">Seleccionar Productos</h3>
             <div className="space-y-2">
               {menuItems.map((item) => {
+                const hasSizes = item.hasSizes && item.sizes && item.sizes.length >= 2;
+
+                if (hasSizes) {
+                  const sizeItems = item.sizes!;
+                  const totalQty = sizeItems.reduce((sum, size) => {
+                    const sel = selectedItems.find(s => s.menuItem.id === `${item.id}-size-${size.id}`);
+                    return sum + (sel?.quantity || 0);
+                  }, 0);
+
+                  return (
+                    <div key={item.id} className="p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <h4 className="font-medium text-base">{item.name}</h4>
+                          <p className="text-sm text-muted-foreground">{item.category}</p>
+                          <p className="font-semibold text-primary text-lg">
+                            ${Math.min(...sizeItems.map(s => s.price)).toFixed(2)} - ${Math.max(...sizeItems.map(s => s.price)).toFixed(2)}
+                          </p>
+                          {totalQty > 0 && <Badge variant="secondary" className="mt-1">{totalQty} en orden</Badge>}
+                        </div>
+                        <Button size="sm" onClick={() => setSizePickerOpen(sizePickerOpen === item.id ? null : item.id)} className="bg-gradient-primary hover:opacity-90 text-xs px-3">
+                          Seleccionar tamaño
+                        </Button>
+                      </div>
+                      {sizePickerOpen === item.id && (
+                        <div className="mt-2 space-y-1 border-t pt-2">
+                          {sizeItems.map(size => {
+                            const sizeId = `${item.id}-size-${size.id}`;
+                            const sel = selectedItems.find(s => s.menuItem.id === sizeId);
+                            const qty = sel?.quantity || 0;
+                            return (
+                              <div key={size.id} className="flex items-center justify-between py-1">
+                                <div>
+                                  <span className="text-sm">{size.name}</span>
+                                  <span className="text-sm text-primary ml-2">${size.price.toFixed(2)}</span>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  {qty > 0 && (
+                                    <>
+                                      <Button size="sm" variant="outline" onClick={() => updateQuantity(sizeId, qty - 1)} className="h-7 w-7 p-0"><Minus className="h-3 w-3" /></Button>
+                                      <span className="w-6 text-center text-sm">{qty}</span>
+                                    </>
+                                  )}
+                                  <Button size="sm" onClick={() => addItem(item, size)} className="bg-gradient-primary hover:opacity-90 h-7 w-7 p-0"><Plus className="h-3 w-3" /></Button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+
                 const selectedItem = selectedItems.find(selected => selected.menuItem.id === item.id);
                 const quantity = selectedItem ? selectedItem.quantity : 0;
-                
+
                 return (
                   <div key={item.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
                     <div className="flex-1">
@@ -173,28 +200,14 @@ export default function NewOrderDialog({ open, onOpenChange, onCreateOrder }: Ne
                         </div>
                       </div>
                     </div>
-                    
                     <div className="flex items-center space-x-3 ml-4">
                       {quantity > 0 && (
                         <>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => updateQuantity(item.id, quantity - 1)}
-                            className="h-8 w-8 p-0"
-                          >
-                            <Minus className="h-4 w-4" />
-                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => updateQuantity(item.id, quantity - 1)} className="h-8 w-8 p-0"><Minus className="h-4 w-4" /></Button>
                           <span className="w-8 text-center font-medium text-lg">{quantity}</span>
                         </>
                       )}
-                      <Button
-                        size="sm"
-                        onClick={() => addItem(item)}
-                        className="bg-gradient-primary hover:opacity-90 h-8 w-8 p-0"
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
+                      <Button size="sm" onClick={() => addItem(item)} className="bg-gradient-primary hover:opacity-90 h-8 w-8 p-0"><Plus className="h-4 w-4" /></Button>
                     </div>
                   </div>
                 );
@@ -202,7 +215,6 @@ export default function NewOrderDialog({ open, onOpenChange, onCreateOrder }: Ne
             </div>
           </div>
 
-          {/* Total */}
           {selectedItems.length > 0 && (
             <div className="border-t pt-4">
               <div className="flex justify-between items-center text-xl font-bold">
@@ -212,16 +224,9 @@ export default function NewOrderDialog({ open, onOpenChange, onCreateOrder }: Ne
             </div>
           )}
 
-          {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Cancelar
-            </Button>
-            <Button 
-              onClick={handleSubmit}
-              className="bg-gradient-primary hover:opacity-90"
-              disabled={!customerName.trim() || selectedItems.length === 0}
-            >
+            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+            <Button onClick={handleSubmit} className="bg-gradient-primary hover:opacity-90" disabled={!customerName.trim() || selectedItems.length === 0}>
               Crear Orden
             </Button>
           </div>
