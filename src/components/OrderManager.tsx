@@ -374,21 +374,26 @@ export default function OrderManager() {
     }
   };
 
-  const addItemToOrder = (item: typeof menuItems[0]) => {
-    const existingItem = newOrderForm.selectedItems.find(i => i.id === item.id);
+  const addItemToOrder = (item: typeof menuItems[0], size?: { id: string; name: string; price: number }) => {
+    const itemId = size ? `${item.id}-size-${size.id}` : item.id;
+    const itemName = size ? `${item.name} — ${size.name}` : item.name;
+    const itemPrice = size ? size.price : item.price;
+    
+    const existingItem = newOrderForm.selectedItems.find(i => i.id === itemId);
     if (existingItem) {
       setNewOrderForm(prev => ({
         ...prev,
         selectedItems: prev.selectedItems.map(i => 
-          i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
+          i.id === itemId ? { ...i, quantity: i.quantity + 1 } : i
         )
       }));
     } else {
       setNewOrderForm(prev => ({
         ...prev,
-        selectedItems: [...prev.selectedItems, { ...item, quantity: 1 }]
+        selectedItems: [...prev.selectedItems, { id: itemId, name: itemName, price: itemPrice, quantity: 1 }]
       }));
     }
+    setNewOrderSizePickerOpen(null);
   };
 
   const removeItemFromOrder = (itemId: string) => {
