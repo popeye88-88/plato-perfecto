@@ -1350,46 +1350,105 @@ export default function OrderManager() {
                       </div>
                 </div>
                 
-              {/* Menu Items Selection */}
+               {/* Menu Items Selection */}
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold text-foreground">Seleccionar Productos</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {menuItems.map((item) => {
+                    const hasSizes = item.hasSizes && item.sizes && item.sizes.length >= 2;
+                    
+                    if (hasSizes) {
+                      // Products with sizes: show size picker
+                      const sizeItems = item.sizes!;
+                      const sizeQuantities = sizeItems.map(size => {
+                        const sizeId = `${item.id}-size-${size.id}`;
+                        const sel = newOrderForm.selectedItems.find(i => i.id === sizeId);
+                        return { size, quantity: sel?.quantity || 0, sizeId };
+                      });
+                      const totalQty = sizeQuantities.reduce((sum, s) => sum + s.quantity, 0);
+                      
+                      return (
+                        <div key={item.id} className="p-3 border border-border rounded-lg bg-card hover:bg-muted/50 transition-colors">
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <h4 className="font-medium text-foreground">{item.name}</h4>
+                              <p className="text-xs text-muted-foreground">{item.category}</p>
+                              <p className="font-semibold text-primary text-sm">
+                                ${Math.min(...sizeItems.map(s => s.price)).toFixed(2)} - ${Math.max(...sizeItems.map(s => s.price)).toFixed(2)}
+                              </p>
+                              {totalQty > 0 && (
+                                <Badge variant="secondary" className="mt-1 text-xs">{totalQty} en orden</Badge>
+                              )}
+                            </div>
+                            <Button 
+                              size="sm" 
+                              onClick={() => setNewOrderSizePickerOpen(newOrderSizePickerOpen === item.id ? null : item.id)}
+                              className="bg-gradient-primary hover:opacity-90 text-xs px-3"
+                            >
+                              Seleccionar tamaño
+                            </Button>
+                          </div>
+                          {newOrderSizePickerOpen === item.id && (
+                            <div className="mt-2 space-y-1 border-t border-border pt-2">
+                              {sizeItems.map(size => {
+                                const sizeId = `${item.id}-size-${size.id}`;
+                                const sel = newOrderForm.selectedItems.find(i => i.id === sizeId);
+                                const qty = sel?.quantity || 0;
+                                return (
+                                  <div key={size.id} className="flex items-center justify-between py-1">
+                                    <div>
+                                      <span className="text-sm">{size.name}</span>
+                                      <span className="text-sm text-primary ml-2">${size.price.toFixed(2)}</span>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                      {qty > 0 && (
+                                        <>
+                                          <Button size="sm" variant="outline" onClick={() => updateItemQuantity(sizeId, qty - 1)} className="h-7 w-7 p-0">
+                                            <Minus className="h-3 w-3" />
+                                          </Button>
+                                          <span className="w-6 text-center text-sm">{qty}</span>
+                                        </>
+                                      )}
+                                      <Button size="sm" onClick={() => addItemToOrder(item, size)} className="bg-gradient-primary hover:opacity-90 h-7 w-7 p-0">
+                                        <Plus className="h-3 w-3" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+                    
+                    // Products without sizes: original behavior
                     const selectedItem = newOrderForm.selectedItems.find(i => i.id === item.id);
                     const quantity = selectedItem?.quantity || 0;
                     
                     return (
                       <div key={item.id} className="p-3 border border-border rounded-lg bg-card hover:bg-muted/50 transition-colors">
                         <div className="flex justify-between items-center">
-                      <div className="flex-1">
+                          <div className="flex-1">
                             <h4 className="font-medium text-foreground">{item.name}</h4>
                             <p className="text-xs text-muted-foreground">{item.category}</p>
                             <p className="font-semibold text-primary text-sm">${item.price.toFixed(2)}</p>
-                        </div>
+                          </div>
                           <div className="flex items-center space-x-2">
                             {quantity > 0 && (
                               <>
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                                  onClick={() => updateItemQuantity(item.id, quantity - 1)}
-                                  className="h-8 w-8 p-0"
-                          >
+                                <Button size="sm" variant="outline" onClick={() => updateItemQuantity(item.id, quantity - 1)} className="h-8 w-8 p-0">
                                   <Minus className="h-4 w-4" />
-                          </Button>
+                                </Button>
                                 <span className="w-8 text-center text-sm font-medium">{quantity}</span>
                               </>
                             )}
-                          <Button 
-                            size="sm" 
-                              onClick={() => addItemToOrder(item)}
-                              className="bg-gradient-primary hover:opacity-90 h-8 w-8 p-0"
-                          >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    </div>
-                    </div>
+                            <Button size="sm" onClick={() => addItemToOrder(item)} className="bg-gradient-primary hover:opacity-90 h-8 w-8 p-0">
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
                     );
                   })}
                 </div>
