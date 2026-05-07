@@ -101,6 +101,7 @@ export default function OrderManager() {
     }
   }, [enableEntregandoStage, activeTab]);
   const [isNewOrderDialogOpen, setIsNewOrderDialogOpen] = useState(false);
+  const [newOrderSizePickerOpen, setNewOrderSizePickerOpen] = useState<string | null>(null);
   const [newOrderForm, setNewOrderForm] = useState({
     customerName: '',
     serviceType: 'puesto' as 'puesto' | 'takeaway' | 'delivery',
