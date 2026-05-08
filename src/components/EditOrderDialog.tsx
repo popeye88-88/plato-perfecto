@@ -123,33 +123,23 @@ export default function EditOrderDialog({ open, onOpenChange, order, menuItems, 
                 if (hasSizes) {
                   return (
                     <div key={item.id} className="p-4 border rounded-lg">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <h4 className="font-medium">{item.name}</h4>
-                          <p className="text-sm text-muted-foreground">{item.category}</p>
-                          <p className="font-semibold text-primary">
-                            ${Math.min(...item.sizes!.map(s => s.price)).toFixed(2)} - ${Math.max(...item.sizes!.map(s => s.price)).toFixed(2)}
-                          </p>
-                        </div>
-                        <Button size="sm" onClick={() => setSizePickerOpen(sizePickerOpen === item.id ? null : item.id)} className="bg-gradient-primary hover:opacity-90 text-xs px-3">
-                          Seleccionar tamaño
-                        </Button>
+                      <div className="mb-2">
+                        <h4 className="font-medium">{item.name}</h4>
+                        <p className="text-sm text-muted-foreground">{item.category}</p>
                       </div>
-                      {sizePickerOpen === item.id && (
-                        <div className="mt-2 space-y-1 border-t pt-2">
-                          {item.sizes!.map(size => (
-                            <div key={size.id} className="flex items-center justify-between py-1">
-                              <div>
-                                <span className="text-sm">{size.name}</span>
-                                <span className="text-sm text-primary ml-2">${size.price.toFixed(2)}</span>
-                              </div>
-                              <Button size="sm" onClick={() => addItem(item, size)} className="bg-gradient-primary hover:opacity-90 h-7 w-7 p-0">
-                                <Plus className="h-3 w-3" />
-                              </Button>
+                      <div className="space-y-1 border-t pt-2">
+                        {item.sizes!.map(size => (
+                          <div key={size.id} className="flex items-center justify-between py-1">
+                            <div>
+                              <span className="text-sm">{size.name}</span>
+                              <span className="text-sm text-primary ml-2">${size.price.toFixed(2)}</span>
                             </div>
-                          ))}
-                        </div>
-                      )}
+                            <Button size="sm" onClick={() => addItem(item, size)} className="bg-gradient-primary hover:opacity-90 h-7 w-7 p-0">
+                              <Plus className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   );
                 }
