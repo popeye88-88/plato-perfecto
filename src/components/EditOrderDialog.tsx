@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Minus, X } from 'lucide-react';
+import { Plus, Minus, X, ChevronDown } from 'lucide-react';
 
 interface MenuItem {
   id: string;
