@@ -1358,66 +1358,42 @@ export default function OrderManager() {
                     const hasSizes = item.hasSizes && item.sizes && item.sizes.length >= 2;
                     
                     if (hasSizes) {
-                      // Products with sizes: show size picker
+                      // Products with sizes: show all sizes inline directly
                       const sizeItems = item.sizes!;
-                      const sizeQuantities = sizeItems.map(size => {
-                        const sizeId = `${item.id}-size-${size.id}`;
-                        const sel = newOrderForm.selectedItems.find(i => i.id === sizeId);
-                        return { size, quantity: sel?.quantity || 0, sizeId };
-                      });
-                      const totalQty = sizeQuantities.reduce((sum, s) => sum + s.quantity, 0);
-                      
                       return (
-                        <div key={item.id} className="p-3 border border-border rounded-lg bg-card hover:bg-muted/50 transition-colors">
-                          <div className="flex justify-between items-start">
-                            <div className="flex-1">
-                              <h4 className="font-medium text-foreground">{item.name}</h4>
-                              <p className="text-xs text-muted-foreground">{item.category}</p>
-                              <p className="font-semibold text-primary text-sm">
-                                ${Math.min(...sizeItems.map(s => s.price)).toFixed(2)} - ${Math.max(...sizeItems.map(s => s.price)).toFixed(2)}
-                              </p>
-                              {totalQty > 0 && (
-                                <Badge variant="secondary" className="mt-1 text-xs">{totalQty} en orden</Badge>
-                              )}
-                            </div>
-                            <Button 
-                              size="sm" 
-                              onClick={() => setNewOrderSizePickerOpen(newOrderSizePickerOpen === item.id ? null : item.id)}
-                              className="bg-gradient-primary hover:opacity-90 text-xs px-3"
-                            >
-                              Seleccionar tamaño
-                            </Button>
+                        <div key={item.id} className="p-3 border border-border rounded-lg bg-card">
+                          <div className="mb-2">
+                            <h4 className="font-medium text-foreground">{item.name}</h4>
+                            <p className="text-xs text-muted-foreground">{item.category}</p>
                           </div>
-                          {newOrderSizePickerOpen === item.id && (
-                            <div className="mt-2 space-y-1 border-t border-border pt-2">
-                              {sizeItems.map(size => {
-                                const sizeId = `${item.id}-size-${size.id}`;
-                                const sel = newOrderForm.selectedItems.find(i => i.id === sizeId);
-                                const qty = sel?.quantity || 0;
-                                return (
-                                  <div key={size.id} className="flex items-center justify-between py-1">
-                                    <div>
-                                      <span className="text-sm">{size.name}</span>
-                                      <span className="text-sm text-primary ml-2">${size.price.toFixed(2)}</span>
-                                    </div>
-                                    <div className="flex items-center space-x-2">
-                                      {qty > 0 && (
-                                        <>
-                                          <Button size="sm" variant="outline" onClick={() => updateItemQuantity(sizeId, qty - 1)} className="h-7 w-7 p-0">
-                                            <Minus className="h-3 w-3" />
-                                          </Button>
-                                          <span className="w-6 text-center text-sm">{qty}</span>
-                                        </>
-                                      )}
-                                      <Button size="sm" onClick={() => addItemToOrder(item, size)} className="bg-gradient-primary hover:opacity-90 h-7 w-7 p-0">
-                                        <Plus className="h-3 w-3" />
-                                      </Button>
-                                    </div>
+                          <div className="space-y-1 border-t border-border pt-2">
+                            {sizeItems.map(size => {
+                              const sizeId = `${item.id}-size-${size.id}`;
+                              const sel = newOrderForm.selectedItems.find(i => i.id === sizeId);
+                              const qty = sel?.quantity || 0;
+                              return (
+                                <div key={size.id} className="flex items-center justify-between py-1">
+                                  <div>
+                                    <span className="text-sm">{size.name}</span>
+                                    <span className="text-sm text-primary ml-2">${size.price.toFixed(2)}</span>
                                   </div>
-                                );
-                              })}
-                            </div>
-                          )}
+                                  <div className="flex items-center space-x-2">
+                                    {qty > 0 && (
+                                      <>
+                                        <Button size="sm" variant="outline" onClick={() => updateItemQuantity(sizeId, qty - 1)} className="h-7 w-7 p-0">
+                                          <Minus className="h-3 w-3" />
+                                        </Button>
+                                        <span className="w-6 text-center text-sm">{qty}</span>
+                                      </>
+                                    )}
+                                    <Button size="sm" onClick={() => addItemToOrder(item, size)} className="bg-gradient-primary hover:opacity-90 h-7 w-7 p-0">
+                                      <Plus className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
                       );
                     }
