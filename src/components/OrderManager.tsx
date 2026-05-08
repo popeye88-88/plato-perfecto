@@ -1916,78 +1916,110 @@ export default function OrderManager() {
                       const hasSizes = menuItem.hasSizes && menuItem.sizes && menuItem.sizes.length >= 2;
                       
                       if (hasSizes) {
-                        // For sized products, render each size as a separate row
-                        return menuItem.sizes!.map(size => {
+                        const isExpanded = expandedEditOrderItems.has(menuItem.id);
+                        const totalQty = menuItem.sizes!.reduce((sum, size) => {
                           const sizeItemId = `${menuItem.id}-size-${size.id}`;
                           const sizeItemName = `${menuItem.name} — ${size.name}`;
                           const orderItem = selectedOrderForEdit.items.find(item =>
                             !item.cancelled && (item.id === sizeItemId || item.name === sizeItemName)
                           );
                           const fakeMenuItem = { id: sizeItemId, name: sizeItemName, category: menuItem.category, price: size.price };
-                          const currentQuantity = resolveQuantityValue(localEditQuantities, orderItem, fakeMenuItem, 0);
-                          
-                          return (
-                            <div key={sizeItemId} className="flex items-center justify-between p-3 border border-border rounded-lg bg-card">
-                              <div className="flex items-center gap-3 flex-1">
-                                <span className="font-medium">{sizeItemName}</span>
+                          return sum + resolveQuantityValue(localEditQuantities, orderItem, fakeMenuItem, 0);
+                        }, 0);
+                        return (
+                          <div key={menuItem.id} className="border border-border rounded-lg bg-card overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => toggleExpandedEditOrder(menuItem.id)}
+                              className="w-full p-3 flex justify-between items-center hover:bg-muted/50 transition-colors text-left"
+                            >
+                              <div className="flex items-center gap-3">
+                                <span className="font-medium">{menuItem.name}</span>
                                 <span className="text-xs text-muted-foreground">{menuItem.category}</span>
                               </div>
-                              <div className="flex items-center gap-3">
-                                <div className="flex items-center gap-2 border border-border rounded-md">
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => {
-                                      const isOrderInCobrando = selectedOrderForEdit.status === 'cobrando';
-                                      const isItemInCobrando = orderItem && orderItem.status === 'cobrando';
-                                      let hasItemInCobrando = false;
-                                      if (orderItem && selectedOrderForEdit.individualItemsStatus) {
-                                        const itemKeys = Array.from({ length: orderItem.quantity }, (_, idx) =>
-                                          `${orderItem.id}-${idx}`
-                                        );
-                                        hasItemInCobrando = itemKeys.some(key =>
-                                          selectedOrderForEdit.individualItemsStatus?.[key] === 'cobrando'
-                                        );
-                                      }
-                                      if (isOrderInCobrando && (isItemInCobrando || hasItemInCobrando)) {
-                                        setItemToReduce({ menuItemId: sizeItemId, menuItemName: sizeItemName, currentQuantity });
-                                        setIsReduceQuantityDialogOpen(true);
-                                      } else {
-                                        setLocalEditQuantities(prev => {
-                                          const newQuantity = Math.max(0, resolveQuantityValue(prev, orderItem, fakeMenuItem, 0) - 1);
-                                          return applyQuantityUpdate(prev, newQuantity, orderItem, fakeMenuItem);
-                                        });
-                                      }
-                                    }}
-                                    disabled={currentQuantity <= 0}
-                                    className="h-6 w-6 p-0"
-                                  >
-                                    <Minus className="h-3 w-3" />
-                                  </Button>
-                                  <span className="text-sm font-medium w-8 text-center">{currentQuantity}</span>
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => {
-                                      setLocalEditQuantities(prev => {
-                                        const newQuantity = resolveQuantityValue(prev, orderItem, fakeMenuItem, 0) + 1;
-                                        return applyQuantityUpdate(prev, newQuantity, orderItem, fakeMenuItem);
-                                      });
-                                    }}
-                                    className="h-6 w-6 p-0"
-                                  >
-                                    <Plus className="h-3 w-3" />
-                                  </Button>
-                                </div>
-                                <span className="font-semibold text-primary min-w-[70px] text-right">
-                                  ${(size.price * currentQuantity).toFixed(2)}
-                                </span>
+                              <div className="flex items-center gap-2">
+                                {totalQty > 0 && (
+                                  <span className="text-xs bg-primary text-primary-foreground rounded-full px-2 py-0.5">{totalQty}</span>
+                                )}
+                                <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                               </div>
-                            </div>
-                          );
-                        });
+                            </button>
+                            {isExpanded && (
+                              <div className="border-t border-border divide-y divide-border">
+                                {menuItem.sizes!.map(size => {
+                                  const sizeItemId = `${menuItem.id}-size-${size.id}`;
+                                  const sizeItemName = `${menuItem.name} — ${size.name}`;
+                                  const orderItem = selectedOrderForEdit.items.find(item =>
+                                    !item.cancelled && (item.id === sizeItemId || item.name === sizeItemName)
+                                  );
+                                  const fakeMenuItem = { id: sizeItemId, name: sizeItemName, category: menuItem.category, price: size.price };
+                                  const currentQuantity = resolveQuantityValue(localEditQuantities, orderItem, fakeMenuItem, 0);
+                                  return (
+                                    <div key={sizeItemId} className="flex items-center justify-between p-3">
+                                      <div className="flex items-center gap-3 flex-1">
+                                        <span className="text-sm">{size.name}</span>
+                                        <span className="text-xs text-primary">${size.price.toFixed(2)}</span>
+                                      </div>
+                                      <div className="flex items-center gap-3">
+                                        <div className="flex items-center gap-2 border border-border rounded-md">
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() => {
+                                              const isOrderInCobrando = selectedOrderForEdit.status === 'cobrando';
+                                              const isItemInCobrando = orderItem && orderItem.status === 'cobrando';
+                                              let hasItemInCobrando = false;
+                                              if (orderItem && selectedOrderForEdit.individualItemsStatus) {
+                                                const itemKeys = Array.from({ length: orderItem.quantity }, (_, idx) =>
+                                                  `${orderItem.id}-${idx}`
+                                                );
+                                                hasItemInCobrando = itemKeys.some(key =>
+                                                  selectedOrderForEdit.individualItemsStatus?.[key] === 'cobrando'
+                                                );
+                                              }
+                                              if (isOrderInCobrando && (isItemInCobrando || hasItemInCobrando)) {
+                                                setItemToReduce({ menuItemId: sizeItemId, menuItemName: sizeItemName, currentQuantity });
+                                                setIsReduceQuantityDialogOpen(true);
+                                              } else {
+                                                setLocalEditQuantities(prev => {
+                                                  const newQuantity = Math.max(0, resolveQuantityValue(prev, orderItem, fakeMenuItem, 0) - 1);
+                                                  return applyQuantityUpdate(prev, newQuantity, orderItem, fakeMenuItem);
+                                                });
+                                              }
+                                            }}
+                                            disabled={currentQuantity <= 0}
+                                            className="h-6 w-6 p-0"
+                                          >
+                                            <Minus className="h-3 w-3" />
+                                          </Button>
+                                          <span className="text-sm font-medium w-8 text-center">{currentQuantity}</span>
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() => {
+                                              setLocalEditQuantities(prev => {
+                                                const newQuantity = resolveQuantityValue(prev, orderItem, fakeMenuItem, 0) + 1;
+                                                return applyQuantityUpdate(prev, newQuantity, orderItem, fakeMenuItem);
+                                              });
+                                            }}
+                                            className="h-6 w-6 p-0"
+                                          >
+                                            <Plus className="h-3 w-3" />
+                                          </Button>
+                                        </div>
+                                        <span className="font-semibold text-primary min-w-[70px] text-right">
+                                          ${(size.price * currentQuantity).toFixed(2)}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
                       }
-                      
+
                       // Products without sizes: original behavior
                       const orderItem = selectedOrderForEdit.items.find(item => 
                         !item.cancelled && (item.id === menuItem.id || item.name === menuItem.name)
