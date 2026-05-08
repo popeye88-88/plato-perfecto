@@ -37,6 +37,12 @@ export default function NewOrderDialog({ open, onOpenChange, menuItems, onCreate
   const [deliveryCharge, setDeliveryCharge] = useState(0);
   const [selectedItems, setSelectedItems] = useState<Array<{menuItem: {id: string; name: string; price: number; category: string}, quantity: number, customIngredients?: string[]}>>([]);
   const [sizePickerOpen, setSizePickerOpen] = useState<string | null>(null);
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const toggleExpanded = (id: string) => setExpandedItems(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
 
   const addItem = (menuItem: MenuItem, size?: { id: string; name: string; price: number }) => {
     const itemId = size ? `${menuItem.id}-size-${size.id}` : menuItem.id;
