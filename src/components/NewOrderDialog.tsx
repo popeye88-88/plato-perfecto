@@ -134,52 +134,36 @@ export default function NewOrderDialog({ open, onOpenChange, menuItems, onCreate
 
                 if (hasSizes) {
                   const sizeItems = item.sizes!;
-                  const totalQty = sizeItems.reduce((sum, size) => {
-                    const sel = selectedItems.find(s => s.menuItem.id === `${item.id}-size-${size.id}`);
-                    return sum + (sel?.quantity || 0);
-                  }, 0);
-
                   return (
-                    <div key={item.id} className="p-4 border rounded-lg hover:bg-muted/50 transition-colors">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <h4 className="font-medium text-base">{item.name}</h4>
-                          <p className="text-sm text-muted-foreground">{item.category}</p>
-                          <p className="font-semibold text-primary text-lg">
-                            ${Math.min(...sizeItems.map(s => s.price)).toFixed(2)} - ${Math.max(...sizeItems.map(s => s.price)).toFixed(2)}
-                          </p>
-                          {totalQty > 0 && <Badge variant="secondary" className="mt-1">{totalQty} en orden</Badge>}
-                        </div>
-                        <Button size="sm" onClick={() => setSizePickerOpen(sizePickerOpen === item.id ? null : item.id)} className="bg-gradient-primary hover:opacity-90 text-xs px-3">
-                          Seleccionar tamaño
-                        </Button>
+                    <div key={item.id} className="p-4 border rounded-lg">
+                      <div className="mb-2">
+                        <h4 className="font-medium text-base">{item.name}</h4>
+                        <p className="text-sm text-muted-foreground">{item.category}</p>
                       </div>
-                      {sizePickerOpen === item.id && (
-                        <div className="mt-2 space-y-1 border-t pt-2">
-                          {sizeItems.map(size => {
-                            const sizeId = `${item.id}-size-${size.id}`;
-                            const sel = selectedItems.find(s => s.menuItem.id === sizeId);
-                            const qty = sel?.quantity || 0;
-                            return (
-                              <div key={size.id} className="flex items-center justify-between py-1">
-                                <div>
-                                  <span className="text-sm">{size.name}</span>
-                                  <span className="text-sm text-primary ml-2">${size.price.toFixed(2)}</span>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                  {qty > 0 && (
-                                    <>
-                                      <Button size="sm" variant="outline" onClick={() => updateQuantity(sizeId, qty - 1)} className="h-7 w-7 p-0"><Minus className="h-3 w-3" /></Button>
-                                      <span className="w-6 text-center text-sm">{qty}</span>
-                                    </>
-                                  )}
-                                  <Button size="sm" onClick={() => addItem(item, size)} className="bg-gradient-primary hover:opacity-90 h-7 w-7 p-0"><Plus className="h-3 w-3" /></Button>
-                                </div>
+                      <div className="space-y-1 border-t pt-2">
+                        {sizeItems.map(size => {
+                          const sizeId = `${item.id}-size-${size.id}`;
+                          const sel = selectedItems.find(s => s.menuItem.id === sizeId);
+                          const qty = sel?.quantity || 0;
+                          return (
+                            <div key={size.id} className="flex items-center justify-between py-1">
+                              <div>
+                                <span className="text-sm">{size.name}</span>
+                                <span className="text-sm text-primary ml-2">${size.price.toFixed(2)}</span>
                               </div>
-                            );
-                          })}
-                        </div>
-                      )}
+                              <div className="flex items-center space-x-2">
+                                {qty > 0 && (
+                                  <>
+                                    <Button size="sm" variant="outline" onClick={() => updateQuantity(sizeId, qty - 1)} className="h-7 w-7 p-0"><Minus className="h-3 w-3" /></Button>
+                                    <span className="w-6 text-center text-sm">{qty}</span>
+                                  </>
+                                )}
+                                <Button size="sm" onClick={() => addItem(item, size)} className="bg-gradient-primary hover:opacity-90 h-7 w-7 p-0"><Plus className="h-3 w-3" /></Button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   );
                 }
