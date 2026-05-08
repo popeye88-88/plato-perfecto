@@ -102,6 +102,18 @@ export default function OrderManager() {
   }, [enableEntregandoStage, activeTab]);
   const [isNewOrderDialogOpen, setIsNewOrderDialogOpen] = useState(false);
   const [newOrderSizePickerOpen, setNewOrderSizePickerOpen] = useState<string | null>(null);
+  const [expandedNewOrderItems, setExpandedNewOrderItems] = useState<Set<string>>(new Set());
+  const [expandedEditOrderItems, setExpandedEditOrderItems] = useState<Set<string>>(new Set());
+  const toggleExpandedNewOrder = (id: string) => setExpandedNewOrderItems(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
+  const toggleExpandedEditOrder = (id: string) => setExpandedEditOrderItems(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
   const [newOrderForm, setNewOrderForm] = useState({
     customerName: '',
     serviceType: 'puesto' as 'puesto' | 'takeaway' | 'delivery',
