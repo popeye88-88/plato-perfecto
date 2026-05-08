@@ -56,6 +56,12 @@ export default function EditOrderDialog({ open, onOpenChange, order, menuItems, 
   const [customerName, setCustomerName] = useState('');
   const [items, setItems] = useState<OrderItem[]>([]);
   const [sizePickerOpen, setSizePickerOpen] = useState<string | null>(null);
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const toggleExpanded = (id: string) => setExpandedItems(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
 
   React.useEffect(() => {
     if (order) {
