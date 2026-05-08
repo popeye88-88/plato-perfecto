@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, Minus, Clock, Truck, DollarSign, X, Edit2, History, Percent, Check } from 'lucide-react';
+import { Plus, Minus, Clock, Truck, DollarSign, X, Edit2, History, Percent, Check, ChevronDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useBusinessContext } from '@/contexts/BusinessContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -102,6 +102,18 @@ export default function OrderManager() {
   }, [enableEntregandoStage, activeTab]);
   const [isNewOrderDialogOpen, setIsNewOrderDialogOpen] = useState(false);
   const [newOrderSizePickerOpen, setNewOrderSizePickerOpen] = useState<string | null>(null);
+  const [expandedNewOrderItems, setExpandedNewOrderItems] = useState<Set<string>>(new Set());
+  const [expandedEditOrderItems, setExpandedEditOrderItems] = useState<Set<string>>(new Set());
+  const toggleExpandedNewOrder = (id: string) => setExpandedNewOrderItems(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
+  const toggleExpandedEditOrder = (id: string) => setExpandedEditOrderItems(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
   const [newOrderForm, setNewOrderForm] = useState({
     customerName: '',
     serviceType: 'puesto' as 'puesto' | 'takeaway' | 'delivery',
@@ -1356,61 +1368,83 @@ export default function OrderManager() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {menuItems.map((item) => {
                     const hasSizes = item.hasSizes && item.sizes && item.sizes.length >= 2;
-                    
+
                     if (hasSizes) {
-                      // Products with sizes: show all sizes inline directly
                       const sizeItems = item.sizes!;
+                      const isExpanded = expandedNewOrderItems.has(item.id);
+                      const totalQty = sizeItems.reduce((sum, s) => {
+                        const sel = newOrderForm.selectedItems.find(i => i.id === `${item.id}-size-${s.id}`);
+                        return sum + (sel?.quantity || 0);
+                      }, 0);
                       return (
-                        <div key={item.id} className="p-3 border border-border rounded-lg bg-card">
-                          <div className="mb-2">
-                            <h4 className="font-medium text-foreground">{item.name}</h4>
-                            <p className="text-xs text-muted-foreground">{item.category}</p>
-                          </div>
-                          <div className="space-y-1 border-t border-border pt-2">
-                            {sizeItems.map(size => {
-                              const sizeId = `${item.id}-size-${size.id}`;
-                              const sel = newOrderForm.selectedItems.find(i => i.id === sizeId);
-                              const qty = sel?.quantity || 0;
-                              return (
-                                <div key={size.id} className="flex items-center justify-between py-1">
-                                  <div>
-                                    <span className="text-sm">{size.name}</span>
-                                    <span className="text-sm text-primary ml-2">${size.price.toFixed(2)}</span>
+                        <div key={item.id} className="border border-border rounded-lg bg-card overflow-hidden">
+                          <button
+                            type="button"
+                            onClick={() => toggleExpandedNewOrder(item.id)}
+                            className="w-full p-3 flex justify-between items-center hover:bg-muted/50 transition-colors text-left"
+                          >
+                            <div>
+                              <h4 className="font-medium text-foreground">{item.name}</h4>
+                              <p className="text-xs text-muted-foreground">{item.category}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {totalQty > 0 && (
+                                <span className="text-xs bg-primary text-primary-foreground rounded-full px-2 py-0.5">{totalQty}</span>
+                              )}
+                              <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                            </div>
+                          </button>
+                          {isExpanded && (
+                            <div className="space-y-1 border-t border-border px-3 py-2">
+                              {sizeItems.map(size => {
+                                const sizeId = `${item.id}-size-${size.id}`;
+                                const sel = newOrderForm.selectedItems.find(i => i.id === sizeId);
+                                const qty = sel?.quantity || 0;
+                                return (
+                                  <div key={size.id} className="flex items-center justify-between py-1">
+                                    <div>
+                                      <span className="text-sm">{size.name}</span>
+                                      <span className="text-sm text-primary ml-2">${size.price.toFixed(2)}</span>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                      {qty > 0 && (
+                                        <>
+                                          <Button size="sm" variant="outline" onClick={() => updateItemQuantity(sizeId, qty - 1)} className="h-7 w-7 p-0">
+                                            <Minus className="h-3 w-3" />
+                                          </Button>
+                                          <span className="w-6 text-center text-sm">{qty}</span>
+                                        </>
+                                      )}
+                                      <Button size="sm" onClick={() => addItemToOrder(item, size)} className="bg-gradient-primary hover:opacity-90 h-7 w-7 p-0">
+                                        <Plus className="h-3 w-3" />
+                                      </Button>
+                                    </div>
                                   </div>
-                                  <div className="flex items-center space-x-2">
-                                    {qty > 0 && (
-                                      <>
-                                        <Button size="sm" variant="outline" onClick={() => updateItemQuantity(sizeId, qty - 1)} className="h-7 w-7 p-0">
-                                          <Minus className="h-3 w-3" />
-                                        </Button>
-                                        <span className="w-6 text-center text-sm">{qty}</span>
-                                      </>
-                                    )}
-                                    <Button size="sm" onClick={() => addItemToOrder(item, size)} className="bg-gradient-primary hover:opacity-90 h-7 w-7 p-0">
-                                      <Plus className="h-3 w-3" />
-                                    </Button>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
                       );
                     }
-                    
-                    // Products without sizes: original behavior
+
                     const selectedItem = newOrderForm.selectedItems.find(i => i.id === item.id);
                     const quantity = selectedItem?.quantity || 0;
-                    
+
                     return (
-                      <div key={item.id} className="p-3 border border-border rounded-lg bg-card hover:bg-muted/50 transition-colors">
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => addItemToOrder(item)}
+                        className="p-3 border border-border rounded-lg bg-card hover:bg-muted/50 transition-colors text-left w-full"
+                      >
                         <div className="flex justify-between items-center">
                           <div className="flex-1">
                             <h4 className="font-medium text-foreground">{item.name}</h4>
                             <p className="text-xs text-muted-foreground">{item.category}</p>
                             <p className="font-semibold text-primary text-sm">${item.price.toFixed(2)}</p>
                           </div>
-                          <div className="flex items-center space-x-2">
+                          <div className="flex items-center space-x-2" onClick={(e) => e.stopPropagation()}>
                             {quantity > 0 && (
                               <>
                                 <Button size="sm" variant="outline" onClick={() => updateItemQuantity(item.id, quantity - 1)} className="h-8 w-8 p-0">
@@ -1419,12 +1453,12 @@ export default function OrderManager() {
                                 <span className="w-8 text-center text-sm font-medium">{quantity}</span>
                               </>
                             )}
-                            <Button size="sm" onClick={() => addItemToOrder(item)} className="bg-gradient-primary hover:opacity-90 h-8 w-8 p-0">
+                            <span className="bg-gradient-primary text-primary-foreground rounded-md h-8 w-8 inline-flex items-center justify-center">
                               <Plus className="h-4 w-4" />
-                            </Button>
+                            </span>
                           </div>
                         </div>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -1882,78 +1916,110 @@ export default function OrderManager() {
                       const hasSizes = menuItem.hasSizes && menuItem.sizes && menuItem.sizes.length >= 2;
                       
                       if (hasSizes) {
-                        // For sized products, render each size as a separate row
-                        return menuItem.sizes!.map(size => {
+                        const isExpanded = expandedEditOrderItems.has(menuItem.id);
+                        const totalQty = menuItem.sizes!.reduce((sum, size) => {
                           const sizeItemId = `${menuItem.id}-size-${size.id}`;
                           const sizeItemName = `${menuItem.name} — ${size.name}`;
                           const orderItem = selectedOrderForEdit.items.find(item =>
                             !item.cancelled && (item.id === sizeItemId || item.name === sizeItemName)
                           );
                           const fakeMenuItem = { id: sizeItemId, name: sizeItemName, category: menuItem.category, price: size.price };
-                          const currentQuantity = resolveQuantityValue(localEditQuantities, orderItem, fakeMenuItem, 0);
-                          
-                          return (
-                            <div key={sizeItemId} className="flex items-center justify-between p-3 border border-border rounded-lg bg-card">
-                              <div className="flex items-center gap-3 flex-1">
-                                <span className="font-medium">{sizeItemName}</span>
+                          return sum + resolveQuantityValue(localEditQuantities, orderItem, fakeMenuItem, 0);
+                        }, 0);
+                        return (
+                          <div key={menuItem.id} className="border border-border rounded-lg bg-card overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => toggleExpandedEditOrder(menuItem.id)}
+                              className="w-full p-3 flex justify-between items-center hover:bg-muted/50 transition-colors text-left"
+                            >
+                              <div className="flex items-center gap-3">
+                                <span className="font-medium">{menuItem.name}</span>
                                 <span className="text-xs text-muted-foreground">{menuItem.category}</span>
                               </div>
-                              <div className="flex items-center gap-3">
-                                <div className="flex items-center gap-2 border border-border rounded-md">
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => {
-                                      const isOrderInCobrando = selectedOrderForEdit.status === 'cobrando';
-                                      const isItemInCobrando = orderItem && orderItem.status === 'cobrando';
-                                      let hasItemInCobrando = false;
-                                      if (orderItem && selectedOrderForEdit.individualItemsStatus) {
-                                        const itemKeys = Array.from({ length: orderItem.quantity }, (_, idx) =>
-                                          `${orderItem.id}-${idx}`
-                                        );
-                                        hasItemInCobrando = itemKeys.some(key =>
-                                          selectedOrderForEdit.individualItemsStatus?.[key] === 'cobrando'
-                                        );
-                                      }
-                                      if (isOrderInCobrando && (isItemInCobrando || hasItemInCobrando)) {
-                                        setItemToReduce({ menuItemId: sizeItemId, menuItemName: sizeItemName, currentQuantity });
-                                        setIsReduceQuantityDialogOpen(true);
-                                      } else {
-                                        setLocalEditQuantities(prev => {
-                                          const newQuantity = Math.max(0, resolveQuantityValue(prev, orderItem, fakeMenuItem, 0) - 1);
-                                          return applyQuantityUpdate(prev, newQuantity, orderItem, fakeMenuItem);
-                                        });
-                                      }
-                                    }}
-                                    disabled={currentQuantity <= 0}
-                                    className="h-6 w-6 p-0"
-                                  >
-                                    <Minus className="h-3 w-3" />
-                                  </Button>
-                                  <span className="text-sm font-medium w-8 text-center">{currentQuantity}</span>
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => {
-                                      setLocalEditQuantities(prev => {
-                                        const newQuantity = resolveQuantityValue(prev, orderItem, fakeMenuItem, 0) + 1;
-                                        return applyQuantityUpdate(prev, newQuantity, orderItem, fakeMenuItem);
-                                      });
-                                    }}
-                                    className="h-6 w-6 p-0"
-                                  >
-                                    <Plus className="h-3 w-3" />
-                                  </Button>
-                                </div>
-                                <span className="font-semibold text-primary min-w-[70px] text-right">
-                                  ${(size.price * currentQuantity).toFixed(2)}
-                                </span>
+                              <div className="flex items-center gap-2">
+                                {totalQty > 0 && (
+                                  <span className="text-xs bg-primary text-primary-foreground rounded-full px-2 py-0.5">{totalQty}</span>
+                                )}
+                                <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                               </div>
-                            </div>
-                          );
-                        });
+                            </button>
+                            {isExpanded && (
+                              <div className="border-t border-border divide-y divide-border">
+                                {menuItem.sizes!.map(size => {
+                                  const sizeItemId = `${menuItem.id}-size-${size.id}`;
+                                  const sizeItemName = `${menuItem.name} — ${size.name}`;
+                                  const orderItem = selectedOrderForEdit.items.find(item =>
+                                    !item.cancelled && (item.id === sizeItemId || item.name === sizeItemName)
+                                  );
+                                  const fakeMenuItem = { id: sizeItemId, name: sizeItemName, category: menuItem.category, price: size.price };
+                                  const currentQuantity = resolveQuantityValue(localEditQuantities, orderItem, fakeMenuItem, 0);
+                                  return (
+                                    <div key={sizeItemId} className="flex items-center justify-between p-3">
+                                      <div className="flex items-center gap-3 flex-1">
+                                        <span className="text-sm">{size.name}</span>
+                                        <span className="text-xs text-primary">${size.price.toFixed(2)}</span>
+                                      </div>
+                                      <div className="flex items-center gap-3">
+                                        <div className="flex items-center gap-2 border border-border rounded-md">
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() => {
+                                              const isOrderInCobrando = selectedOrderForEdit.status === 'cobrando';
+                                              const isItemInCobrando = orderItem && orderItem.status === 'cobrando';
+                                              let hasItemInCobrando = false;
+                                              if (orderItem && selectedOrderForEdit.individualItemsStatus) {
+                                                const itemKeys = Array.from({ length: orderItem.quantity }, (_, idx) =>
+                                                  `${orderItem.id}-${idx}`
+                                                );
+                                                hasItemInCobrando = itemKeys.some(key =>
+                                                  selectedOrderForEdit.individualItemsStatus?.[key] === 'cobrando'
+                                                );
+                                              }
+                                              if (isOrderInCobrando && (isItemInCobrando || hasItemInCobrando)) {
+                                                setItemToReduce({ menuItemId: sizeItemId, menuItemName: sizeItemName, currentQuantity });
+                                                setIsReduceQuantityDialogOpen(true);
+                                              } else {
+                                                setLocalEditQuantities(prev => {
+                                                  const newQuantity = Math.max(0, resolveQuantityValue(prev, orderItem, fakeMenuItem, 0) - 1);
+                                                  return applyQuantityUpdate(prev, newQuantity, orderItem, fakeMenuItem);
+                                                });
+                                              }
+                                            }}
+                                            disabled={currentQuantity <= 0}
+                                            className="h-6 w-6 p-0"
+                                          >
+                                            <Minus className="h-3 w-3" />
+                                          </Button>
+                                          <span className="text-sm font-medium w-8 text-center">{currentQuantity}</span>
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() => {
+                                              setLocalEditQuantities(prev => {
+                                                const newQuantity = resolveQuantityValue(prev, orderItem, fakeMenuItem, 0) + 1;
+                                                return applyQuantityUpdate(prev, newQuantity, orderItem, fakeMenuItem);
+                                              });
+                                            }}
+                                            className="h-6 w-6 p-0"
+                                          >
+                                            <Plus className="h-3 w-3" />
+                                          </Button>
+                                        </div>
+                                        <span className="font-semibold text-primary min-w-[70px] text-right">
+                                          ${(size.price * currentQuantity).toFixed(2)}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
                       }
-                      
+
                       // Products without sizes: original behavior
                       const orderItem = selectedOrderForEdit.items.find(item => 
                         !item.cancelled && (item.id === menuItem.id || item.name === menuItem.name)

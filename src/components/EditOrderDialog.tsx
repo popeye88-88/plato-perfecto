@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Minus, X } from 'lucide-react';
+import { Plus, Minus, X, ChevronDown } from 'lucide-react';
 
 interface MenuItem {
   id: string;
@@ -56,6 +56,12 @@ export default function EditOrderDialog({ open, onOpenChange, order, menuItems, 
   const [customerName, setCustomerName] = useState('');
   const [items, setItems] = useState<OrderItem[]>([]);
   const [sizePickerOpen, setSizePickerOpen] = useState<string | null>(null);
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const toggleExpanded = (id: string) => setExpandedItems(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
 
   React.useEffect(() => {
     if (order) {
@@ -121,42 +127,57 @@ export default function EditOrderDialog({ open, onOpenChange, order, menuItems, 
                 const hasSizes = item.hasSizes && item.sizes && item.sizes.length >= 2;
 
                 if (hasSizes) {
+                  const isExpanded = expandedItems.has(item.id);
                   return (
-                    <div key={item.id} className="p-4 border rounded-lg">
-                      <div className="mb-2">
-                        <h4 className="font-medium">{item.name}</h4>
-                        <p className="text-sm text-muted-foreground">{item.category}</p>
-                      </div>
-                      <div className="space-y-1 border-t pt-2">
-                        {item.sizes!.map(size => (
-                          <div key={size.id} className="flex items-center justify-between py-1">
-                            <div>
-                              <span className="text-sm">{size.name}</span>
-                              <span className="text-sm text-primary ml-2">${size.price.toFixed(2)}</span>
+                    <div key={item.id} className="border rounded-lg overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={() => toggleExpanded(item.id)}
+                        className="w-full p-4 flex justify-between items-center hover:bg-muted/50 transition-colors text-left"
+                      >
+                        <div>
+                          <h4 className="font-medium">{item.name}</h4>
+                          <p className="text-sm text-muted-foreground">{item.category}</p>
+                        </div>
+                        <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                      </button>
+                      {isExpanded && (
+                        <div className="space-y-1 border-t px-4 py-2">
+                          {item.sizes!.map(size => (
+                            <div key={size.id} className="flex items-center justify-between py-1">
+                              <div>
+                                <span className="text-sm">{size.name}</span>
+                                <span className="text-sm text-primary ml-2">${size.price.toFixed(2)}</span>
+                              </div>
+                              <Button size="sm" onClick={() => addItem(item, size)} className="bg-gradient-primary hover:opacity-90 h-7 w-7 p-0">
+                                <Plus className="h-3 w-3" />
+                              </Button>
                             </div>
-                            <Button size="sm" onClick={() => addItem(item, size)} className="bg-gradient-primary hover:opacity-90 h-7 w-7 p-0">
-                              <Plus className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   );
                 }
 
                 return (
-                  <div key={item.id} className="p-4 border rounded-lg">
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => addItem(item)}
+                    className="p-4 border rounded-lg w-full text-left hover:bg-muted/50 transition-colors"
+                  >
                     <div className="flex justify-between items-center">
                       <div>
                         <h4 className="font-medium">{item.name}</h4>
                         <p className="text-sm text-muted-foreground">{item.category}</p>
                         <p className="font-semibold text-primary">${item.price.toFixed(2)}</p>
                       </div>
-                      <Button size="sm" onClick={() => addItem(item)} className="bg-gradient-primary hover:opacity-90">
+                      <span className="bg-gradient-primary text-primary-foreground rounded-md h-9 w-9 inline-flex items-center justify-center">
                         <Plus className="h-4 w-4" />
-                      </Button>
+                      </span>
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>

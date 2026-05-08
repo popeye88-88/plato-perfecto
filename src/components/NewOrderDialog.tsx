@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Minus } from 'lucide-react';
+import { Plus, Minus, ChevronDown } from 'lucide-react';
 
 interface MenuItem {
   id: string;
@@ -37,6 +37,12 @@ export default function NewOrderDialog({ open, onOpenChange, menuItems, onCreate
   const [deliveryCharge, setDeliveryCharge] = useState(0);
   const [selectedItems, setSelectedItems] = useState<Array<{menuItem: {id: string; name: string; price: number; category: string}, quantity: number, customIngredients?: string[]}>>([]);
   const [sizePickerOpen, setSizePickerOpen] = useState<string | null>(null);
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const toggleExpanded = (id: string) => setExpandedItems(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
 
   const addItem = (menuItem: MenuItem, size?: { id: string; name: string; price: number }) => {
     const itemId = size ? `${menuItem.id}-size-${size.id}` : menuItem.id;
@@ -134,36 +140,55 @@ export default function NewOrderDialog({ open, onOpenChange, menuItems, onCreate
 
                 if (hasSizes) {
                   const sizeItems = item.sizes!;
+                  const isExpanded = expandedItems.has(item.id);
+                  const totalQty = sizeItems.reduce((sum, s) => {
+                    const sel = selectedItems.find(x => x.menuItem.id === `${item.id}-size-${s.id}`);
+                    return sum + (sel?.quantity || 0);
+                  }, 0);
                   return (
-                    <div key={item.id} className="p-4 border rounded-lg">
-                      <div className="mb-2">
-                        <h4 className="font-medium text-base">{item.name}</h4>
-                        <p className="text-sm text-muted-foreground">{item.category}</p>
-                      </div>
-                      <div className="space-y-1 border-t pt-2">
-                        {sizeItems.map(size => {
-                          const sizeId = `${item.id}-size-${size.id}`;
-                          const sel = selectedItems.find(s => s.menuItem.id === sizeId);
-                          const qty = sel?.quantity || 0;
-                          return (
-                            <div key={size.id} className="flex items-center justify-between py-1">
-                              <div>
-                                <span className="text-sm">{size.name}</span>
-                                <span className="text-sm text-primary ml-2">${size.price.toFixed(2)}</span>
+                    <div key={item.id} className="border rounded-lg overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={() => toggleExpanded(item.id)}
+                        className="w-full p-4 flex justify-between items-center hover:bg-muted/50 transition-colors text-left"
+                      >
+                        <div>
+                          <h4 className="font-medium text-base">{item.name}</h4>
+                          <p className="text-sm text-muted-foreground">{item.category}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {totalQty > 0 && (
+                            <span className="text-xs bg-primary text-primary-foreground rounded-full px-2 py-0.5">{totalQty}</span>
+                          )}
+                          <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                        </div>
+                      </button>
+                      {isExpanded && (
+                        <div className="space-y-1 border-t px-4 py-2">
+                          {sizeItems.map(size => {
+                            const sizeId = `${item.id}-size-${size.id}`;
+                            const sel = selectedItems.find(s => s.menuItem.id === sizeId);
+                            const qty = sel?.quantity || 0;
+                            return (
+                              <div key={size.id} className="flex items-center justify-between py-1">
+                                <div>
+                                  <span className="text-sm">{size.name}</span>
+                                  <span className="text-sm text-primary ml-2">${size.price.toFixed(2)}</span>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  {qty > 0 && (
+                                    <>
+                                      <Button size="sm" variant="outline" onClick={() => updateQuantity(sizeId, qty - 1)} className="h-7 w-7 p-0"><Minus className="h-3 w-3" /></Button>
+                                      <span className="w-6 text-center text-sm">{qty}</span>
+                                    </>
+                                  )}
+                                  <Button size="sm" onClick={() => addItem(item, size)} className="bg-gradient-primary hover:opacity-90 h-7 w-7 p-0"><Plus className="h-3 w-3" /></Button>
+                                </div>
                               </div>
-                              <div className="flex items-center space-x-2">
-                                {qty > 0 && (
-                                  <>
-                                    <Button size="sm" variant="outline" onClick={() => updateQuantity(sizeId, qty - 1)} className="h-7 w-7 p-0"><Minus className="h-3 w-3" /></Button>
-                                    <span className="w-6 text-center text-sm">{qty}</span>
-                                  </>
-                                )}
-                                <Button size="sm" onClick={() => addItem(item, size)} className="bg-gradient-primary hover:opacity-90 h-7 w-7 p-0"><Plus className="h-3 w-3" /></Button>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   );
                 }
@@ -172,7 +197,12 @@ export default function NewOrderDialog({ open, onOpenChange, menuItems, onCreate
                 const quantity = selectedItem ? selectedItem.quantity : 0;
 
                 return (
-                  <div key={item.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => addItem(item)}
+                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors w-full text-left"
+                  >
                     <div className="flex-1">
                       <div className="flex items-center justify-between">
                         <div>
@@ -184,16 +214,18 @@ export default function NewOrderDialog({ open, onOpenChange, menuItems, onCreate
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-3 ml-4">
+                    <div className="flex items-center space-x-3 ml-4" onClick={(e) => e.stopPropagation()}>
                       {quantity > 0 && (
                         <>
                           <Button size="sm" variant="outline" onClick={() => updateQuantity(item.id, quantity - 1)} className="h-8 w-8 p-0"><Minus className="h-4 w-4" /></Button>
                           <span className="w-8 text-center font-medium text-lg">{quantity}</span>
                         </>
                       )}
-                      <Button size="sm" onClick={() => addItem(item)} className="bg-gradient-primary hover:opacity-90 h-8 w-8 p-0"><Plus className="h-4 w-4" /></Button>
+                      <span className="bg-gradient-primary text-primary-foreground rounded-md h-8 w-8 inline-flex items-center justify-center">
+                        <Plus className="h-4 w-4" />
+                      </span>
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
