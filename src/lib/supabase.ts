@@ -1,7 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 export const isSupabaseConfigured = () =>
   !!SUPABASE_URL && !!SUPABASE_KEY && SUPABASE_URL !== 'https://your-project.supabase.co';
