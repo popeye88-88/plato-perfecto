@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -120,67 +120,90 @@ export default function EditOrderDialog({ open, onOpenChange, order, menuItems, 
             <Input id="customerName" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Ingresa el nombre" />
           </div>
 
-          <div>
+          <div className="space-y-6">
             <h3 className="text-lg font-semibold mb-4">Agregar Productos</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {menuItems.map((item) => {
-                const hasSizes = item.hasSizes && item.sizes && item.sizes.length >= 2;
-
-                if (hasSizes) {
-                  const isExpanded = expandedItems.has(item.id);
-                  return (
-                    <div key={item.id} className="border rounded-lg overflow-hidden">
-                      <button
-                        type="button"
-                        onClick={() => toggleExpanded(item.id)}
-                        className="w-full p-4 flex justify-between items-center hover:bg-muted/50 transition-colors text-left"
-                      >
-                        <div>
-                          <h4 className="font-medium">{item.name}</h4>
-                          <p className="text-sm text-muted-foreground">{item.category}</p>
-                        </div>
-                        <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                      </button>
-                      {isExpanded && (
-                        <div className="space-y-1 border-t px-4 py-2">
-                          {item.sizes!.map(size => (
-                            <div key={size.id} className="flex items-center justify-between py-1">
-                              <div>
-                                <span className="text-sm">{size.name}</span>
-                                <span className="text-sm text-primary ml-2">${size.price.toFixed(2)}</span>
-                              </div>
-                              <Button size="sm" onClick={() => addItem(item, size)} className="bg-gradient-primary hover:opacity-90 h-7 w-7 p-0">
-                                <Plus className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
+            {(() => {
+              const groups: Record<string, MenuItem[]> = {};
+              const categories: string[] = [];
+              menuItems.forEach(item => {
+                if (!groups[item.category]) {
+                  groups[item.category] = [];
+                  categories.push(item.category);
                 }
+                groups[item.category].push(item);
+              });
+              categories.forEach(cat => {
+                groups[cat].sort((a, b) => {
+                  const priceA = a.hasSizes && a.sizes?.length ? Math.min(...a.sizes.map(s => s.price)) : a.price;
+                  const priceB = b.hasSizes && b.sizes?.length ? Math.min(...b.sizes.map(s => s.price)) : b.price;
+                  return priceA - priceB;
+                });
+              });
+              return categories.map(category => (
+                <div key={category} className="space-y-2">
+                  <h4 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide border-b border-border pb-1">{category}</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {groups[category].map((item) => {
+                      const hasSizes = item.hasSizes && item.sizes && item.sizes.length >= 2;
 
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => addItem(item)}
-                    className="p-4 border rounded-lg w-full text-left hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <h4 className="font-medium">{item.name}</h4>
-                        <p className="text-sm text-muted-foreground">{item.category}</p>
-                        <p className="font-semibold text-primary">${item.price.toFixed(2)}</p>
-                      </div>
-                      <span className="bg-gradient-primary text-primary-foreground rounded-md h-9 w-9 inline-flex items-center justify-center">
-                        <Plus className="h-4 w-4" />
-                      </span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+                      if (hasSizes) {
+                        const isExpanded = expandedItems.has(item.id);
+                        return (
+                          <div key={item.id} className="border rounded-lg overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => toggleExpanded(item.id)}
+                              className="w-full p-4 flex justify-between items-center hover:bg-muted/50 transition-colors text-left"
+                            >
+                              <div>
+                                <h4 className="font-medium">{item.name}</h4>
+                                <p className="text-sm text-muted-foreground">{item.category}</p>
+                              </div>
+                              <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                            </button>
+                            {isExpanded && (
+                              <div className="space-y-1 border-t px-4 py-2">
+                                {item.sizes!.map(size => (
+                                  <div key={size.id} className="flex items-center justify-between py-1">
+                                    <div>
+                                      <span className="text-sm">{size.name}</span>
+                                      <span className="text-sm text-primary ml-2">${size.price.toFixed(2)}</span>
+                                    </div>
+                                    <Button size="sm" onClick={() => addItem(item, size)} className="bg-gradient-primary hover:opacity-90 h-7 w-7 p-0">
+                                      <Plus className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => addItem(item)}
+                          className="p-4 border rounded-lg w-full text-left hover:bg-muted/50 transition-colors"
+                        >
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <h4 className="font-medium">{item.name}</h4>
+                              <p className="text-sm text-muted-foreground">{item.category}</p>
+                              <p className="font-semibold text-primary">${item.price.toFixed(2)}</p>
+                            </div>
+                            <span className="bg-gradient-primary text-primary-foreground rounded-md h-9 w-9 inline-flex items-center justify-center">
+                              <Plus className="h-4 w-4" />
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ));
+            })()}
           </div>
 
           {items.length > 0 && (
