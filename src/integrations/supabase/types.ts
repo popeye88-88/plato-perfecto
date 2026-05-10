@@ -101,9 +101,11 @@ export type Database = {
           category: string
           created_at: string
           description: string | null
+          has_sizes: boolean
           id: string
           name: string
           price: number
+          sizes: Json | null
           updated_at: string
         }
         Insert: {
@@ -112,9 +114,11 @@ export type Database = {
           category: string
           created_at?: string
           description?: string | null
+          has_sizes?: boolean
           id?: string
           name: string
           price: number
+          sizes?: Json | null
           updated_at?: string
         }
         Update: {
@@ -123,9 +127,11 @@ export type Database = {
           category?: string
           created_at?: string
           description?: string | null
+          has_sizes?: boolean
           id?: string
           name?: string
           price?: number
+          sizes?: Json | null
           updated_at?: string
         }
         Relationships: []
