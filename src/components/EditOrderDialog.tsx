@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Minus, X, ChevronDown } from 'lucide-react';
+import { getMenuItemCardStyle, type ColorStyle } from '@/lib/menuItemColor';
 
 interface MenuItem {
   id: string;
@@ -14,6 +15,8 @@ interface MenuItem {
   description?: string;
   hasSizes: boolean;
   sizes?: { id: string; name: string; price: number }[];
+  color?: string;
+  colorStyle?: ColorStyle;
 }
 
 interface OrderItem {
