@@ -324,6 +324,8 @@ export default function MenuManager() {
     setHasSizes(false);
     setSizes([]);
     setNewCategoryName('');
+    setColor(undefined);
+    setColorStyle('fill');
     setIsDialogOpen(true);
   };
 
