@@ -525,6 +525,47 @@ export default function MenuManager() {
               )}
             </div>
 
+            {/* Color Section */}
+            <div className="space-y-3 border-t border-border pt-4">
+              <Label>Color del producto</Label>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setColor(undefined)}
+                  className={`h-8 w-8 rounded-full border-2 flex items-center justify-center text-xs ${!color ? 'border-foreground' : 'border-border'}`}
+                  style={{ backgroundColor: DEFAULT_COLOR }}
+                  title="Sin color (gris claro por defecto)"
+                >
+                  {!color && '✓'}
+                </button>
+                {COLOR_PRESETS.slice(1).map((preset) => (
+                  <button
+                    key={preset.value}
+                    type="button"
+                    onClick={() => setColor(preset.value)}
+                    className={`h-8 w-8 rounded-full border-2 flex items-center justify-center text-xs ${color === preset.value ? 'border-foreground' : 'border-border'}`}
+                    style={{ backgroundColor: preset.value }}
+                    title={preset.name}
+                  >
+                    {color === preset.value && '✓'}
+                  </button>
+                ))}
+              </div>
+              <div>
+                <Label className="text-sm text-muted-foreground">Aplicar como</Label>
+                <RadioGroup value={colorStyle} onValueChange={(v) => setColorStyle(v as ColorStyle)} className="flex gap-4 mt-2">
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="fill" id="color-fill" />
+                    <Label htmlFor="color-fill" className="cursor-pointer">Fondo</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="border" id="color-border" />
+                    <Label htmlFor="color-border" className="cursor-pointer">Borde</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+            </div>
+
             <div className="flex gap-2 pt-4">
               <Button type="submit" className="bg-gradient-primary hover:opacity-90 flex-1">
                 {editingItem ? 'Actualizar' : 'Agregar'}
@@ -539,6 +580,8 @@ export default function MenuManager() {
                   setHasSizes(false);
                   setSizes([]);
                   setNewCategoryName('');
+                  setColor(undefined);
+                  setColorStyle('fill');
                 }}
               >
                 Cancelar
