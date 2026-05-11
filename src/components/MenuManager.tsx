@@ -12,6 +12,8 @@ import { useToast } from '@/hooks/use-toast';
 import CategoryManager from './CategoryManager';
 import { useBusinessContext } from '@/contexts/BusinessContext';
 import { isSupabaseConfigured, fetchCategories, upsertMenuItems, upsertCategories } from '@/lib/supabase';
+import { COLOR_PRESETS, DEFAULT_COLOR, type ColorStyle } from '@/lib/menuItemColor';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 interface MenuItem {
   id: string;
@@ -21,6 +23,8 @@ interface MenuItem {
   description?: string;
   hasSizes: boolean;
   sizes?: { id: string; name: string; price: number }[];
+  color?: string;
+  colorStyle?: ColorStyle;
 }
 
 interface Category {
