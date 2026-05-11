@@ -157,9 +157,10 @@ export default function NewOrderDialog({ open, onOpenChange, menuItems, onCreate
               return categories.map(category => (
                 <div key={category} className="space-y-2">
                   <h4 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide border-b border-border pb-1">{category}</h4>
-                  <div className="space-y-2">
+                  <div className="grid grid-cols-3 gap-2">
                     {groups[category].map((item) => {
                       const hasSizes = item.hasSizes && item.sizes && item.sizes.length >= 2;
+                      const cardStyle = getMenuItemCardStyle(item.color, item.colorStyle);
 
                       if (hasSizes) {
                         const sizeItems = item.sizes!;
@@ -169,15 +170,14 @@ export default function NewOrderDialog({ open, onOpenChange, menuItems, onCreate
                           return sum + (sel?.quantity || 0);
                         }, 0);
                         return (
-                          <div key={item.id} className="border rounded-lg overflow-hidden">
+                          <div key={item.id} className="col-span-3 border rounded-lg overflow-hidden" style={cardStyle}>
                             <button
                               type="button"
                               onClick={() => toggleExpanded(item.id)}
-                              className="w-full p-4 flex justify-between items-center hover:bg-muted/50 transition-colors text-left"
+                              className="w-full p-3 flex justify-between items-center hover:bg-black/5 transition-colors text-center"
                             >
-                              <div>
-                                <h4 className="font-medium text-base">{item.name}</h4>
-                                <p className="text-sm text-muted-foreground">{item.category}</p>
+                              <div className="flex-1">
+                                <h4 className="font-semibold text-sm text-foreground text-center">{item.name}</h4>
                               </div>
                               <div className="flex items-center gap-2">
                                 {totalQty > 0 && (
@@ -187,27 +187,27 @@ export default function NewOrderDialog({ open, onOpenChange, menuItems, onCreate
                               </div>
                             </button>
                             {isExpanded && (
-                              <div className="space-y-1 border-t px-4 py-2">
+                              <div className="grid grid-cols-3 gap-2 border-t bg-background/60 p-2">
                                 {sizeItems.map(size => {
                                   const sizeId = `${item.id}-size-${size.id}`;
                                   const sel = selectedItems.find(s => s.menuItem.id === sizeId);
                                   const qty = sel?.quantity || 0;
                                   return (
-                                    <div key={size.id} className="flex items-center justify-between py-1">
-                                      <div>
-                                        <span className="text-sm">{size.name}</span>
-                                        <span className="text-sm text-primary ml-2">${size.price.toFixed(2)}</span>
-                                      </div>
-                                      <div className="flex items-center space-x-2">
-                                        {qty > 0 && (
-                                          <>
-                                            <Button size="sm" variant="outline" onClick={() => updateQuantity(sizeId, qty - 1)} className="h-7 w-7 p-0"><Minus className="h-3 w-3" /></Button>
-                                            <span className="w-6 text-center text-sm">{qty}</span>
-                                          </>
-                                        )}
-                                        <Button size="sm" onClick={() => addItem(item, size)} className="bg-gradient-primary hover:opacity-90 h-7 w-7 p-0"><Plus className="h-3 w-3" /></Button>
-                                      </div>
-                                    </div>
+                                    <button
+                                      key={size.id}
+                                      type="button"
+                                      onClick={() => addItem(item, size)}
+                                      className="border rounded-md p-2 flex flex-col items-center justify-center text-center bg-card hover:bg-muted/50 transition-colors min-h-[72px]"
+                                    >
+                                      <span className="text-xs font-medium leading-tight">{size.name}</span>
+                                      <span className="text-xs text-primary mt-1">${size.price.toFixed(2)}</span>
+                                      {qty > 0 && (
+                                        <div className="flex items-center gap-1 mt-1" onClick={(e) => e.stopPropagation()}>
+                                          <Button size="sm" variant="outline" onClick={() => updateQuantity(sizeId, qty - 1)} className="h-5 w-5 p-0"><Minus className="h-3 w-3" /></Button>
+                                          <span className="text-xs w-4 text-center">{qty}</span>
+                                        </div>
+                                      )}
+                                    </button>
                                   );
                                 })}
                               </div>
@@ -224,30 +224,17 @@ export default function NewOrderDialog({ open, onOpenChange, menuItems, onCreate
                           key={item.id}
                           type="button"
                           onClick={() => addItem(item)}
-                          className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors w-full text-left"
+                          className="border rounded-lg p-2 flex flex-col items-center justify-center text-center hover:opacity-90 transition-opacity min-h-[88px] relative"
+                          style={cardStyle}
                         >
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <h4 className="font-medium text-base">{item.name}</h4>
-                                <p className="text-sm text-muted-foreground">{item.category}</p>
-                              </div>
-                              <div className="text-right">
-                                <p className="font-semibold text-primary text-lg">${item.price.toFixed(2)}</p>
-                              </div>
+                          <h4 className="font-semibold text-sm leading-tight text-foreground text-center break-words">{item.name}</h4>
+                          <p className="text-xs font-semibold text-primary mt-1">${item.price.toFixed(2)}</p>
+                          {quantity > 0 && (
+                            <div className="absolute top-1 right-1 flex items-center gap-1 bg-background/80 rounded-md px-1" onClick={(e) => e.stopPropagation()}>
+                              <Button size="sm" variant="ghost" onClick={() => updateQuantity(item.id, quantity - 1)} className="h-5 w-5 p-0"><Minus className="h-3 w-3" /></Button>
+                              <span className="text-xs font-bold w-3 text-center">{quantity}</span>
                             </div>
-                          </div>
-                          <div className="flex items-center space-x-3 ml-4" onClick={(e) => e.stopPropagation()}>
-                            {quantity > 0 && (
-                              <>
-                                <Button size="sm" variant="outline" onClick={() => updateQuantity(item.id, quantity - 1)} className="h-8 w-8 p-0"><Minus className="h-4 w-4" /></Button>
-                                <span className="w-8 text-center font-medium text-lg">{quantity}</span>
-                              </>
-                            )}
-                            <span className="bg-gradient-primary text-primary-foreground rounded-md h-8 w-8 inline-flex items-center justify-center">
-                              <Plus className="h-4 w-4" />
-                            </span>
-                          </div>
+                          )}
                         </button>
                       );
                     })}
