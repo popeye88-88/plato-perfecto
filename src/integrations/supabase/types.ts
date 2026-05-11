@@ -99,6 +99,8 @@ export type Database = {
           available: boolean
           business_id: string
           category: string
+          color: string | null
+          color_style: string
           created_at: string
           description: string | null
           has_sizes: boolean
@@ -112,6 +114,8 @@ export type Database = {
           available?: boolean
           business_id: string
           category: string
+          color?: string | null
+          color_style?: string
           created_at?: string
           description?: string | null
           has_sizes?: boolean
@@ -125,6 +129,8 @@ export type Database = {
           available?: boolean
           business_id?: string
           category?: string
+          color?: string | null
+          color_style?: string
           created_at?: string
           description?: string | null
           has_sizes?: boolean

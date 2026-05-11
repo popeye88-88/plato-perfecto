@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Minus, X, ChevronDown } from 'lucide-react';
+import { getMenuItemCardStyle, type ColorStyle } from '@/lib/menuItemColor';
 
 interface MenuItem {
   id: string;
@@ -14,6 +15,8 @@ interface MenuItem {
   description?: string;
   hasSizes: boolean;
   sizes?: { id: string; name: string; price: number }[];
+  color?: string;
+  colorStyle?: ColorStyle;
 }
 
 interface OrderItem {
@@ -142,37 +145,35 @@ export default function EditOrderDialog({ open, onOpenChange, order, menuItems, 
               return categories.map(category => (
                 <div key={category} className="space-y-2">
                   <h4 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide border-b border-border pb-1">{category}</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-3 gap-2">
                     {groups[category].map((item) => {
                       const hasSizes = item.hasSizes && item.sizes && item.sizes.length >= 2;
+                      const cardStyle = getMenuItemCardStyle(item.color, item.colorStyle);
 
                       if (hasSizes) {
                         const isExpanded = expandedItems.has(item.id);
                         return (
-                          <div key={item.id} className="border rounded-lg overflow-hidden">
+                          <div key={item.id} className="col-span-3 border rounded-lg overflow-hidden" style={cardStyle}>
                             <button
                               type="button"
                               onClick={() => toggleExpanded(item.id)}
-                              className="w-full p-4 flex justify-between items-center hover:bg-muted/50 transition-colors text-left"
+                              className="w-full p-3 flex justify-between items-center hover:bg-black/5 transition-colors"
                             >
-                              <div>
-                                <h4 className="font-medium">{item.name}</h4>
-                                <p className="text-sm text-muted-foreground">{item.category}</p>
-                              </div>
+                              <h4 className="font-semibold text-sm flex-1 text-center">{item.name}</h4>
                               <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                             </button>
                             {isExpanded && (
-                              <div className="space-y-1 border-t px-4 py-2">
+                              <div className="grid grid-cols-3 gap-2 border-t bg-background/60 p-2">
                                 {item.sizes!.map(size => (
-                                  <div key={size.id} className="flex items-center justify-between py-1">
-                                    <div>
-                                      <span className="text-sm">{size.name}</span>
-                                      <span className="text-sm text-primary ml-2">${size.price.toFixed(2)}</span>
-                                    </div>
-                                    <Button size="sm" onClick={() => addItem(item, size)} className="bg-gradient-primary hover:opacity-90 h-7 w-7 p-0">
-                                      <Plus className="h-3 w-3" />
-                                    </Button>
-                                  </div>
+                                  <button
+                                    key={size.id}
+                                    type="button"
+                                    onClick={() => addItem(item, size)}
+                                    className="border rounded-md p-2 flex flex-col items-center justify-center text-center bg-card hover:bg-muted/50 transition-colors min-h-[64px]"
+                                  >
+                                    <span className="text-xs font-medium">{size.name}</span>
+                                    <span className="text-xs text-primary mt-1">${size.price.toFixed(2)}</span>
+                                  </button>
                                 ))}
                               </div>
                             )}
@@ -185,18 +186,11 @@ export default function EditOrderDialog({ open, onOpenChange, order, menuItems, 
                           key={item.id}
                           type="button"
                           onClick={() => addItem(item)}
-                          className="p-4 border rounded-lg w-full text-left hover:bg-muted/50 transition-colors"
+                          className="border rounded-lg p-2 flex flex-col items-center justify-center text-center hover:opacity-90 transition-opacity min-h-[80px]"
+                          style={cardStyle}
                         >
-                          <div className="flex justify-between items-center">
-                            <div>
-                              <h4 className="font-medium">{item.name}</h4>
-                              <p className="text-sm text-muted-foreground">{item.category}</p>
-                              <p className="font-semibold text-primary">${item.price.toFixed(2)}</p>
-                            </div>
-                            <span className="bg-gradient-primary text-primary-foreground rounded-md h-9 w-9 inline-flex items-center justify-center">
-                              <Plus className="h-4 w-4" />
-                            </span>
-                          </div>
+                          <h4 className="font-semibold text-sm leading-tight text-foreground text-center break-words">{item.name}</h4>
+                          <p className="text-xs font-semibold text-primary mt-1">${item.price.toFixed(2)}</p>
                         </button>
                       );
                     })}

@@ -232,11 +232,13 @@ export async function fetchMenuItems(businessId: string) {
     category: m.category,
     description: m.description,
     hasSizes: m.has_sizes ?? false,
-    sizes: m.sizes ? (typeof m.sizes === 'string' ? JSON.parse(m.sizes) : m.sizes) : undefined
+    sizes: m.sizes ? (typeof m.sizes === 'string' ? JSON.parse(m.sizes) : m.sizes) : undefined,
+    color: m.color ?? undefined,
+    colorStyle: (m.color_style as 'fill' | 'border' | undefined) ?? 'fill'
   }));
 }
 
-export async function upsertMenuItems(businessId: string, items: Array<{ id: string; name: string; price: number; category: string; description?: string; hasSizes?: boolean; sizes?: { id: string; name: string; price: number }[] }>) {
+export async function upsertMenuItems(businessId: string, items: Array<{ id: string; name: string; price: number; category: string; description?: string; hasSizes?: boolean; sizes?: { id: string; name: string; price: number }[]; color?: string; colorStyle?: 'fill' | 'border' }>) {
   if (!isSupabaseConfigured()) return false;
   await supabase.from('menu_items').delete().eq('business_id', businessId);
   if (items.length === 0) return true;
@@ -248,7 +250,9 @@ export async function upsertMenuItems(businessId: string, items: Array<{ id: str
     category: item.category,
     description: item.description || null,
     has_sizes: item.hasSizes ?? false,
-    sizes: item.sizes ? JSON.stringify(item.sizes) : null
+    sizes: item.sizes ? JSON.stringify(item.sizes) : null,
+    color: item.color || null,
+    color_style: item.colorStyle || 'fill'
   }));
   const { error } = await supabase.from('menu_items').insert(rows);
   return !error;
