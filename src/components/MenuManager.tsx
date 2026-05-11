@@ -236,7 +236,9 @@ export default function MenuManager() {
       category: categoryName,
       description: formData.description,
       hasSizes,
-      sizes: hasSizes ? sizes : undefined
+      sizes: hasSizes ? sizes : undefined,
+      color: color || undefined,
+      colorStyle
     };
 
     let updatedMenuItems: MenuItem[] = [];
