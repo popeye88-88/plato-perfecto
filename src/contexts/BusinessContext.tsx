@@ -26,6 +26,8 @@ interface MenuItem {
   description?: string;
   hasSizes: boolean;
   sizes?: { id: string; name: string; price: number }[];
+  color?: string;
+  colorStyle?: 'fill' | 'border';
 }
 
 export type BusinessRole = 'owner' | 'staff';
