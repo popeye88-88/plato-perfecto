@@ -54,6 +54,8 @@ export default function MenuManager() {
   const [hasSizes, setHasSizes] = useState(false);
   const [sizes, setSizes] = useState<{ id: string; name: string; price: number }[]>([]);
   const [newCategoryName, setNewCategoryName] = useState('');
+  const [color, setColor] = useState<string | undefined>(undefined);
+  const [colorStyle, setColorStyle] = useState<ColorStyle>('fill');
 
   const categoriesStorageKey = useMemo(() => {
     return currentBusiness?.id ? `categories_${currentBusiness.id}` : null;
