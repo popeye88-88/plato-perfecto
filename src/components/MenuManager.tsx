@@ -277,6 +277,8 @@ export default function MenuManager() {
     setHasSizes(false);
     setSizes([]);
     setNewCategoryName('');
+    setColor(undefined);
+    setColorStyle('fill');
     setEditingItem(null);
     setIsDialogOpen(false);
   };
@@ -292,6 +294,8 @@ export default function MenuManager() {
     setHasSizes(item.hasSizes || false);
     setSizes(item.sizes || []);
     setNewCategoryName('');
+    setColor(item.color);
+    setColorStyle(item.colorStyle || 'fill');
     setIsDialogOpen(true);
   };
 
