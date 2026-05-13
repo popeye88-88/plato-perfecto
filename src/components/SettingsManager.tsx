@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Settings, Users, Globe, DollarSign, UserPlus, ChefHat, Building2, Plus, Edit2, Trash2, LogOut, Share2, Truck } from 'lucide-react';
+import { Settings, Users, Globe, DollarSign, UserPlus, Building2, Plus, Edit2, Trash2, LogOut, Share2, Truck } from 'lucide-react';
 import { useBusinessContext, type BusinessRole } from '@/contexts/BusinessContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -156,7 +156,7 @@ export default function SettingsManager() {
       </div>
 
       <Tabs defaultValue="business" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="business" className="flex items-center gap-2">
             <Building2 className="h-4 w-4" />
             <span className="hidden sm:inline">Negocio</span>
@@ -168,14 +168,6 @@ export default function SettingsManager() {
           <TabsTrigger value="language" className="flex items-center gap-2">
             <Globe className="h-4 w-4" />
             <span className="hidden sm:inline">Idioma</span>
-          </TabsTrigger>
-          <TabsTrigger value="currency" className="flex items-center gap-2">
-            <DollarSign className="h-4 w-4" />
-            <span className="hidden sm:inline">Moneda</span>
-          </TabsTrigger>
-          <TabsTrigger value="ingredients" className="flex items-center gap-2">
-            <ChefHat className="h-4 w-4" />
-            <span className="hidden sm:inline">Ingredientes</span>
           </TabsTrigger>
         </TabsList>
 
@@ -445,6 +437,37 @@ export default function SettingsManager() {
             </CardContent>
           </Card>
 
+          {/* Currency Settings */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <DollarSign className="h-5 w-5" />
+                Moneda
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="currency">Moneda principal</Label>
+                <Select
+                  value={settings.currency}
+                  onValueChange={(value) => handleSettingChange('currency', value)}
+                >
+                  <SelectTrigger id="currency">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="MXN">MXN - Peso Mexicano ($)</SelectItem>
+                    <SelectItem value="EUR">EUR - Euro (€)</SelectItem>
+                    <SelectItem value="USD">USD - Dólar Americano ($)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-sm text-muted-foreground">
+                  Moneda actual: {settings.currency} ({currencySymbols[settings.currency]})
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Business List */}
           <Card>
             <CardHeader>
@@ -557,65 +580,6 @@ export default function SettingsManager() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="currency" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Configuración de Moneda</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="currency">Moneda principal</Label>
-                <Select 
-                  value={settings.currency} 
-                  onValueChange={(value) => handleSettingChange('currency', value)}
-                >
-                  <SelectTrigger id="currency">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="MXN">MXN - Peso Mexicano ($)</SelectItem>
-                    <SelectItem value="EUR">EUR - Euro (€)</SelectItem>
-                    <SelectItem value="USD">USD - Dólar Americano ($)</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-sm text-muted-foreground">
-                  Moneda actual: {settings.currency} ({currencySymbols[settings.currency]})
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="ingredients" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Gestión de Ingredientes</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <Label htmlFor="ingredient-management">Activar gestión de ingredientes</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Permite personalizar ingredientes en los productos del menú
-                  </p>
-                </div>
-                <Switch
-                  id="ingredient-management"
-                  checked={settings.ingredientManagement}
-                  onCheckedChange={(checked) => handleSettingChange('ingredientManagement', checked)}
-                />
-              </div>
-              {settings.ingredientManagement && (
-                <div className="p-4 bg-muted rounded-lg">
-                  <p className="text-sm text-muted-foreground">
-                    La gestión de ingredientes está activa. Los productos del menú ahora incluyen 
-                    opciones para personalizar ingredientes durante la creación de órdenes.
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
     </div>
   );
