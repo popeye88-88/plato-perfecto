@@ -580,65 +580,6 @@ export default function SettingsManager() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="currency" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Configuración de Moneda</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="currency">Moneda principal</Label>
-                <Select 
-                  value={settings.currency} 
-                  onValueChange={(value) => handleSettingChange('currency', value)}
-                >
-                  <SelectTrigger id="currency">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="MXN">MXN - Peso Mexicano ($)</SelectItem>
-                    <SelectItem value="EUR">EUR - Euro (€)</SelectItem>
-                    <SelectItem value="USD">USD - Dólar Americano ($)</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-sm text-muted-foreground">
-                  Moneda actual: {settings.currency} ({currencySymbols[settings.currency]})
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="ingredients" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Gestión de Ingredientes</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <Label htmlFor="ingredient-management">Activar gestión de ingredientes</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Permite personalizar ingredientes en los productos del menú
-                  </p>
-                </div>
-                <Switch
-                  id="ingredient-management"
-                  checked={settings.ingredientManagement}
-                  onCheckedChange={(checked) => handleSettingChange('ingredientManagement', checked)}
-                />
-              </div>
-              {settings.ingredientManagement && (
-                <div className="p-4 bg-muted rounded-lg">
-                  <p className="text-sm text-muted-foreground">
-                    La gestión de ingredientes está activa. Los productos del menú ahora incluyen 
-                    opciones para personalizar ingredientes durante la creación de órdenes.
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
     </div>
   );
