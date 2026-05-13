@@ -83,10 +83,12 @@ export default function Dashboard() {
     setFilters(prev => ({ ...prev, [key]: value }));
   };
 
+  const [refreshKey, setRefreshKey] = useState(0);
+
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
-      if (!currentBusiness) {
+      if (!currentBusiness?.id) {
         setDataLoading(false);
         setAllOrders([]);
         return;
@@ -104,7 +106,19 @@ export default function Dashboard() {
     };
     load();
     return () => { cancelled = true; };
-  }, [currentBusiness]);
+    // Use primitive ids to avoid stale closures and ensure fetch runs on navigation
+  }, [currentBusiness?.id, refreshKey]);
+
+  // Refresh data when the browser tab regains focus
+  useEffect(() => {
+    const handleFocus = () => {
+      if (currentBusiness?.id) {
+        setRefreshKey(k => k + 1);
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [currentBusiness?.id]);
 
   useEffect(() => {
     const from = startOfDay(filters.dateRange.from);
