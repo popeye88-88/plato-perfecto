@@ -12,6 +12,7 @@ export async function fetchBusinesses() {
     name: b.name,
     description: b.description,
     createdAt: new Date(b.created_at),
+    enableEntregandoStage: b.enable_entregando_stage ?? true,
     menuItems: []
   }));
 }
