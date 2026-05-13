@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,7 +11,7 @@ import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import CategoryManager from './CategoryManager';
 import { useBusinessContext } from '@/contexts/BusinessContext';
-import { isSupabaseConfigured, fetchCategories, upsertMenuItems, upsertCategories } from '@/lib/supabase';
+import { fetchCategories, upsertMenuItems, upsertCategories } from '@/lib/supabase';
 import { COLOR_PRESETS, DEFAULT_COLOR, type ColorStyle } from '@/lib/menuItemColor';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
@@ -57,13 +57,6 @@ export default function MenuManager() {
   const [color, setColor] = useState<string | undefined>(undefined);
   const [colorStyle, setColorStyle] = useState<ColorStyle>('fill');
 
-  const categoriesStorageKey = useMemo(() => {
-    return currentBusiness?.id ? `categories_${currentBusiness.id}` : null;
-  }, [currentBusiness?.id]);
-
-  const menuItemsStorageKey = useMemo(() => {
-    return currentBusiness?.id ? `menuItems_${currentBusiness.id}` : null;
-  }, [currentBusiness?.id]);
 
   const recalcCategoryCounts = (cats: StoredCategory[], items: MenuItem[]): Category[] => {
     return cats.map(cat => ({
@@ -73,13 +66,9 @@ export default function MenuManager() {
   };
 
   const persistCategories = (cats: Category[]) => {
-    if (!categoriesStorageKey || !currentBusiness?.id) return;
+    if (!currentBusiness?.id) return;
     const categoriesToStore: StoredCategory[] = cats.map(({ id, name }) => ({ id, name }));
-    if (isSupabaseConfigured()) {
-      upsertCategories(currentBusiness.id, categoriesToStore);
-    } else {
-      localStorage.setItem(categoriesStorageKey, JSON.stringify(categoriesToStore));
-    }
+    upsertCategories(currentBusiness.id, categoriesToStore);
   };
 
   const updateCategories = (newCategories: Category[], items: MenuItem[] = menuItems) => {
@@ -90,12 +79,8 @@ export default function MenuManager() {
   };
 
   const persistMenuItems = (items: MenuItem[]) => {
-    if (!menuItemsStorageKey || !currentBusiness?.id) return;
-    if (isSupabaseConfigured()) {
-      upsertMenuItems(currentBusiness.id, items);
-    } else {
-      localStorage.setItem(menuItemsStorageKey, JSON.stringify(items));
-    }
+    if (!currentBusiness?.id) return;
+    upsertMenuItems(currentBusiness.id, items);
   };
 
   const syncMenuItems = (items: MenuItem[]) => {
@@ -107,26 +92,7 @@ export default function MenuManager() {
   };
 
   useEffect(() => {
-    const fallbackItems = currentBusiness?.menuItems || [];
-    let items = fallbackItems;
-
-    if (menuItemsStorageKey) {
-      if (isSupabaseConfigured()) {
-        items = fallbackItems;
-      } else {
-        const storedItems = localStorage.getItem(menuItemsStorageKey);
-        if (storedItems) {
-          try {
-            items = JSON.parse(storedItems);
-          } catch (error) {
-            console.error('Error parsing stored menu items:', error);
-          }
-        } else if (fallbackItems.length > 0) {
-          localStorage.setItem(menuItemsStorageKey, JSON.stringify(fallbackItems));
-        }
-      }
-    }
-
+    const items = currentBusiness?.menuItems || [];
     setMenuItems(items);
     setEditingItem(null);
     setFormData({ name: '', price: '', category: '', description: '' });
@@ -134,58 +100,37 @@ export default function MenuManager() {
     setSizes([]);
     setNewCategoryName('');
     setIsDialogOpen(false);
-  }, [currentBusiness, menuItemsStorageKey]);
+  }, [currentBusiness]);
 
   useEffect(() => {
-    if (!categoriesStorageKey || !currentBusiness?.id) {
+    if (!currentBusiness?.id) {
       setCategories([]);
       return;
     }
 
     const baseItems = menuItems;
     const loadCategories = async () => {
-      if (isSupabaseConfigured()) {
-        const dbCats = await fetchCategories(currentBusiness!.id);
-        let stored: StoredCategory[] = dbCats.map((c) => ({ id: c.id, name: c.name }));
-        if (stored.length === 0 && baseItems.length > 0) {
-          const derivedNames = Array.from(new Set(baseItems.map((item) => item.category)));
-          stored = derivedNames.map((name) => ({ id: name, name }));
-        }
-        const recalculated = recalcCategoryCounts(stored, baseItems);
-        setCategories(recalculated);
-        return;
+      const dbCats = await fetchCategories(currentBusiness.id);
+      let stored: StoredCategory[] = dbCats.map((c) => ({ id: c.id, name: c.name }));
+      if (stored.length === 0 && baseItems.length > 0) {
+        const derivedNames = Array.from(new Set(baseItems.map((item) => item.category)));
+        stored = derivedNames.map((name) => ({ id: name, name }));
       }
-      const savedCategories = localStorage.getItem(categoriesStorageKey);
-      if (savedCategories) {
-        try {
-          const parsed: StoredCategory[] = JSON.parse(savedCategories);
-          const recalculated = recalcCategoryCounts(parsed, baseItems);
-          setCategories(recalculated);
-          return;
-        } catch (error) {
-          console.error('Error parsing saved categories:', error);
-        }
-      }
-      const derivedNames = Array.from(new Set(baseItems.map((item) => item.category)));
-      const derivedCategories = recalcCategoryCounts(
-        derivedNames.map((name) => ({ id: name, name })),
-        baseItems
-      );
-      setCategories(derivedCategories);
-      persistCategories(derivedCategories);
+      const recalculated = recalcCategoryCounts(stored, baseItems);
+      setCategories(recalculated);
     };
     loadCategories();
-  }, [categoriesStorageKey, currentBusiness, menuItems]);
+  }, [currentBusiness, menuItems]);
 
   useEffect(() => {
-    if (!categoriesStorageKey) return;
+    if (!currentBusiness?.id) return;
     setCategories(prev => {
       const stored = prev.map(({ id, name }) => ({ id, name }));
       const recalculated = recalcCategoryCounts(stored, menuItems);
       persistCategories(recalculated);
       return recalculated;
     });
-  }, [menuItems, categoriesStorageKey]);
+  }, [menuItems, currentBusiness]);
 
   const handleCategoryChange = (value: string) => {
     if (value === 'nueva-categoria') {

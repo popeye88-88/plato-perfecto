@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,7 +12,7 @@ import { Plus, Minus, Clock, Truck, DollarSign, X, Edit2, History, Percent, Chec
 import { useToast } from '@/hooks/use-toast';
 import { useBusinessContext } from '@/contexts/BusinessContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { isSupabaseConfigured, fetchOrders as fetchOrdersDb, saveOrders as persistOrdersDb, generateOrderId } from '@/lib/supabase';
+import { fetchOrders as fetchOrdersDb, saveOrders as persistOrdersDb, generateOrderId } from '@/lib/supabase';
 import { getMenuItemCardStyle } from '@/lib/menuItemColor';
 
 interface OrderItem {
@@ -63,35 +63,14 @@ export default function OrderManager() {
   const { currentBusiness } = useBusinessContext();
   const { currentUser } = useAuth();
   
-  // Read entregando stage setting
-  const [enableEntregandoStage, setEnableEntregandoStage] = useState(() => {
-    const stored = localStorage.getItem('enableEntregandoStage');
-    return stored === null ? true : stored === 'true';
-  });
-
-  // Listen for changes to the setting (from SettingsManager)
-  useEffect(() => {
-    const handleStorageChange = () => {
-      const stored = localStorage.getItem('enableEntregandoStage');
-      setEnableEntregandoStage(stored === null ? true : stored === 'true');
-    };
-    window.addEventListener('storage', handleStorageChange);
-    // Also poll for same-tab changes
-    const interval = setInterval(handleStorageChange, 500);
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      clearInterval(interval);
-    };
-  }, []);
+  // Read entregando stage from current business (Supabase)
+  const enableEntregandoStage = currentBusiness?.enableEntregandoStage ?? true;
 
   // Helper: resolve the effective next status after 'preparando'
   const nextStatusAfterPreparando = enableEntregandoStage ? 'entregando' as const : 'cobrando' as const;
   
   // Get menu items from current business
   const menuItems = currentBusiness?.menuItems || [];
-  const ordersStorageKey = useMemo(() => {
-    return currentBusiness?.id ? `orders_${currentBusiness.id}` : null;
-  }, [currentBusiness?.id]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [activeTab, setActiveTab] = useState('resumen');
 
@@ -141,86 +120,19 @@ export default function OrderManager() {
   const [reduceQuantityReason, setReduceQuantityReason] = useState('');
   const [reduceQuantityReasons, setReduceQuantityReasons] = useState<Record<string, string>>({});
 
-  const parseStoredOrders = (rawOrders: string): Order[] => {
-      try {
-      const parsedOrders = JSON.parse(rawOrders).map((order: any) => {
-          const migrateStatus = (status: string) => {
-            if (status === 'entregado') return 'cobrando';
-            return status;
-          };
-          
-          if (order.individualItemsStatus) {
-            const migratedIndividualStatus: Record<string, 'preparando' | 'entregando' | 'cobrando'> = {};
-            Object.entries(order.individualItemsStatus).forEach(([key, status]) => {
-              if (typeof status === 'string') {
-                migratedIndividualStatus[key] = migrateStatus(status) as 'preparando' | 'entregando' | 'cobrando';
-              }
-            });
-            order.individualItemsStatus = migratedIndividualStatus;
-          }
-          
-          if (order.items) {
-            order.items = order.items.map((item: any) => ({
-              ...item,
-              status: migrateStatus(item.status)
-            }));
-          }
-          
-          return {
-            ...order,
-            createdAt: new Date(order.createdAt),
-            initialItems: Array.isArray(order.initialItems)
-              ? order.initialItems
-              : Array.isArray(order.items)
-                ? order.items
-                    .filter((i: any) => !i?.cancelled)
-                    .map((i: any) => ({
-                      id: i.id,
-                      name: i.name,
-                      price: i.price,
-                      quantity: i.originalQuantity ?? i.quantity
-                    }))
-                : []
-          };
-        });
-
-      return Array.isArray(parsedOrders) ? parsedOrders : [];
-      } catch (error) {
-        console.error('Error parsing saved orders:', error);
-      return [];
-    }
-  };
-
-  // Load orders for the current business (Supabase or localStorage)
+  // Load orders for the current business from Supabase
   useEffect(() => {
-    if (!ordersStorageKey || !currentBusiness?.id) {
+    if (!currentBusiness?.id) {
       setOrders([]);
       return;
     }
 
     const load = async () => {
-      if (isSupabaseConfigured()) {
-        const data = await fetchOrdersDb(currentBusiness!.id);
-        setOrders(data);
-        return;
-      }
-      const savedOrders = localStorage.getItem(ordersStorageKey);
-      if (savedOrders) {
-        setOrders(parseStoredOrders(savedOrders));
-        return;
-      }
-      const legacyOrders = localStorage.getItem('orders');
-      if (legacyOrders && currentBusiness?.id === 'business-mi-restaurante') {
-        const migratedOrders = parseStoredOrders(legacyOrders);
-        setOrders(migratedOrders);
-        localStorage.setItem(ordersStorageKey, JSON.stringify(migratedOrders));
-        localStorage.removeItem('orders');
-        return;
-      }
-      setOrders([]);
+      const data = await fetchOrdersDb(currentBusiness.id);
+      setOrders(data);
     };
     load();
-  }, [ordersStorageKey, currentBusiness?.id]);
+  }, [currentBusiness?.id]);
 
   // Update selectedOrderForEdit when orders change
   useEffect(() => {
@@ -244,17 +156,13 @@ export default function OrderManager() {
     setIsPaymentOpen(false);
     setLocalEditQuantities({});
     setReduceQuantityReasons({});
-  }, [ordersStorageKey]);
+  }, [currentBusiness?.id]);
 
-  // Save orders (Supabase or localStorage)
+  // Save orders to Supabase
   const saveOrders = (newOrders: Order[]) => {
     setOrders(newOrders);
-    if (!ordersStorageKey || !currentBusiness?.id) return;
-    if (isSupabaseConfigured()) {
-      persistOrdersDb(currentBusiness.id, newOrders);
-    } else {
-      localStorage.setItem(ordersStorageKey, JSON.stringify(newOrders));
-    }
+    if (!currentBusiness?.id) return;
+    persistOrdersDb(currentBusiness.id, newOrders);
   };
 
   // Add entry to edit history
@@ -269,7 +177,7 @@ export default function OrderManager() {
 
   // Clear all orders for testing
   const clearAllOrders = () => {
-    if (!ordersStorageKey) {
+    if (!currentBusiness?.id) {
       toast({
         title: "Negocio no seleccionado",
         description: "Selecciona un negocio para administrar sus órdenes.",
@@ -278,8 +186,7 @@ export default function OrderManager() {
       return;
     }
 
-    setOrders([]);
-    localStorage.removeItem(ordersStorageKey);
+    saveOrders([]);
     toast({
       title: "Órdenes eliminadas",
       description: "Todas las órdenes han sido eliminadas para testing",
@@ -434,7 +341,7 @@ export default function OrderManager() {
   };
 
   const createNewOrder = () => {
-    if (!currentBusiness || !ordersStorageKey) {
+    if (!currentBusiness) {
       toast({
         title: "Negocio no disponible",
         description: "Selecciona un negocio para crear órdenes.",
@@ -470,7 +377,7 @@ export default function OrderManager() {
     });
 
     const newOrder: Order = {
-      id: isSupabaseConfigured() ? generateOrderId() : Date.now().toString(),
+      id: generateOrderId(),
       number: `ORD-${orders.length + 1}`,
       customerName: newOrderForm.customerName,
       serviceType: newOrderForm.serviceType,
