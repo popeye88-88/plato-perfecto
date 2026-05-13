@@ -1443,16 +1443,6 @@ export default function OrderManager() {
             </div>
           </DialogContent>
         </Dialog>
-          
-          <Button 
-            variant="outline" 
-            onClick={clearAllOrders}
-            className="text-red-600 border-red-600 hover:bg-red-50 w-full sm:w-auto"
-            disabled={!currentBusiness}
-          >
-            <X className="h-4 w-4 mr-2" />
-            Limpiar Órdenes
-          </Button>
         </div>
       </div>
 
