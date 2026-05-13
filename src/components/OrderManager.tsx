@@ -156,7 +156,7 @@ export default function OrderManager() {
     setIsPaymentOpen(false);
     setLocalEditQuantities({});
     setReduceQuantityReasons({});
-  }, [ordersStorageKey]);
+  }, [currentBusiness?.id]);
 
   // Save orders to Supabase
   const saveOrders = (newOrders: Order[]) => {
