@@ -341,7 +341,7 @@ export default function OrderManager() {
   };
 
   const createNewOrder = () => {
-    if (!currentBusiness || !ordersStorageKey) {
+    if (!currentBusiness) {
       toast({
         title: "Negocio no disponible",
         description: "Selecciona un negocio para crear órdenes.",
