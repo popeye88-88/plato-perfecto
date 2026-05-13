@@ -211,15 +211,11 @@ export default function OrderManager() {
     setReduceQuantityReasons({});
   }, [ordersStorageKey]);
 
-  // Save orders (Supabase or localStorage)
+  // Save orders to Supabase
   const saveOrders = (newOrders: Order[]) => {
     setOrders(newOrders);
-    if (!ordersStorageKey || !currentBusiness?.id) return;
-    if (isSupabaseConfigured()) {
-      persistOrdersDb(currentBusiness.id, newOrders);
-    } else {
-      localStorage.setItem(ordersStorageKey, JSON.stringify(newOrders));
-    }
+    if (!currentBusiness?.id) return;
+    persistOrdersDb(currentBusiness.id, newOrders);
   };
 
   // Add entry to edit history
@@ -234,7 +230,7 @@ export default function OrderManager() {
 
   // Clear all orders for testing
   const clearAllOrders = () => {
-    if (!ordersStorageKey) {
+    if (!currentBusiness?.id) {
       toast({
         title: "Negocio no seleccionado",
         description: "Selecciona un negocio para administrar sus órdenes.",
@@ -243,8 +239,7 @@ export default function OrderManager() {
       return;
     }
 
-    setOrders([]);
-    localStorage.removeItem(ordersStorageKey);
+    saveOrders([]);
     toast({
       title: "Órdenes eliminadas",
       description: "Todas las órdenes han sido eliminadas para testing",
