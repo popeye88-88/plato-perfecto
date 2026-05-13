@@ -158,11 +158,38 @@ export default function OrderManager() {
     setReduceQuantityReasons({});
   }, [currentBusiness?.id]);
 
-  // Save orders to Supabase
+  // Save a single order to Supabase with error handling
+  const saveOrderToDb = async (order: Order) => {
+    if (!currentBusiness?.id) return;
+    try {
+      const success = await persistOrdersDb(currentBusiness.id, [order]);
+      if (!success) {
+        toast({
+          title: "Error al guardar",
+          description: "No se pudo guardar la orden. Intenta de nuevo.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Error saving order:', error);
+      toast({
+        title: "Error al guardar",
+        description: "No se pudo guardar la orden. Intenta de nuevo.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Save orders to Supabase (only the ones that changed)
   const saveOrders = (newOrders: Order[]) => {
+    const previousOrders = orders;
     setOrders(newOrders);
     if (!currentBusiness?.id) return;
-    persistOrdersDb(currentBusiness.id, newOrders);
+    const changedOrders = newOrders.filter(newOrder => {
+      const prev = previousOrders.find(o => o.id === newOrder.id);
+      return !prev || JSON.stringify(prev) !== JSON.stringify(newOrder);
+    });
+    changedOrders.forEach(order => saveOrderToDb(order));
   };
 
   // Add entry to edit history
@@ -523,7 +550,7 @@ export default function OrderManager() {
     });
   };
 
-  const processPayment = () => {
+  const processPayment = async () => {
     if (!selectedOrderForPayment || !paymentMethod) {
       toast({
         title: "Error",
@@ -533,23 +560,47 @@ export default function OrderManager() {
       return;
     }
 
-    const updatedOrders = orders.map(order => 
-      order.id === selectedOrderForPayment.id 
-            ? { 
-                ...order, 
+    const updatedOrders = orders.map(order =>
+      order.id === selectedOrderForPayment.id
+        ? {
+            ...order,
             status: 'pagado' as const,
             paymentMethod,
             edited: true
-              }
-            : order
-      );
-    
-    saveOrders(updatedOrders);
+          }
+        : order
+    );
+
+    setOrders(updatedOrders);
+
+    const paidOrder = updatedOrders.find(o => o.id === selectedOrderForPayment.id);
+    if (paidOrder && currentBusiness?.id) {
+      try {
+        const success = await persistOrdersDb(currentBusiness.id, [paidOrder]);
+        if (!success) {
+          toast({
+            title: "Error al procesar pago",
+            description: "El pago no se pudo guardar. Intenta de nuevo.",
+            variant: "destructive"
+          });
+          return;
+        }
+      } catch (error) {
+        console.error('Error processing payment:', error);
+        toast({
+          title: "Error al procesar pago",
+          description: "El pago no se pudo guardar. Intenta de nuevo.",
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+
     setIsPaymentOpen(false);
     setPaymentMethod('');
     setSelectedOrderForPayment(null);
-      
-      toast({
+
+    toast({
       title: "Pago procesado",
       description: `Orden pagada con ${paymentMethod === 'tarjeta' ? 'tarjeta' : 'efectivo'}`
     });
