@@ -5,16 +5,27 @@ import { supabase } from '@/integrations/supabase/client';
 
 // Businesses
 export async function fetchBusinesses() {
-  const { data, error } = await supabase.from('businesses').select('*').order('created_at', { ascending: true });
-  if (error) return [];
-  return (data || []).map((b: any) => ({
-    id: b.id,
-    name: b.name,
-    description: b.description,
-    createdAt: new Date(b.created_at),
-    enableEntregandoStage: b.enable_entregando_stage ?? true,
-    menuItems: []
-  }));
+  try {
+    const { data, error } = await supabase
+      .from('businesses')
+      .select('*')
+      .order('created_at', { ascending: true });
+    if (error) {
+      console.error('fetchBusinessesDb error:', error);
+      return [];
+    }
+    return (data || []).map((b: any) => ({
+      id: b.id,
+      name: b.name,
+      description: b.description,
+      createdAt: new Date(b.created_at),
+      enableEntregandoStage: b.enable_entregando_stage ?? true,
+      menuItems: []
+    }));
+  } catch (error) {
+    console.error('fetchBusinessesDb exception:', error);
+    return [];
+  }
 }
 
 export async function insertBusiness(business: { id: string; name: string; description?: string }) {

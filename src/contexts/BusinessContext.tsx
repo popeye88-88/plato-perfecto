@@ -80,9 +80,12 @@ export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     const load = async () => {
       try {
-        const { data: memberships } = await supabase
+        const { data: memberships, error: membErr } = await supabase
           .from('business_members')
           .select('business_id, user_id, role');
+
+        if (membErr) throw membErr;
+
         const accessData = (memberships || []).map((m) => ({
           businessId: m.business_id,
           userId: m.user_id,
@@ -92,18 +95,26 @@ export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
         const businessesData = await fetchBusinessesDb();
         const userBusinessIds = accessData
-          .filter((a) => a.userId === currentUser.id)
+          .filter((a) => a.userId === currentUser!.id)
           .map((a) => a.businessId);
-        const userBizData = businessesData.filter((b) => userBusinessIds.includes(b.id));
+        const userBizData = (businessesData || []).filter((b) =>
+          userBusinessIds.includes(b.id)
+        );
+
         const withMenuItems = await Promise.all(
           userBizData.map(async (b) => {
-            const items = await fetchMenuItems(b.id);
-            return { ...b, menuItems: items };
+            try {
+              const items = await fetchMenuItems(b.id);
+              return { ...b, menuItems: items || [] };
+            } catch {
+              return { ...b, menuItems: [] };
+            }
           })
         );
+
         setBusinesses(withMenuItems);
 
-        const savedCurrent = localStorage.getItem(`currentBusiness_${currentUser.id}`);
+        const savedCurrent = localStorage.getItem(`currentBusiness_${currentUser!.id}`);
         const parsed = savedCurrent
           ? (() => { try { return JSON.parse(savedCurrent); } catch { return null; } })()
           : null;
@@ -111,6 +122,8 @@ export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         setCurrentBusiness(found ?? withMenuItems[0] ?? null);
       } catch (error) {
         console.error('BusinessProvider load error:', error);
+        setBusinesses([]);
+        setCurrentBusiness(null);
       } finally {
         setLoading(false);
       }
