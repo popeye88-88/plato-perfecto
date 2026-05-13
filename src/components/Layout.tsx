@@ -2,26 +2,24 @@ import { ReactNode, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Menu, Settings, ClipboardList, BarChart3, ChefHat } from 'lucide-react';
-import type { BusinessRole } from '@/contexts/BusinessContext';
 
 interface LayoutProps {
   children: ReactNode;
   currentPage: string;
   onPageChange: (page: string) => void;
-  currentUserRole?: BusinessRole;
-  isStaff?: boolean;
+  canViewDashboard?: boolean;
 }
 
 const allNavItems = [
-  { id: 'dashboard', label: 'Dashboard', icon: BarChart3, staffHidden: true },
-  { id: 'menu', label: 'Menú', icon: ChefHat, staffHidden: false },
-  { id: 'orders', label: 'Comandas', icon: ClipboardList, staffHidden: false },
-  { id: 'settings', label: 'Ajustes', icon: Settings, staffHidden: false },
+  { id: 'dashboard', label: 'Dashboard', icon: BarChart3, requiresDashboard: true },
+  { id: 'menu', label: 'Menú', icon: ChefHat, requiresDashboard: false },
+  { id: 'orders', label: 'Comandas', icon: ClipboardList, requiresDashboard: false },
+  { id: 'settings', label: 'Ajustes', icon: Settings, requiresDashboard: false },
 ];
 
-export default function Layout({ children, currentPage, onPageChange, isStaff }: LayoutProps) {
+export default function Layout({ children, currentPage, onPageChange, canViewDashboard = true }: LayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Start closed on mobile
-  const navigation = isStaff ? allNavItems.filter(item => !item.staffHidden) : allNavItems;
+  const navigation = canViewDashboard ? allNavItems : allNavItems.filter(item => !item.requiresDashboard);
 
   return (
     <div className="min-h-screen bg-gradient-subtle">

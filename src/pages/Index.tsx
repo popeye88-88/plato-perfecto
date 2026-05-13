@@ -5,26 +5,23 @@ import MenuManager from '@/components/MenuManager';
 import OrderManager from '@/components/OrderManager';
 import SettingsManager from '@/components/SettingsManager';
 import Login from '@/components/Login';
-import { BusinessProvider, useBusinessContext } from '@/contexts/BusinessContext';
+import { BusinessProvider } from '@/contexts/BusinessContext';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { usePermissions } from '@/hooks/usePermissions';
 
 const AppContentInner = () => {
-  const { currentBusiness, getUserRole } = useBusinessContext();
-  const { currentUser } = useAuth();
+  const { can } = usePermissions();
   const [currentPage, setCurrentPage] = useState('dashboard');
 
-  const role = currentBusiness && currentUser ? getUserRole(currentBusiness.id, currentUser.id) : undefined;
-  const isStaff = role === 'staff';
-
-  // Staff no puede ver dashboard: redirigir a menú si lo intenta
+  // Redirect users without dashboard access
   useEffect(() => {
-    if (isStaff && currentPage === 'dashboard') {
-      setCurrentPage('menu');
+    if (!can.viewDashboard && currentPage === 'dashboard') {
+      setCurrentPage('orders');
     }
-  }, [isStaff, currentPage]);
+  }, [can.viewDashboard, currentPage]);
 
   const renderPage = () => {
-    const page = isStaff && currentPage === 'dashboard' ? 'menu' : currentPage;
+    const page = !can.viewDashboard && currentPage === 'dashboard' ? 'orders' : currentPage;
     switch (page) {
       case 'dashboard':
         return <Dashboard />;
@@ -35,12 +32,12 @@ const AppContentInner = () => {
       case 'settings':
         return <SettingsManager />;
       default:
-        return isStaff ? <MenuManager /> : <Dashboard />;
+        return can.viewDashboard ? <Dashboard /> : <OrderManager />;
     }
   };
 
   return (
-    <Layout currentPage={currentPage} onPageChange={setCurrentPage} isStaff={isStaff}>
+    <Layout currentPage={currentPage} onPageChange={setCurrentPage} canViewDashboard={can.viewDashboard}>
       {renderPage()}
     </Layout>
   );
