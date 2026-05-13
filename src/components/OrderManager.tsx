@@ -550,7 +550,7 @@ export default function OrderManager() {
     });
   };
 
-  const processPayment = () => {
+  const processPayment = async () => {
     if (!selectedOrderForPayment || !paymentMethod) {
       toast({
         title: "Error",
@@ -560,23 +560,47 @@ export default function OrderManager() {
       return;
     }
 
-    const updatedOrders = orders.map(order => 
-      order.id === selectedOrderForPayment.id 
-            ? { 
-                ...order, 
+    const updatedOrders = orders.map(order =>
+      order.id === selectedOrderForPayment.id
+        ? {
+            ...order,
             status: 'pagado' as const,
             paymentMethod,
             edited: true
-              }
-            : order
-      );
-    
-    saveOrders(updatedOrders);
+          }
+        : order
+    );
+
+    setOrders(updatedOrders);
+
+    const paidOrder = updatedOrders.find(o => o.id === selectedOrderForPayment.id);
+    if (paidOrder && currentBusiness?.id) {
+      try {
+        const success = await persistOrdersDb(currentBusiness.id, [paidOrder]);
+        if (!success) {
+          toast({
+            title: "Error al procesar pago",
+            description: "El pago no se pudo guardar. Intenta de nuevo.",
+            variant: "destructive"
+          });
+          return;
+        }
+      } catch (error) {
+        console.error('Error processing payment:', error);
+        toast({
+          title: "Error al procesar pago",
+          description: "El pago no se pudo guardar. Intenta de nuevo.",
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+
     setIsPaymentOpen(false);
     setPaymentMethod('');
     setSelectedOrderForPayment(null);
-      
-      toast({
+
+    toast({
       title: "Pago procesado",
       description: `Orden pagada con ${paymentMethod === 'tarjeta' ? 'tarjeta' : 'efectivo'}`
     });
