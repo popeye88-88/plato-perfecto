@@ -63,26 +63,8 @@ export default function OrderManager() {
   const { currentBusiness } = useBusinessContext();
   const { currentUser } = useAuth();
   
-  // Read entregando stage setting
-  const [enableEntregandoStage, setEnableEntregandoStage] = useState(() => {
-    const stored = localStorage.getItem('enableEntregandoStage');
-    return stored === null ? true : stored === 'true';
-  });
-
-  // Listen for changes to the setting (from SettingsManager)
-  useEffect(() => {
-    const handleStorageChange = () => {
-      const stored = localStorage.getItem('enableEntregandoStage');
-      setEnableEntregandoStage(stored === null ? true : stored === 'true');
-    };
-    window.addEventListener('storage', handleStorageChange);
-    // Also poll for same-tab changes
-    const interval = setInterval(handleStorageChange, 500);
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      clearInterval(interval);
-    };
-  }, []);
+  // Read entregando stage from current business (Supabase)
+  const enableEntregandoStage = currentBusiness?.enableEntregandoStage ?? true;
 
   // Helper: resolve the effective next status after 'preparando'
   const nextStatusAfterPreparando = enableEntregandoStage ? 'entregando' as const : 'cobrando' as const;
