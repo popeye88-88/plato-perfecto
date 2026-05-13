@@ -100,7 +100,7 @@ export default function MenuManager() {
     setSizes([]);
     setNewCategoryName('');
     setIsDialogOpen(false);
-  }, [currentBusiness, menuItemsStorageKey]);
+  }, [currentBusiness]);
 
   useEffect(() => {
     if (!currentBusiness?.id) {
