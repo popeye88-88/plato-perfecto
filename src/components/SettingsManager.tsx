@@ -437,6 +437,37 @@ export default function SettingsManager() {
             </CardContent>
           </Card>
 
+          {/* Currency Settings */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <DollarSign className="h-5 w-5" />
+                Moneda
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="currency">Moneda principal</Label>
+                <Select
+                  value={settings.currency}
+                  onValueChange={(value) => handleSettingChange('currency', value)}
+                >
+                  <SelectTrigger id="currency">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="MXN">MXN - Peso Mexicano ($)</SelectItem>
+                    <SelectItem value="EUR">EUR - Euro (€)</SelectItem>
+                    <SelectItem value="USD">USD - Dólar Americano ($)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-sm text-muted-foreground">
+                  Moneda actual: {settings.currency} ({currencySymbols[settings.currency]})
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Business List */}
           <Card>
             <CardHeader>
