@@ -428,14 +428,11 @@ export default function SettingsManager() {
                   </p>
                 </div>
                 <Switch
-                  checked={(() => {
-                    const stored = localStorage.getItem('enableEntregandoStage');
-                    return stored === null ? true : stored === 'true';
-                  })()}
+                  checked={currentBusiness?.enableEntregandoStage ?? true}
+                  disabled={!currentBusiness}
                   onCheckedChange={(checked) => {
-                    localStorage.setItem('enableEntregandoStage', String(checked));
-                    // Force re-render
-                    setSettings(prev => ({ ...prev }));
+                    if (!currentBusiness) return;
+                    updateBusiness(currentBusiness.id, { enableEntregandoStage: checked });
                     toast({
                       title: checked ? "Etapa activada" : "Etapa desactivada",
                       description: checked
