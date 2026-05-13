@@ -333,6 +333,8 @@ export default function MenuManager() {
             </Button>
           </div>
         )}
+      </div>
+
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
