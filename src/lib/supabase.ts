@@ -26,8 +26,9 @@ export async function insertBusiness(business: { id: string; name: string; descr
   return error ? null : business;
 }
 
-export async function updateBusinessDb(id: string, updates: { name?: string; description?: string }) {
+export async function updateBusinessDb(id: string, updates: { name?: string; description?: string; enable_entregando_stage?: boolean }) {
   const { error } = await supabase.from('businesses').update(updates).eq('id', id);
+  if (error) console.error('updateBusinessDb error:', error);
   return !error;
 }
 
