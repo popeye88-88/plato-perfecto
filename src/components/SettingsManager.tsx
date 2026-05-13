@@ -156,7 +156,7 @@ export default function SettingsManager() {
       </div>
 
       <Tabs defaultValue="business" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="business" className="flex items-center gap-2">
             <Building2 className="h-4 w-4" />
             <span className="hidden sm:inline">Negocio</span>
@@ -168,14 +168,6 @@ export default function SettingsManager() {
           <TabsTrigger value="language" className="flex items-center gap-2">
             <Globe className="h-4 w-4" />
             <span className="hidden sm:inline">Idioma</span>
-          </TabsTrigger>
-          <TabsTrigger value="currency" className="flex items-center gap-2">
-            <DollarSign className="h-4 w-4" />
-            <span className="hidden sm:inline">Moneda</span>
-          </TabsTrigger>
-          <TabsTrigger value="ingredients" className="flex items-center gap-2">
-            <ChefHat className="h-4 w-4" />
-            <span className="hidden sm:inline">Ingredientes</span>
           </TabsTrigger>
         </TabsList>
 
