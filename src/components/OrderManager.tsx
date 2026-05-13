@@ -164,19 +164,10 @@ export default function OrderManager() {
     try {
       const success = await persistOrdersDb(currentBusiness.id, [order]);
       if (!success) {
-        toast({
-          title: "Error al guardar",
-          description: "No se pudo guardar la orden. Intenta de nuevo.",
-          variant: "destructive"
-        });
+        console.error('persistOrdersDb returned false for order:', order.id);
       }
     } catch (error) {
-      console.error('Error saving order:', error);
-      toast({
-        title: "Error al guardar",
-        description: "No se pudo guardar la orden. Intenta de nuevo.",
-        variant: "destructive"
-      });
+      console.error('Full error saving order:', JSON.stringify(error, null, 2));
     }
   };
 
