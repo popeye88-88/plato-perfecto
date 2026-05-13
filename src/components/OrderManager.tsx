@@ -173,36 +173,19 @@ export default function OrderManager() {
     }
   };
 
-  // Load orders for the current business (Supabase or localStorage)
+  // Load orders for the current business from Supabase
   useEffect(() => {
-    if (!ordersStorageKey || !currentBusiness?.id) {
+    if (!currentBusiness?.id) {
       setOrders([]);
       return;
     }
 
     const load = async () => {
-      if (isSupabaseConfigured()) {
-        const data = await fetchOrdersDb(currentBusiness!.id);
-        setOrders(data);
-        return;
-      }
-      const savedOrders = localStorage.getItem(ordersStorageKey);
-      if (savedOrders) {
-        setOrders(parseStoredOrders(savedOrders));
-        return;
-      }
-      const legacyOrders = localStorage.getItem('orders');
-      if (legacyOrders && currentBusiness?.id === 'business-mi-restaurante') {
-        const migratedOrders = parseStoredOrders(legacyOrders);
-        setOrders(migratedOrders);
-        localStorage.setItem(ordersStorageKey, JSON.stringify(migratedOrders));
-        localStorage.removeItem('orders');
-        return;
-      }
-      setOrders([]);
+      const data = await fetchOrdersDb(currentBusiness.id);
+      setOrders(data);
     };
     load();
-  }, [ordersStorageKey, currentBusiness?.id]);
+  }, [currentBusiness?.id]);
 
   // Update selectedOrderForEdit when orders change
   useEffect(() => {
