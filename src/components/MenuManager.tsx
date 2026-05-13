@@ -73,13 +73,9 @@ export default function MenuManager() {
   };
 
   const persistCategories = (cats: Category[]) => {
-    if (!categoriesStorageKey || !currentBusiness?.id) return;
+    if (!currentBusiness?.id) return;
     const categoriesToStore: StoredCategory[] = cats.map(({ id, name }) => ({ id, name }));
-    if (isSupabaseConfigured()) {
-      upsertCategories(currentBusiness.id, categoriesToStore);
-    } else {
-      localStorage.setItem(categoriesStorageKey, JSON.stringify(categoriesToStore));
-    }
+    upsertCategories(currentBusiness.id, categoriesToStore);
   };
 
   const updateCategories = (newCategories: Category[], items: MenuItem[] = menuItems) => {
@@ -90,12 +86,8 @@ export default function MenuManager() {
   };
 
   const persistMenuItems = (items: MenuItem[]) => {
-    if (!menuItemsStorageKey || !currentBusiness?.id) return;
-    if (isSupabaseConfigured()) {
-      upsertMenuItems(currentBusiness.id, items);
-    } else {
-      localStorage.setItem(menuItemsStorageKey, JSON.stringify(items));
-    }
+    if (!currentBusiness?.id) return;
+    upsertMenuItems(currentBusiness.id, items);
   };
 
   const syncMenuItems = (items: MenuItem[]) => {
