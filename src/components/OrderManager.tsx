@@ -71,9 +71,6 @@ export default function OrderManager() {
   
   // Get menu items from current business
   const menuItems = currentBusiness?.menuItems || [];
-  const ordersStorageKey = useMemo(() => {
-    return currentBusiness?.id ? `orders_${currentBusiness.id}` : null;
-  }, [currentBusiness?.id]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [activeTab, setActiveTab] = useState('resumen');
 
