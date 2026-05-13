@@ -1,16 +1,10 @@
 import { supabase } from '@/integrations/supabase/client';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-
-export const isSupabaseConfigured = () =>
-  !!SUPABASE_URL && !!SUPABASE_KEY && SUPABASE_URL !== 'https://your-project.supabase.co';
 
 // App Users - removed: now using Supabase Auth (supabase.auth.signInWithPassword)
 
 // Businesses
 export async function fetchBusinesses() {
-  if (!isSupabaseConfigured()) return [];
   const { data, error } = await supabase.from('businesses').select('*').order('created_at', { ascending: true });
   if (error) return [];
   return (data || []).map((b: any) => ({
@@ -23,7 +17,6 @@ export async function fetchBusinesses() {
 }
 
 export async function insertBusiness(business: { id: string; name: string; description?: string }) {
-  if (!isSupabaseConfigured()) return null;
   const { error } = await supabase.from('businesses').insert({
     id: business.id,
     name: business.name,
@@ -33,13 +26,11 @@ export async function insertBusiness(business: { id: string; name: string; descr
 }
 
 export async function updateBusinessDb(id: string, updates: { name?: string; description?: string }) {
-  if (!isSupabaseConfigured()) return false;
   const { error } = await supabase.from('businesses').update(updates).eq('id', id);
   return !error;
 }
 
 export async function deleteBusinessDb(id: string) {
-  if (!isSupabaseConfigured()) return false;
   const { error } = await supabase.from('businesses').delete().eq('id', id);
   return !error;
 }
@@ -81,7 +72,6 @@ interface OrderItemRow {
 }
 
 export async function fetchOrders(businessId: string) {
-  if (!isSupabaseConfigured()) return [];
   const { data: ordersData, error: ordersError } = await supabase
     .from('orders')
     .select('*')
@@ -162,7 +152,6 @@ export async function saveOrders(businessId: string, orders: Array<{
   initialItems?: Array<{ id: string; name: string; price: number; quantity: number }>;
   editHistory?: Array<{ timestamp: Date; action: string; stage: string; itemName?: string; quantity?: number; details?: string; userId?: string }>;
 }>) {
-  if (!isSupabaseConfigured()) return false;
   for (const order of orders) {
     const orderRow = {
       id: order.id,
@@ -218,7 +207,6 @@ export function generateOrderId() {
 
 // Menu Items
 export async function fetchMenuItems(businessId: string) {
-  if (!isSupabaseConfigured()) return [];
   const { data, error } = await supabase
     .from('menu_items')
     .select('*')
@@ -239,7 +227,6 @@ export async function fetchMenuItems(businessId: string) {
 }
 
 export async function upsertMenuItems(businessId: string, items: Array<{ id: string; name: string; price: number; category: string; description?: string; hasSizes?: boolean; sizes?: { id: string; name: string; price: number }[]; color?: string; colorStyle?: 'fill' | 'border' }>) {
-  if (!isSupabaseConfigured()) return false;
   await supabase.from('menu_items').delete().eq('business_id', businessId);
   if (items.length === 0) return true;
   const rows = items.map((item) => ({
@@ -260,7 +247,6 @@ export async function upsertMenuItems(businessId: string, items: Array<{ id: str
 
 // Categories
 export async function fetchCategories(businessId: string) {
-  if (!isSupabaseConfigured()) return [];
   const { data, error } = await supabase
     .from('categories')
     .select('*')
@@ -275,7 +261,6 @@ export async function fetchCategories(businessId: string) {
 }
 
 export async function upsertCategories(businessId: string, categories: Array<{ id: string; name: string }>) {
-  if (!isSupabaseConfigured()) return false;
   await supabase.from('categories').delete().eq('business_id', businessId);
   if (categories.length === 0) return true;
   const rows = categories.map((c) => ({
