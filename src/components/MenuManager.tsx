@@ -123,14 +123,14 @@ export default function MenuManager() {
   }, [currentBusiness, menuItems]);
 
   useEffect(() => {
-    if (!categoriesStorageKey) return;
+    if (!currentBusiness?.id) return;
     setCategories(prev => {
       const stored = prev.map(({ id, name }) => ({ id, name }));
       const recalculated = recalcCategoryCounts(stored, menuItems);
       persistCategories(recalculated);
       return recalculated;
     });
-  }, [menuItems, categoriesStorageKey]);
+  }, [menuItems, currentBusiness]);
 
   const handleCategoryChange = (value: string) => {
     if (value === 'nueva-categoria') {
