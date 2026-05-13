@@ -177,7 +177,10 @@ export async function saveOrders(businessId: string, orders: Array<{
       })) || null
     };
     const { error: orderError } = await supabase.from('orders').upsert(orderRow, { onConflict: 'id' });
-    if (orderError) return false;
+    if (orderError) {
+      console.error('Order upsert error:', JSON.stringify(orderError, null, 2));
+      return false;
+    }
 
     await supabase.from('order_items').delete().eq('order_id', order.id);
     if (order.items.length > 0) {
