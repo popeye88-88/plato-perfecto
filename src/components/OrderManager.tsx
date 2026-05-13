@@ -12,7 +12,7 @@ import { Plus, Minus, Clock, Truck, DollarSign, X, Edit2, History, Percent, Chec
 import { useToast } from '@/hooks/use-toast';
 import { useBusinessContext } from '@/contexts/BusinessContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { isSupabaseConfigured, fetchOrders as fetchOrdersDb, saveOrders as persistOrdersDb, generateOrderId } from '@/lib/supabase';
+import { fetchOrders as fetchOrdersDb, saveOrders as persistOrdersDb, generateOrderId } from '@/lib/supabase';
 import { getMenuItemCardStyle } from '@/lib/menuItemColor';
 
 interface OrderItem {
