@@ -1,0 +1,1 @@
+ALTER TABLE public.businesses ADD COLUMN IF NOT EXISTS enable_entregando_stage boolean NOT NULL DEFAULT true;
