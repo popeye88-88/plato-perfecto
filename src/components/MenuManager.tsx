@@ -57,13 +57,6 @@ export default function MenuManager() {
   const [color, setColor] = useState<string | undefined>(undefined);
   const [colorStyle, setColorStyle] = useState<ColorStyle>('fill');
 
-  const categoriesStorageKey = useMemo(() => {
-    return currentBusiness?.id ? `categories_${currentBusiness.id}` : null;
-  }, [currentBusiness?.id]);
-
-  const menuItemsStorageKey = useMemo(() => {
-    return currentBusiness?.id ? `menuItems_${currentBusiness.id}` : null;
-  }, [currentBusiness?.id]);
 
   const recalcCategoryCounts = (cats: StoredCategory[], items: MenuItem[]): Category[] => {
     return cats.map(cat => ({
