@@ -175,6 +175,130 @@ export type Database = {
         }
         Relationships: []
       }
+      order_items: {
+        Row: {
+          cancellation_reason: string | null
+          cancelled: boolean
+          cancelled_at: string | null
+          cancelled_in_stage: string | null
+          created_at: string
+          id: string
+          name: string
+          order_id: string
+          original_quantity: number | null
+          price: number
+          quantity: number
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          cancellation_reason?: string | null
+          cancelled?: boolean
+          cancelled_at?: string | null
+          cancelled_in_stage?: string | null
+          created_at?: string
+          id: string
+          name: string
+          order_id: string
+          original_quantity?: number | null
+          price?: number
+          quantity?: number
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          cancellation_reason?: string | null
+          cancelled?: boolean
+          cancelled_at?: string | null
+          cancelled_in_stage?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          order_id?: string
+          original_quantity?: number | null
+          price?: number
+          quantity?: number
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      orders: {
+        Row: {
+          business_id: string
+          created_at: string
+          customer_name: string
+          diners: number | null
+          discount_amount: number | null
+          discount_reason: string | null
+          edit_history: Json | null
+          edited: boolean
+          id: string
+          individual_items_status: Json | null
+          initial_items: Json | null
+          number: string
+          payment_method: string | null
+          service_type: string | null
+          status: string
+          total: number
+          updated_at: string
+        }
+        Insert: {
+          business_id: string
+          created_at?: string
+          customer_name: string
+          diners?: number | null
+          discount_amount?: number | null
+          discount_reason?: string | null
+          edit_history?: Json | null
+          edited?: boolean
+          id: string
+          individual_items_status?: Json | null
+          initial_items?: Json | null
+          number: string
+          payment_method?: string | null
+          service_type?: string | null
+          status: string
+          total?: number
+          updated_at?: string
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          customer_name?: string
+          diners?: number | null
+          discount_amount?: number | null
+          discount_reason?: string | null
+          edit_history?: Json | null
+          edited?: boolean
+          id?: string
+          individual_items_status?: Json | null
+          initial_items?: Json | null
+          number?: string
+          payment_method?: string | null
+          service_type?: string | null
+          status?: string
+          total?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
