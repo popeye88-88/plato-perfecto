@@ -198,7 +198,10 @@ export async function saveOrders(businessId: string, orders: Array<{
         cancelled_in_stage: item.cancelledInStage || null
       }));
       const { error: itemsError } = await supabase.from('order_items').insert(itemRows);
-      if (itemsError) return false;
+      if (itemsError) {
+        console.error('Order items insert error:', JSON.stringify(itemsError, null, 2));
+        return false;
+      }
     }
   }
   return true;
