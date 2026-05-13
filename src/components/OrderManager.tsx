@@ -430,7 +430,7 @@ export default function OrderManager() {
     });
 
     const newOrder: Order = {
-      id: isSupabaseConfigured() ? generateOrderId() : Date.now().toString(),
+      id: generateOrderId(),
       number: `ORD-${orders.length + 1}`,
       customerName: newOrderForm.customerName,
       serviceType: newOrderForm.serviceType,
