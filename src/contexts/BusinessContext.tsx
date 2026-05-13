@@ -79,36 +79,41 @@ export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
 
     const load = async () => {
-      const { data: memberships } = await supabase
-        .from('business_members')
-        .select('business_id, user_id, role');
-      const accessData = (memberships || []).map((m) => ({
-        businessId: m.business_id,
-        userId: m.user_id,
-        role: (m.role === 'admin' ? 'owner' : 'staff') as BusinessRole,
-      }));
-      setAccess(accessData);
+      try {
+        const { data: memberships } = await supabase
+          .from('business_members')
+          .select('business_id, user_id, role');
+        const accessData = (memberships || []).map((m) => ({
+          businessId: m.business_id,
+          userId: m.user_id,
+          role: (m.role === 'admin' ? 'owner' : 'staff') as BusinessRole,
+        }));
+        setAccess(accessData);
 
-      const businessesData = await fetchBusinessesDb();
-      const userBusinessIds = accessData
-        .filter((a) => a.userId === currentUser.id)
-        .map((a) => a.businessId);
-      const userBizData = businessesData.filter((b) => userBusinessIds.includes(b.id));
-      const withMenuItems = await Promise.all(
-        userBizData.map(async (b) => {
-          const items = await fetchMenuItems(b.id);
-          return { ...b, menuItems: items };
-        })
-      );
-      setBusinesses(withMenuItems);
+        const businessesData = await fetchBusinessesDb();
+        const userBusinessIds = accessData
+          .filter((a) => a.userId === currentUser.id)
+          .map((a) => a.businessId);
+        const userBizData = businessesData.filter((b) => userBusinessIds.includes(b.id));
+        const withMenuItems = await Promise.all(
+          userBizData.map(async (b) => {
+            const items = await fetchMenuItems(b.id);
+            return { ...b, menuItems: items };
+          })
+        );
+        setBusinesses(withMenuItems);
 
-      const savedCurrent = localStorage.getItem(`currentBusiness_${currentUser.id}`);
-      const parsed = savedCurrent
-        ? (() => { try { return JSON.parse(savedCurrent); } catch { return null; } })()
-        : null;
-      const found = withMenuItems.find((b) => b.id === parsed?.id);
-      setCurrentBusiness(found ?? withMenuItems[0] ?? null);
-      setLoading(false);
+        const savedCurrent = localStorage.getItem(`currentBusiness_${currentUser.id}`);
+        const parsed = savedCurrent
+          ? (() => { try { return JSON.parse(savedCurrent); } catch { return null; } })()
+          : null;
+        const found = withMenuItems.find((b) => b.id === parsed?.id);
+        setCurrentBusiness(found ?? withMenuItems[0] ?? null);
+      } catch (error) {
+        console.error('BusinessProvider load error:', error);
+      } finally {
+        setLoading(false);
+      }
     };
     load();
   }, [currentUser]);
