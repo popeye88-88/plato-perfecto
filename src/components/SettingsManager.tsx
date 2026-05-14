@@ -636,6 +636,8 @@ export default function SettingsManager() {
         </TabsContent>
 
       </Tabs>
+        );
+      })()}
     </div>
   );
 }
