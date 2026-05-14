@@ -53,6 +53,47 @@ export default function SettingsManager() {
   const [selectedBusinessForShare, setSelectedBusinessForShare] = useState<string>('');
   const [selectedRoleForShare, setSelectedRoleForShare] = useState<BusinessRole>('staff');
   const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [roleHistoryRefresh, setRoleHistoryRefresh] = useState(0);
+
+  type RoleHistoryEntry = {
+    date: string;
+    actorId: string;
+    actorName: string;
+    targetId: string;
+    targetName: string;
+    fromRole?: BusinessRole;
+    toRole: BusinessRole;
+  };
+
+  const getRoleHistory = (businessId: string): RoleHistoryEntry[] => {
+    try {
+      const raw = localStorage.getItem(`roleHistory_${businessId}`);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const logRoleChange = (
+    businessId: string,
+    targetUserId: string,
+    fromRole: BusinessRole | undefined,
+    toRole: BusinessRole
+  ) => {
+    const targetUser = allUsers.find(u => u.id === targetUserId);
+    const entry: RoleHistoryEntry = {
+      date: new Date().toISOString(),
+      actorId: currentUser?.id || '',
+      actorName: currentUser?.username || currentUser?.email || 'Desconocido',
+      targetId: targetUserId,
+      targetName: targetUser?.username || targetUser?.email || targetUserId,
+      fromRole,
+      toRole,
+    };
+    const existing = getRoleHistory(businessId);
+    localStorage.setItem(`roleHistory_${businessId}`, JSON.stringify([entry, ...existing].slice(0, 200)));
+    setRoleHistoryRefresh(v => v + 1);
+  };
 
   const handleSettingChange = (key: keyof AppSettings, value: string | boolean) => {
     setSettings(prev => ({
