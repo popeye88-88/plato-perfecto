@@ -326,7 +326,7 @@ export default function SettingsManager() {
                     </div>
 
                     {/* Share Business Section - solo para owners */}
-                    {isOwnerOfCurrentBusiness && (
+                    {can.inviteStaff && (
                     <div className="p-4 border border-border rounded-lg bg-card">
                       <div className="flex items-center justify-between mb-3">
                         <h4 className="font-semibold text-foreground">Invitar Usuario</h4>
@@ -444,8 +444,18 @@ export default function SettingsManager() {
                                   <Users className="h-4 w-4" />
                                   <span>{user?.username || user?.email || userId}</span>
                                   <span className="text-xs font-medium text-primary">
-                                    ({role === 'owner' ? 'Propietario' : 'Personal'})
+                                    ({ROLE_LABELS[role]})
                                   </span>
+                                  {role === 'owner' && (
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Lock className="h-3 w-3 text-muted-foreground" />
+                                        </TooltipTrigger>
+                                        <TooltipContent>No se puede modificar</TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  )}
                                   {userId === currentUser?.id && (
                                     <span className="text-xs text-primary">(Tú)</span>
                                   )}
