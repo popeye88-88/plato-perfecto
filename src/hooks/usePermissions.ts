@@ -21,34 +21,26 @@ export function usePermissions() {
     isManager,
     isStaff,
     can: {
-      // Dashboard
       viewDashboard: ownerOrManager,
-
-      // Menu
       viewMenu: true,
       editMenu: ownerOrManager,
-
-      // Orders
       createOrder: true,
       moveOrderStages: true,
       processPayment: true,
       applyDiscount: true,
       deleteOrders: ownerOrManager,
-
-      // Settings tabs
       viewSettingsNegocio: ownerOrManager,
       viewSettingsUsuarios: ownerOrManager,
       viewSettingsIdioma: true,
       viewSettingsMoneda: ownerOrManager,
       viewSettingsIngredientes: ownerOrManager,
-
-      // User management
       inviteStaff: ownerOrManager,
       inviteManager: isOwner,
       inviteOwner: isOwner,
-      changeManagerRole: isOwner,
-      changeOwnerRole: false,
-      deleteOwner: false,
+      removeUser: ownerOrManager,
+      changeRoleOfStaff: ownerOrManager,
+      changeRoleOfManager: isOwner,
+      changeRoleOfOwner: false,
       deleteBusiness: isOwner,
       viewRoleHistory: ownerOrManager,
     },
@@ -59,4 +51,10 @@ export const ROLE_LABELS: Record<'owner' | 'manager' | 'staff', string> = {
   owner: 'Propietario',
   manager: 'Manager',
   staff: 'Staff',
+};
+
+export const ROLE_BADGE_CLASS: Record<'owner' | 'manager' | 'staff', string> = {
+  owner: 'bg-orange-500 text-white hover:bg-orange-500/90',
+  manager: 'bg-blue-500 text-white hover:bg-blue-500/90',
+  staff: 'bg-muted text-muted-foreground hover:bg-muted/90',
 };
