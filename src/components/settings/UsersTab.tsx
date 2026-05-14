@@ -44,6 +44,7 @@ export default function UsersTab() {
     fetchRoleHistory,
     fetchPendingInvitations,
     cancelInvitation,
+    reload,
   } = useBusinessContext();
   const { currentUser } = useAuth();
   const { can, isOwner, isManager } = usePermissions();
