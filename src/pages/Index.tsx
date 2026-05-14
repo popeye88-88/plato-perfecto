@@ -15,6 +15,13 @@ const AppContentInner = () => {
   const { hasNoBusinesses, loading } = useBusinessContext();
   const [currentPage, setCurrentPage] = useState('dashboard');
 
+  // Redirect users without dashboard access
+  useEffect(() => {
+    if (!can.viewDashboard && currentPage === 'dashboard') {
+      setCurrentPage('orders');
+    }
+  }, [can.viewDashboard, currentPage]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -26,13 +33,6 @@ const AppContentInner = () => {
   if (hasNoBusinesses) {
     return <CreateFirstBusiness />;
   }
-
-  // Redirect users without dashboard access
-  useEffect(() => {
-    if (!can.viewDashboard && currentPage === 'dashboard') {
-      setCurrentPage('orders');
-    }
-  }, [can.viewDashboard, currentPage]);
 
   const renderPage = () => {
     const page = !can.viewDashboard && currentPage === 'dashboard' ? 'orders' : currentPage;
