@@ -204,20 +204,26 @@ export default function SettingsManager() {
         </Button>
       </div>
 
-      <Tabs defaultValue="business" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="business" className="flex items-center gap-2">
-            <Building2 className="h-4 w-4" />
-            <span className="hidden sm:inline">Negocio</span>
-          </TabsTrigger>
-          <TabsTrigger value="users" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            <span className="hidden sm:inline">Usuarios</span>
-          </TabsTrigger>
-          <TabsTrigger value="language" className="flex items-center gap-2">
-            <Globe className="h-4 w-4" />
-            <span className="hidden sm:inline">Idioma</span>
-          </TabsTrigger>
+      {(() => {
+        const visibleTabs = [
+          can.viewSettingsNegocio && { value: 'business', label: 'Negocio', icon: Building2 },
+          can.viewSettingsUsuarios && { value: 'users', label: 'Usuarios', icon: Users },
+          can.viewSettingsIdioma && { value: 'language', label: 'Idioma', icon: Globe },
+        ].filter(Boolean) as { value: string; label: string; icon: typeof Building2 }[];
+        const defaultTab = visibleTabs[0]?.value || 'language';
+        const colsClass = visibleTabs.length === 1 ? 'grid-cols-1' : visibleTabs.length === 2 ? 'grid-cols-2' : 'grid-cols-3';
+        return (
+      <Tabs defaultValue={defaultTab} className="space-y-6">
+        <TabsList className={`grid w-full ${colsClass}`}>
+          {visibleTabs.map(t => {
+            const Icon = t.icon;
+            return (
+              <TabsTrigger key={t.value} value={t.value} className="flex items-center gap-2">
+                <Icon className="h-4 w-4" />
+                <span className="hidden sm:inline">{t.label}</span>
+              </TabsTrigger>
+            );
+          })}
         </TabsList>
 
         <TabsContent value="business" className="space-y-6">
