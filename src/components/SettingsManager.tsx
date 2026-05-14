@@ -7,11 +7,13 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Settings, Users, Globe, DollarSign, UserPlus, Building2, Plus, Edit2, Trash2, LogOut, Share2, Truck } from 'lucide-react';
+import { Settings, Users, Globe, DollarSign, UserPlus, Building2, Plus, Edit2, Trash2, LogOut, Share2, Truck, Lock, History } from 'lucide-react';
 import { useBusinessContext, type BusinessRole } from '@/contexts/BusinessContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePermissions, ROLE_LABELS } from '@/hooks/usePermissions';
 import { useToast } from '@/hooks/use-toast';
 import { User } from '@/contexts/AuthContext';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface AppSettings {
   language: 'es' | 'en';
