@@ -36,6 +36,7 @@ export default function SettingsManager() {
   const { currentBusiness, businesses, setCurrentBusiness, addBusiness, updateBusiness, deleteBusiness, shareBusinessWithUser, getBusinessUsersWithRoles, getUserRole } = useBusinessContext();
   const { currentUser, logout, getUsers } = useAuth();
   const { toast } = useToast();
+  const { can, isOwner, isManager, role: myRole } = usePermissions();
   const [settings, setSettings] = useState<AppSettings>({
     language: 'es',
     currency: 'MXN',
