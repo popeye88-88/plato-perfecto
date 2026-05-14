@@ -299,24 +299,87 @@ export type Database = {
           },
         ]
       }
+      pending_invitations: {
+        Row: {
+          accepted_at: string | null
+          business_id: string
+          created_at: string
+          email: string
+          id: string
+          invited_by: string
+          role: Database["public"]["Enums"]["app_role"]
+        }
+        Insert: {
+          accepted_at?: string | null
+          business_id: string
+          created_at?: string
+          email: string
+          id?: string
+          invited_by: string
+          role: Database["public"]["Enums"]["app_role"]
+        }
+        Update: {
+          accepted_at?: string | null
+          business_id?: string
+          created_at?: string
+          email?: string
+          id?: string
+          invited_by?: string
+          role?: Database["public"]["Enums"]["app_role"]
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
+          email: string | null
           full_name: string | null
           id: string
           updated_at: string
         }
         Insert: {
           created_at?: string
+          email?: string | null
           full_name?: string | null
           id: string
           updated_at?: string
         }
         Update: {
           created_at?: string
+          email?: string | null
           full_name?: string | null
           id?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      role_history: {
+        Row: {
+          business_id: string
+          changed_by: string
+          created_at: string
+          id: string
+          new_role: Database["public"]["Enums"]["app_role"]
+          old_role: Database["public"]["Enums"]["app_role"] | null
+          target_user_id: string
+        }
+        Insert: {
+          business_id: string
+          changed_by: string
+          created_at?: string
+          id?: string
+          new_role: Database["public"]["Enums"]["app_role"]
+          old_role?: Database["public"]["Enums"]["app_role"] | null
+          target_user_id: string
+        }
+        Update: {
+          business_id?: string
+          changed_by?: string
+          created_at?: string
+          id?: string
+          new_role?: Database["public"]["Enums"]["app_role"]
+          old_role?: Database["public"]["Enums"]["app_role"] | null
+          target_user_id?: string
         }
         Relationships: []
       }
@@ -346,6 +409,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      find_user_id_by_email: { Args: { _email: string }; Returns: string }
       get_user_role_in_business: {
         Args: { _business_id: string; _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
