@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -6,14 +6,28 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Settings, Users, Globe, DollarSign, UserPlus, Building2, Plus, Edit2, Trash2, LogOut, Share2, Truck, Lock, History } from 'lucide-react';
-import { useBusinessContext, type BusinessRole } from '@/contexts/BusinessContext';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Settings, Users, Globe, DollarSign, UserPlus, Building2, Plus, Edit2, Trash2, LogOut, Truck, Lock, History, Mail, ChevronDown, X } from 'lucide-react';
+import { useBusinessContext, type BusinessRole, type RoleHistoryRow, type PendingInvitationRow } from '@/contexts/BusinessContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { usePermissions, ROLE_LABELS } from '@/hooks/usePermissions';
+import { usePermissions, ROLE_LABELS, ROLE_BADGE_CLASS } from '@/hooks/usePermissions';
 import { useToast } from '@/hooks/use-toast';
 import { User } from '@/contexts/AuthContext';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { inviteUserToBusiness } from '@/lib/invitations';
+import { supabase } from '@/integrations/supabase/client';
 
 interface AppSettings {
   language: 'es' | 'en';
