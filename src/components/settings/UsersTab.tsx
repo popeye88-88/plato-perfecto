@@ -125,6 +125,7 @@ export default function UsersTab() {
       }
       setInviteEmail('');
       setInviteRole('staff');
+      if (result.status === 'access_granted') await reload();
       await refresh();
     } finally {
       setInviting(false);
