@@ -5,13 +5,27 @@ import MenuManager from '@/components/MenuManager';
 import OrderManager from '@/components/OrderManager';
 import SettingsManager from '@/components/SettingsManager';
 import Login from '@/components/Login';
-import { BusinessProvider } from '@/contexts/BusinessContext';
+import CreateFirstBusiness from '@/components/CreateFirstBusiness';
+import { BusinessProvider, useBusinessContext } from '@/contexts/BusinessContext';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
 
 const AppContentInner = () => {
   const { can } = usePermissions();
+  const { hasNoBusinesses, loading } = useBusinessContext();
   const [currentPage, setCurrentPage] = useState('dashboard');
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-muted-foreground">Cargando...</div>
+      </div>
+    );
+  }
+
+  if (hasNoBusinesses) {
+    return <CreateFirstBusiness />;
+  }
 
   // Redirect users without dashboard access
   useEffect(() => {
