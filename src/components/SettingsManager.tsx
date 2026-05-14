@@ -409,8 +409,15 @@ export default function SettingsManager() {
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="owner">Propietario (acceso total)</SelectItem>
-                                    <SelectItem value="staff">Personal (sin dashboard ni invitar)</SelectItem>
+                                    {can.inviteOwner && (
+                                      <SelectItem value="owner">{ROLE_LABELS.owner} (acceso total)</SelectItem>
+                                    )}
+                                    {can.inviteManager && (
+                                      <SelectItem value="manager">{ROLE_LABELS.manager}</SelectItem>
+                                    )}
+                                    {can.inviteStaff && (
+                                      <SelectItem value="staff">{ROLE_LABELS.staff}</SelectItem>
+                                    )}
                                   </SelectContent>
                                 </Select>
                               </div>
