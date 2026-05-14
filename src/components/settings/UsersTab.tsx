@@ -125,10 +125,6 @@ export default function UsersTab() {
       setInviteEmail('');
       setInviteRole('staff');
       await refresh();
-      // Reload memberships if access granted
-      if (result.status === 'access_granted') {
-        await useBusinessContext;
-      }
     } finally {
       setInviting(false);
     }
