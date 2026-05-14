@@ -74,7 +74,7 @@ const AppContent = () => {
 
   return (
     <BusinessProvider>
-      <AppContentInner />
+      <AppContentInner key="business-shell" />
     </BusinessProvider>
   );
 };
