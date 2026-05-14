@@ -28,6 +28,7 @@ import { User } from '@/contexts/AuthContext';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { inviteUserToBusiness } from '@/lib/invitations';
 import { supabase } from '@/integrations/supabase/client';
+import UsersTab from '@/components/settings/UsersTab';
 
 interface AppSettings {
   language: 'es' | 'en';
