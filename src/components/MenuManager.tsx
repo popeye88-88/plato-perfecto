@@ -11,6 +11,7 @@ import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import CategoryManager from './CategoryManager';
 import { useBusinessContext } from '@/contexts/BusinessContext';
+import { usePermissions } from '@/hooks/usePermissions';
 import { fetchCategories, upsertMenuItems, upsertCategories } from '@/lib/supabase';
 import { COLOR_PRESETS, DEFAULT_COLOR, type ColorStyle } from '@/lib/menuItemColor';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -38,6 +39,7 @@ type StoredCategory = Pick<Category, 'id' | 'name'>;
 export default function MenuManager() {
   const { toast } = useToast();
   const { currentBusiness, updateBusiness } = useBusinessContext();
+  const { can } = usePermissions();
 
   const [menuItems, setMenuItems] = useState<MenuItem[]>(currentBusiness?.menuItems || []);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -308,29 +310,31 @@ export default function MenuManager() {
           <p className="text-sm md:text-base text-muted-foreground">Administra los productos de tu restaurante</p>
         </div>
         
-        <div className="flex gap-2 flex-wrap">
-          <Button 
-            onClick={openNewProductDialog}
-            className="bg-gradient-primary hover:opacity-90"
-            disabled={!currentBusiness}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            <span className="hidden sm:inline">Agregar Producto</span>
-            <span className="sm:hidden">Producto</span>
-          </Button>
-          <Button 
-            variant="outline" 
-            onClick={() => setIsCategoryManagerOpen(true)}
-            className="flex items-center gap-2"
-            disabled={!currentBusiness}
-          >
-            <Settings className="h-4 w-4" />
-            <span className="hidden sm:inline">Editar Categorías</span>
-            <span className="sm:hidden">Categorías</span>
-          </Button>
-        </div>
+        {can.editMenu && (
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              onClick={openNewProductDialog}
+              className="bg-gradient-primary hover:opacity-90"
+              disabled={!currentBusiness}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              <span className="hidden sm:inline">Agregar Producto</span>
+              <span className="sm:hidden">Producto</span>
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setIsCategoryManagerOpen(true)}
+              className="flex items-center gap-2"
+              disabled={!currentBusiness}
+            >
+              <Settings className="h-4 w-4" />
+              <span className="hidden sm:inline">Editar Categorías</span>
+              <span className="sm:hidden">Categorías</span>
+            </Button>
+          </div>
+        )}
       </div>
-        
+
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -581,23 +585,25 @@ export default function MenuManager() {
                         </div>
                       </div>
                     </div>
-                    <div className="flex gap-1 ml-4">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEdit(item)}
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDelete(item.id)}
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    {can.editMenu && (
+                      <div className="flex gap-1 ml-4">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEdit(item)}
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(item.id)}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

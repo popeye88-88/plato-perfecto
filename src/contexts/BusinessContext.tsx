@@ -30,7 +30,7 @@ interface MenuItem {
   colorStyle?: 'fill' | 'border';
 }
 
-export type BusinessRole = 'owner' | 'staff';
+export type BusinessRole = 'owner' | 'manager' | 'staff';
 
 interface BusinessUserAccess {
   businessId: string;
@@ -89,7 +89,7 @@ export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         const accessData = (memberships || []).map((m) => ({
           businessId: m.business_id,
           userId: m.user_id,
-          role: (m.role === 'admin' ? 'owner' : 'staff') as BusinessRole,
+          role: (m.role === 'admin' ? 'owner' : m.role === 'manager' ? 'manager' : 'staff') as BusinessRole,
         }));
         setAccess(accessData);
 
@@ -183,9 +183,9 @@ export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const shareBusinessWithUser = (businessId: string, userId: string, role: BusinessRole) => {
-    const supaRole = role === 'owner' ? 'admin' : 'staff';
+    const supaRole = role === 'owner' ? 'admin' : role === 'manager' ? 'manager' : 'staff';
     supabase.from('business_members').upsert(
-      { business_id: businessId, user_id: userId, role: supaRole as 'admin' | 'staff' },
+      { business_id: businessId, user_id: userId, role: supaRole as 'admin' | 'manager' | 'staff' },
       { onConflict: 'business_id,user_id' }
     );
     setAccess((prev) => {
