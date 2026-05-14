@@ -589,39 +589,128 @@ export default function SettingsManager() {
               <h2 className="text-xl font-semibold text-foreground">Gestión de Usuarios</h2>
               <p className="text-muted-foreground">Administra el equipo de tu restaurante</p>
             </div>
-            
-            <Button className="bg-gradient-primary hover:opacity-90">
-              <UserPlus className="h-4 w-4 mr-2" />
-              Agregar Usuario
-            </Button>
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Settings className="h-5 w-5" />
-                Funcionalidad en Desarrollo
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-12">
-                <Users className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-foreground mb-2">
-                  Gestión de Usuarios
-                </h3>
-                <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                  Esta sección permitirá gestionar los usuarios del sistema, asignar roles 
-                  y permisos para el personal del restaurante.
-                </p>
-                <div className="space-y-2 text-sm text-muted-foreground">
-                  <div>• Agregar y gestionar empleados</div>
-                  <div>• Asignar roles (Administrador, Mesero, Chef)</div>
-                  <div>• Control de permisos por módulo</div>
-                  <div>• Horarios y turnos de trabajo</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          {currentBusiness ? (
+            <>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    Miembros del negocio
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {getBusinessUsersWithRoles(currentBusiness.id).map(({ userId, role: userRole }) => {
+                      const user = allUsers.find(u => u.id === userId);
+                      const isTargetOwner = userRole === 'owner';
+                      // Owner can change role of managers and staff (not owners)
+                      // Manager can only change staff roles
+                      const canChange = !isTargetOwner && userId !== currentUser?.id && (
+                        (isOwner && (userRole === 'manager' || userRole === 'staff')) ||
+                        (isManager && userRole === 'staff')
+                      );
+                      const availableRoles: BusinessRole[] = isOwner
+                        ? ['manager', 'staff']
+                        : ['staff'];
+                      return (
+                        <div key={userId} className="flex items-center justify-between gap-3 p-3 border border-border rounded-lg bg-card">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Users className="h-4 w-4 text-muted-foreground shrink-0" />
+                            <span className="font-medium text-foreground truncate">
+                              {user?.username || user?.email || userId}
+                            </span>
+                            {userId === currentUser?.id && (
+                              <span className="text-xs text-primary">(Tú)</span>
+                            )}
+                            {isTargetOwner && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Lock className="h-3 w-3 text-muted-foreground" />
+                                  </TooltipTrigger>
+                                  <TooltipContent>No se puede modificar</TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {canChange ? (
+                              <Select
+                                value={userRole}
+                                onValueChange={(v) => {
+                                  const newRole = v as BusinessRole;
+                                  if (newRole === userRole) return;
+                                  shareBusinessWithUser(currentBusiness.id, userId, newRole);
+                                  logRoleChange(currentBusiness.id, userId, userRole, newRole);
+                                  toast({
+                                    title: 'Rol actualizado',
+                                    description: `Nuevo rol: ${ROLE_LABELS[newRole]}`,
+                                  });
+                                }}
+                              >
+                                <SelectTrigger className="w-[140px]">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {availableRoles.map(r => (
+                                    <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <span className="text-sm font-medium text-primary px-2">
+                                {ROLE_LABELS[userRole]}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {getBusinessUsersWithRoles(currentBusiness.id).length === 0 && (
+                      <p className="text-sm text-muted-foreground">No hay miembros aún.</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {can.viewRoleHistory && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <History className="h-5 w-5" />
+                      Historial de roles
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {(() => {
+                      const history = getRoleHistory(currentBusiness.id);
+                      void roleHistoryRefresh;
+                      if (history.length === 0) {
+                        return <p className="text-sm text-muted-foreground">Sin cambios registrados.</p>;
+                      }
+                      return (
+                        <div className="space-y-2">
+                          {history.map((h, idx) => (
+                            <div key={idx} className="text-sm text-muted-foreground border-l-2 border-border pl-3">
+                              [{new Date(h.date).toLocaleString('es-ES')}] {h.actorName} cambió el rol de {h.targetName} {h.fromRole ? `de ${ROLE_LABELS[h.fromRole]} ` : ''}a {ROLE_LABELS[h.toRole]}
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          ) : (
+            <Card>
+              <CardContent className="py-12 text-center text-muted-foreground">
+                Selecciona un negocio para gestionar usuarios.
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="language" className="space-y-6">
