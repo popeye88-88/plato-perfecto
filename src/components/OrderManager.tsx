@@ -12,6 +12,7 @@ import { Plus, Minus, Clock, Truck, DollarSign, X, Edit2, History, Percent, Chec
 import { useToast } from '@/hooks/use-toast';
 import { useBusinessContext } from '@/contexts/BusinessContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePermissions } from '@/hooks/usePermissions';
 import { fetchOrders as fetchOrdersDb, saveOrders as persistOrdersDb, generateOrderId } from '@/lib/supabase';
 import { getMenuItemCardStyle } from '@/lib/menuItemColor';
 
@@ -61,6 +62,7 @@ interface Order {
 export default function OrderManager() {
   const { toast } = useToast();
   const { currentBusiness } = useBusinessContext();
+  const { can } = usePermissions();
   const { currentUser } = useAuth();
   
   // Read entregando stage from current business (Supabase)
@@ -1190,17 +1192,19 @@ export default function OrderManager() {
           <div className="flex gap-2">
             {order.status === 'cobrando' && currentTab === 'cobrando' && (
               <>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => {
-                    setSelectedOrderForDiscount(order);
-                    setIsDiscountOpen(true);
-                  }}
-                >
-                  <Percent className="h-4 w-4 mr-1" />
-                  Descuento
-                </Button>
+                {can.applyDiscount && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedOrderForDiscount(order);
+                      setIsDiscountOpen(true);
+                    }}
+                  >
+                    <Percent className="h-4 w-4 mr-1" />
+                    Descuento
+                  </Button>
+                )}
                 <Button 
                   size="sm" 
                   onClick={() => {
