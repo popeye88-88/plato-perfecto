@@ -128,9 +128,14 @@ export default function SettingsManager() {
     setSelectedRoleForShare('staff');
     setIsShareDialogOpen(false);
     
+    // Log role assignment to history
+    if (currentBusiness?.id) {
+      logRoleChange(currentBusiness.id, selectedUserForShare, undefined, selectedRoleForShare);
+    }
+
     toast({
       title: "Negocio compartido",
-      description: `Acceso asignado como ${selectedRoleForShare === 'owner' ? 'propietario' : 'personal'}`
+      description: `Acceso asignado como ${ROLE_LABELS[selectedRoleForShare]}`
     });
   };
 
