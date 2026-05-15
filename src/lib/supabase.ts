@@ -245,10 +245,20 @@ export async function fetchMenuItems(businessId: string) {
   }));
 }
 
-export async function upsertMenuItems(businessId: string, items: Array<{ id: string; name: string; price: number; category: string; description?: string; hasSizes?: boolean; sizes?: { id: string; name: string; price: number }[]; color?: string; colorStyle?: 'fill' | 'border' }>) {
-  await supabase.from('menu_items').delete().eq('business_id', businessId);
-  if (items.length === 0) return true;
-  const rows = items.map((item) => ({
+type MenuItemPayload = {
+  id: string;
+  name: string;
+  price: number;
+  category: string;
+  description?: string;
+  hasSizes?: boolean;
+  sizes?: { id: string; name: string; price: number }[];
+  color?: string;
+  colorStyle?: 'fill' | 'border';
+};
+
+function toMenuItemRow(businessId: string, item: MenuItemPayload) {
+  return {
     id: item.id,
     business_id: businessId,
     name: item.name,
@@ -258,9 +268,34 @@ export async function upsertMenuItems(businessId: string, items: Array<{ id: str
     has_sizes: item.hasSizes ?? false,
     sizes: item.sizes ? JSON.stringify(item.sizes) : null,
     color: item.color || null,
-    color_style: item.colorStyle || 'fill'
-  }));
-  const { error } = await supabase.from('menu_items').insert(rows);
+    color_style: item.colorStyle || 'fill',
+  };
+}
+
+export async function insertMenuItem(businessId: string, item: MenuItemPayload) {
+  const { error } = await supabase.from('menu_items').insert(toMenuItemRow(businessId, item));
+  if (error) console.error('insertMenuItem error:', error);
+  return !error;
+}
+
+export async function updateMenuItem(businessId: string, item: MenuItemPayload) {
+  const { id, ...row } = toMenuItemRow(businessId, item);
+  const { error } = await supabase
+    .from('menu_items')
+    .update(row)
+    .eq('id', id)
+    .eq('business_id', businessId);
+  if (error) console.error('updateMenuItem error:', error);
+  return !error;
+}
+
+export async function deleteMenuItem(businessId: string, id: string) {
+  const { error } = await supabase
+    .from('menu_items')
+    .delete()
+    .eq('id', id)
+    .eq('business_id', businessId);
+  if (error) console.error('deleteMenuItem error:', error);
   return !error;
 }
 
@@ -275,18 +310,50 @@ export async function fetchCategories(businessId: string) {
   return (data || []).map((c: any) => ({
     id: c.id,
     name: c.name,
-    productCount: 0
+    productCount: 0,
   }));
 }
 
-export async function upsertCategories(businessId: string, categories: Array<{ id: string; name: string }>) {
-  await supabase.from('categories').delete().eq('business_id', businessId);
-  if (categories.length === 0) return true;
-  const rows = categories.map((c) => ({
-    id: c.id,
+export async function insertCategory(businessId: string, category: { id: string; name: string }) {
+  const { error } = await supabase.from('categories').insert({
+    id: category.id,
     business_id: businessId,
-    name: c.name
-  }));
-  const { error } = await supabase.from('categories').insert(rows);
+    name: category.name,
+  });
+  if (error) console.error('insertCategory error:', error);
+  return !error;
+}
+
+export async function renameCategoryWithCascade(
+  businessId: string,
+  categoryId: string,
+  oldName: string,
+  newName: string
+) {
+  const { error: catErr } = await supabase
+    .from('categories')
+    .update({ name: newName })
+    .eq('id', categoryId)
+    .eq('business_id', businessId);
+  if (catErr) {
+    console.error('renameCategory error:', catErr);
+    return false;
+  }
+  const { error: itemsErr } = await supabase
+    .from('menu_items')
+    .update({ category: newName })
+    .eq('business_id', businessId)
+    .eq('category', oldName);
+  if (itemsErr) console.error('renameCategory cascade error:', itemsErr);
+  return !itemsErr;
+}
+
+export async function deleteCategory(businessId: string, id: string) {
+  const { error } = await supabase
+    .from('categories')
+    .delete()
+    .eq('id', id)
+    .eq('business_id', businessId);
+  if (error) console.error('deleteCategory error:', error);
   return !error;
 }
