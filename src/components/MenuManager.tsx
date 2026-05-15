@@ -4,7 +4,17 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Edit2, Trash2, Settings, X } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
@@ -12,7 +22,15 @@ import { useToast } from '@/hooks/use-toast';
 import CategoryManager from './CategoryManager';
 import { useBusinessContext } from '@/contexts/BusinessContext';
 import { usePermissions } from '@/hooks/usePermissions';
-import { fetchCategories, upsertMenuItems, upsertCategories } from '@/lib/supabase';
+import {
+  fetchCategories,
+  insertMenuItem,
+  updateMenuItem,
+  deleteMenuItem,
+  insertCategory,
+  renameCategoryWithCascade,
+  deleteCategory,
+} from '@/lib/supabase';
 import { COLOR_PRESETS, DEFAULT_COLOR, type ColorStyle } from '@/lib/menuItemColor';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
@@ -36,22 +54,28 @@ interface Category {
 
 type StoredCategory = Pick<Category, 'id' | 'name'>;
 
+const newId = () =>
+  typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+
 export default function MenuManager() {
   const { toast } = useToast();
   const { currentBusiness, updateBusiness } = useBusinessContext();
   const { can } = usePermissions();
 
   const [menuItems, setMenuItems] = useState<MenuItem[]>(currentBusiness?.menuItems || []);
-  const [categories, setCategories] = useState<Category[]>([]);
-  
+  const [storedCategories, setStoredCategories] = useState<StoredCategory[]>([]);
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<MenuItem | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     price: '',
     category: '',
-    description: ''
+    description: '',
   });
   const [hasSizes, setHasSizes] = useState(false);
   const [sizes, setSizes] = useState<{ id: string; name: string; price: number }[]>([]);
@@ -59,43 +83,20 @@ export default function MenuManager() {
   const [color, setColor] = useState<string | undefined>(undefined);
   const [colorStyle, setColorStyle] = useState<ColorStyle>('fill');
 
+  const categories: Category[] = storedCategories.map((c) => ({
+    ...c,
+    productCount: menuItems.filter((item) => item.category === c.name).length,
+  }));
 
-  const recalcCategoryCounts = (cats: StoredCategory[], items: MenuItem[]): Category[] => {
-    return cats.map(cat => ({
-      ...cat,
-      productCount: items.filter(item => item.category === cat.name).length
-    }));
-  };
-
-  const persistCategories = (cats: Category[]) => {
-    if (!currentBusiness?.id) return;
-    const categoriesToStore: StoredCategory[] = cats.map(({ id, name }) => ({ id, name }));
-    upsertCategories(currentBusiness.id, categoriesToStore);
-  };
-
-  const updateCategories = (newCategories: Category[], items: MenuItem[] = menuItems) => {
-    const storedCategories: StoredCategory[] = newCategories.map(({ id, name }) => ({ id, name }));
-    const recalculated = recalcCategoryCounts(storedCategories, items);
-    setCategories(recalculated);
-    persistCategories(recalculated);
-  };
-
-  const persistMenuItems = (items: MenuItem[]) => {
-    if (!currentBusiness?.id) return;
-    upsertMenuItems(currentBusiness.id, items);
-  };
-
-  const syncMenuItems = (items: MenuItem[]) => {
+  const updateContextItems = (items: MenuItem[]) => {
     setMenuItems(items);
     if (currentBusiness) {
       updateBusiness(currentBusiness.id, { menuItems: items });
     }
-    persistMenuItems(items);
   };
 
   useEffect(() => {
-    const items = currentBusiness?.menuItems || [];
-    setMenuItems(items);
+    setMenuItems(currentBusiness?.menuItems || []);
     setEditingItem(null);
     setFormData({ name: '', price: '', category: '', description: '' });
     setHasSizes(false);
@@ -106,119 +107,115 @@ export default function MenuManager() {
 
   useEffect(() => {
     if (!currentBusiness?.id) {
-      setCategories([]);
+      setStoredCategories([]);
       return;
     }
-
-    const baseItems = menuItems;
-    const loadCategories = async () => {
+    let cancelled = false;
+    (async () => {
       const dbCats = await fetchCategories(currentBusiness.id);
+      if (cancelled) return;
       let stored: StoredCategory[] = dbCats.map((c) => ({ id: c.id, name: c.name }));
-      if (stored.length === 0 && baseItems.length > 0) {
-        const derivedNames = Array.from(new Set(baseItems.map((item) => item.category)));
-        stored = derivedNames.map((name) => ({ id: name, name }));
+      // Derive from existing items if none in DB yet (does not persist)
+      if (stored.length === 0 && (currentBusiness.menuItems?.length ?? 0) > 0) {
+        const derived = Array.from(new Set(currentBusiness.menuItems!.map((i) => i.category)));
+        stored = derived.map((name) => ({ id: newId(), name }));
       }
-      const recalculated = recalcCategoryCounts(stored, baseItems);
-      setCategories(recalculated);
+      setStoredCategories(stored);
+    })();
+    return () => {
+      cancelled = true;
     };
-    loadCategories();
-  }, [currentBusiness, menuItems]);
-
-  useEffect(() => {
-    if (!currentBusiness?.id) return;
-    setCategories(prev => {
-      const stored = prev.map(({ id, name }) => ({ id, name }));
-      const recalculated = recalcCategoryCounts(stored, menuItems);
-      persistCategories(recalculated);
-      return recalculated;
-    });
-  }, [menuItems, currentBusiness]);
+  }, [currentBusiness]);
 
   const handleCategoryChange = (value: string) => {
     if (value === 'nueva-categoria') {
       setNewCategoryName('');
-      setFormData({...formData, category: ''});
+      setFormData({ ...formData, category: '' });
     } else {
-      setFormData({...formData, category: value});
+      setFormData({ ...formData, category: value });
       setNewCategoryName('');
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const ensureCategory = async (name: string): Promise<StoredCategory | null> => {
+    const existing = storedCategories.find((c) => c.name.toLowerCase() === name.toLowerCase());
+    if (existing) return existing;
+    if (!currentBusiness) return null;
+    const cat: StoredCategory = { id: newId(), name };
+    const ok = await insertCategory(currentBusiness.id, cat);
+    if (!ok) return null;
+    setStoredCategories((prev) => [...prev, cat]);
+    return cat;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    const categoryName = newCategoryName || formData.category;
-    
+
+    const categoryName = (newCategoryName || formData.category).trim();
+
     if (!currentBusiness) {
       toast({
-        title: "Negocio no seleccionado",
-        description: "Selecciona un negocio en el menú de ajustes para administrar su menú.",
-        variant: "destructive"
+        title: 'Negocio no seleccionado',
+        description: 'Selecciona un negocio en el menú de ajustes para administrar su menú.',
+        variant: 'destructive',
       });
       return;
     }
 
     if (!formData.name || !formData.price || !categoryName) {
       toast({
-        title: "Error",
-        description: "Por favor completa todos los campos obligatorios",
-        variant: "destructive"
+        title: 'Error',
+        description: 'Por favor completa todos los campos obligatorios',
+        variant: 'destructive',
       });
       return;
     }
 
     if (hasSizes && sizes.length < 2) {
       toast({
-        title: "Error",
-        description: "Debes agregar al menos 2 tamaños cuando la opción de tamaños está activa",
-        variant: "destructive"
+        title: 'Error',
+        description: 'Debes agregar al menos 2 tamaños cuando la opción de tamaños está activa',
+        variant: 'destructive',
       });
       return;
     }
 
-    const newItem: MenuItem = {
-      id: editingItem?.id || Date.now().toString(),
-      name: formData.name,
+    // Make sure the category exists (creates it as a row if new)
+    const cat = await ensureCategory(categoryName);
+    if (!cat) {
+      toast({ title: 'Error', description: 'No se pudo crear la categoría', variant: 'destructive' });
+      return;
+    }
+
+    const item: MenuItem = {
+      id: editingItem?.id || newId(),
+      name: formData.name.trim(),
       price: parseFloat(formData.price),
-      category: categoryName,
+      category: cat.name,
       description: formData.description,
       hasSizes,
       sizes: hasSizes ? sizes : undefined,
       color: color || undefined,
-      colorStyle
+      colorStyle,
     };
 
-    let updatedMenuItems: MenuItem[] = [];
-
     if (editingItem) {
-      updatedMenuItems = menuItems.map(item => 
-        item.id === editingItem.id ? newItem : item
-      );
-      syncMenuItems(updatedMenuItems);
-      toast({
-        title: "Producto actualizado",
-        description: "El producto ha sido actualizado correctamente"
-      });
+      const ok = await updateMenuItem(currentBusiness.id, item);
+      if (!ok) {
+        toast({ title: 'Error', description: 'No se pudo actualizar el producto', variant: 'destructive' });
+        return;
+      }
+      updateContextItems(menuItems.map((m) => (m.id === editingItem.id ? item : m)));
+      toast({ title: 'Producto actualizado', description: 'El producto ha sido actualizado correctamente' });
     } else {
-      updatedMenuItems = [...menuItems, newItem];
-      syncMenuItems(updatedMenuItems);
-      toast({
-        title: "Producto agregado",
-        description: "El producto ha sido agregado al menú"
-      });
+      const ok = await insertMenuItem(currentBusiness.id, item);
+      if (!ok) {
+        toast({ title: 'Error', description: 'No se pudo agregar el producto', variant: 'destructive' });
+        return;
+      }
+      updateContextItems([...menuItems, item]);
+      toast({ title: 'Producto agregado', description: 'El producto ha sido agregado al menú' });
     }
-
-    let updatedCategories = categories;
-    if (newCategoryName && !categories.find(cat => cat.name === newCategoryName)) {
-      const newCategory: Category = {
-        id: Date.now().toString(),
-        name: newCategoryName,
-        productCount: 0
-      };
-      updatedCategories = [...categories, newCategory];
-    }
-
-    updateCategories(updatedCategories, updatedMenuItems);
 
     setFormData({ name: '', price: '', category: '', description: '' });
     setHasSizes(false);
@@ -236,7 +233,7 @@ export default function MenuManager() {
       name: item.name,
       price: item.price.toString(),
       category: item.category,
-      description: item.description || ''
+      description: item.description || '',
     });
     setHasSizes(item.hasSizes || false);
     setSizes(item.sizes || []);
@@ -246,26 +243,56 @@ export default function MenuManager() {
     setIsDialogOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    const updatedMenuItems = menuItems.filter(item => item.id !== id);
-    syncMenuItems(updatedMenuItems);
-    updateCategories(categories, updatedMenuItems);
-    toast({
-      title: "Producto eliminado",
-      description: "El producto ha sido eliminado del menú"
-    });
+  const requestDelete = (item: MenuItem) => setItemToDelete(item);
+
+  const performDelete = async () => {
+    if (!itemToDelete || !currentBusiness) return;
+    const ok = await deleteMenuItem(currentBusiness.id, itemToDelete.id);
+    if (!ok) {
+      toast({ title: 'Error', description: 'No se pudo eliminar el producto', variant: 'destructive' });
+      return;
+    }
+    updateContextItems(menuItems.filter((m) => m.id !== itemToDelete.id));
+    toast({ title: 'Producto eliminado', description: `"${itemToDelete.name}" ha sido eliminado` });
+    setItemToDelete(null);
+  };
+
+  const handleAddCategory = async (name: string) => {
+    if (!currentBusiness) return false;
+    const cat: StoredCategory = { id: newId(), name };
+    const ok = await insertCategory(currentBusiness.id, cat);
+    if (ok) setStoredCategories((prev) => [...prev, cat]);
+    return ok;
+  };
+
+  const handleRenameCategory = async (id: string, oldName: string, newName: string) => {
+    if (!currentBusiness) return false;
+    const ok = await renameCategoryWithCascade(currentBusiness.id, id, oldName, newName);
+    if (ok) {
+      setStoredCategories((prev) => prev.map((c) => (c.id === id ? { ...c, name: newName } : c)));
+      updateContextItems(
+        menuItems.map((item) => (item.category === oldName ? { ...item, category: newName } : item))
+      );
+    }
+    return ok;
+  };
+
+  const handleDeleteCategory = async (id: string) => {
+    if (!currentBusiness) return false;
+    const ok = await deleteCategory(currentBusiness.id, id);
+    if (ok) setStoredCategories((prev) => prev.filter((c) => c.id !== id));
+    return ok;
   };
 
   const openNewProductDialog = () => {
     if (!currentBusiness) {
       toast({
-        title: "Negocio no disponible",
-        description: "Selecciona un negocio para agregar productos.",
-        variant: "destructive"
+        title: 'Negocio no disponible',
+        description: 'Selecciona un negocio para agregar productos.',
+        variant: 'destructive',
       });
       return;
     }
-
     setEditingItem(null);
     setFormData({ name: '', price: '', category: '', description: '' });
     setHasSizes(false);
@@ -290,9 +317,7 @@ export default function MenuManager() {
   }
 
   const groupedItems = menuItems.reduce((acc, item) => {
-    if (!acc[item.category]) {
-      acc[item.category] = [];
-    }
+    if (!acc[item.category]) acc[item.category] = [];
     acc[item.category].push(item);
     return acc;
   }, {} as Record<string, MenuItem[]>);
@@ -309,14 +334,10 @@ export default function MenuManager() {
           </div>
           <p className="text-sm md:text-base text-muted-foreground">Administra los productos de tu restaurante</p>
         </div>
-        
+
         {can.editMenu && (
           <div className="flex gap-2 flex-wrap">
-            <Button
-              onClick={openNewProductDialog}
-              className="bg-gradient-primary hover:opacity-90"
-              disabled={!currentBusiness}
-            >
+            <Button onClick={openNewProductDialog} className="bg-gradient-primary hover:opacity-90" disabled={!currentBusiness}>
               <Plus className="h-4 w-4 mr-2" />
               <span className="hidden sm:inline">Agregar Producto</span>
               <span className="sm:hidden">Producto</span>
@@ -338,9 +359,7 @@ export default function MenuManager() {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>
-              {editingItem ? 'Editar Producto' : 'Agregar Nuevo Producto'}
-            </DialogTitle>
+            <DialogTitle>{editingItem ? 'Editar Producto' : 'Agregar Nuevo Producto'}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -348,7 +367,7 @@ export default function MenuManager() {
               <Input
                 id="name"
                 value={formData.name}
-                onChange={(e) => setFormData({...formData, name: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 placeholder="Ej: Pizza Margherita"
               />
             </div>
@@ -359,28 +378,30 @@ export default function MenuManager() {
                 type="number"
                 step="0.01"
                 value={formData.price}
-                onChange={(e) => setFormData({...formData, price: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                 placeholder="0.00"
               />
             </div>
             <div>
               <Label htmlFor="category">Categoría *</Label>
               <div className="space-y-2">
-                <Select 
-                  value={formData.category || (newCategoryName ? 'nueva-categoria' : '')} 
+                <Select
+                  value={formData.category || (newCategoryName ? 'nueva-categoria' : '')}
                   onValueChange={handleCategoryChange}
                 >
                   <SelectTrigger id="category">
                     <SelectValue placeholder="Selecciona una categoría" />
                   </SelectTrigger>
                   <SelectContent>
-                    {categories.map(cat => (
-                      <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
+                    {categories.map((cat) => (
+                      <SelectItem key={cat.id} value={cat.name}>
+                        {cat.name}
+                      </SelectItem>
                     ))}
                     <SelectItem value="nueva-categoria">+ Nueva categoría</SelectItem>
                   </SelectContent>
                 </Select>
-                
+
                 {!formData.category && (
                   <Input
                     value={newCategoryName}
@@ -395,7 +416,7 @@ export default function MenuManager() {
               <Input
                 id="description"
                 value={formData.description}
-                onChange={(e) => setFormData({...formData, description: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 placeholder="Descripción del producto"
               />
             </div>
@@ -411,8 +432,8 @@ export default function MenuManager() {
                     setHasSizes(checked);
                     if (checked && sizes.length === 0) {
                       setSizes([
-                        { id: Date.now().toString(), name: '', price: 0 },
-                        { id: (Date.now() + 1).toString(), name: '', price: 0 }
+                        { id: newId(), name: '', price: 0 },
+                        { id: newId(), name: '', price: 0 },
                       ]);
                     }
                   }}
@@ -462,7 +483,7 @@ export default function MenuManager() {
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => setSizes([...sizes, { id: Date.now().toString(), name: '', price: 0 }])}
+                      onClick={() => setSizes([...sizes, { id: newId(), name: '', price: 0 }])}
                     >
                       <Plus className="h-4 w-4 mr-1" /> Agregar Tamaño
                     </Button>
@@ -519,9 +540,9 @@ export default function MenuManager() {
               <Button type="submit" className="bg-gradient-primary hover:opacity-90 flex-1">
                 {editingItem ? 'Actualizar' : 'Agregar'}
               </Button>
-              <Button 
-                type="button" 
-                variant="outline" 
+              <Button
+                type="button"
+                variant="outline"
                 onClick={() => {
                   setIsDialogOpen(false);
                   setEditingItem(null);
@@ -544,8 +565,31 @@ export default function MenuManager() {
         open={isCategoryManagerOpen}
         onOpenChange={setIsCategoryManagerOpen}
         categories={categories}
-        onUpdateCategories={updateCategories}
+        onAddCategory={handleAddCategory}
+        onRenameCategory={handleRenameCategory}
+        onDeleteCategory={handleDeleteCategory}
       />
+
+      {/* Confirm delete item */}
+      <AlertDialog open={!!itemToDelete} onOpenChange={(o) => !o && setItemToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar producto?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Vas a eliminar <strong>{itemToDelete?.name}</strong> del menú. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={performDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Menu Items by Category */}
       <div className="space-y-6">
@@ -570,14 +614,14 @@ export default function MenuManager() {
                           )}
                           {item.hasSizes && item.sizes && item.sizes.length > 0 && (
                             <p className="text-xs text-muted-foreground">
-                              Tamaños: {item.sizes.map(s => `${s.name} ($${s.price.toFixed(2)})`).join(', ')}
+                              Tamaños: {item.sizes.map((s) => `${s.name} ($${s.price.toFixed(2)})`).join(', ')}
                             </p>
                           )}
                         </div>
                         <div className="text-right">
                           {item.hasSizes && item.sizes && item.sizes.length > 0 ? (
                             <p className="text-sm font-bold text-primary">
-                              ${Math.min(...item.sizes.map(s => s.price)).toFixed(2)} - ${Math.max(...item.sizes.map(s => s.price)).toFixed(2)}
+                              ${Math.min(...item.sizes.map((s) => s.price)).toFixed(2)} - ${Math.max(...item.sizes.map((s) => s.price)).toFixed(2)}
                             </p>
                           ) : (
                             <p className="text-lg font-bold text-primary">${item.price.toFixed(2)}</p>
@@ -587,17 +631,13 @@ export default function MenuManager() {
                     </div>
                     {can.editMenu && (
                       <div className="flex gap-1 ml-4">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEdit(item)}
-                        >
+                        <Button variant="ghost" size="sm" onClick={() => handleEdit(item)}>
                           <Edit2 className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleDelete(item.id)}
+                          onClick={() => requestDelete(item)}
                           className="text-destructive hover:text-destructive"
                         >
                           <Trash2 className="h-4 w-4" />
