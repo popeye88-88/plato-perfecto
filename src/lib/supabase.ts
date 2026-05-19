@@ -20,8 +20,11 @@ export async function fetchBusinesses() {
       description: b.description,
       createdAt: new Date(b.created_at),
       enableEntregandoStage: b.enable_entregando_stage ?? true,
+      language: b.language ?? 'es',
+      currency: b.currency ?? 'MXN',
       menuItems: []
     }));
+
   } catch (error) {
     console.error('fetchBusinessesDb exception:', error);
     return [];
