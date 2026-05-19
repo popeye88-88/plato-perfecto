@@ -393,8 +393,9 @@ export default function SettingsManager() {
               <div className="space-y-2">
                 <Label htmlFor="currency">Moneda principal</Label>
                 <Select
-                  value={settings.currency}
-                  onValueChange={(value) => handleSettingChange('currency', value)}
+                  value={currency}
+                  onValueChange={(value) => handleCurrencyChange(value as Currency)}
+                  disabled={!currentBusiness}
                 >
                   <SelectTrigger id="currency">
                     <SelectValue />
@@ -406,8 +407,9 @@ export default function SettingsManager() {
                   </SelectContent>
                 </Select>
                 <p className="text-sm text-muted-foreground">
-                  Moneda actual: {settings.currency} ({currencySymbols[settings.currency]})
+                  Moneda actual: {currency} ({currencySymbols[currency]})
                 </p>
+
               </div>
             </CardContent>
           </Card>
