@@ -1081,9 +1081,14 @@ export default function OrderManager() {
                               // Update individual item status
                               const updatedOrders = orders.map(o => {
                                 if (o.id === order.id) {
+                                  const nextIndividualStatus: 'preparando' | 'entregando' | 'cobrando' =
+                                    isPreparandoTab ? nextStatusAfterPreparando
+                                    : isResumenTab
+                                      ? (individualItemStatus === 'preparando' ? nextStatusAfterPreparando : 'cobrando')
+                                      : 'cobrando';
                                   const updatedIndividualItemsStatus: Record<string, 'preparando' | 'entregando' | 'cobrando'> = {
                                     ...o.individualItemsStatus,
-                                    [individualItemId]: isPreparandoTab ? nextStatusAfterPreparando : 'cobrando'
+                                    [individualItemId]: nextIndividualStatus
                                   };
                                   
                                   // Check if all individual items of this product are in the same status
