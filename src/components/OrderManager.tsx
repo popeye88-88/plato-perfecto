@@ -1034,20 +1034,9 @@ export default function OrderManager() {
             activeItems.flatMap((item, itemIndex) => {
               const isPreparandoTab = currentTab === 'preparando';
               const isEntregandoTab = currentTab === 'entregando';
+              const isResumenTab = currentTab === 'resumen';
               
-              let isEnabled = false;
-              let showCheckbox = true;
-              let isChecked = false;
-              
-              if (isPreparandoTab) {
-                isEnabled = item.status === 'preparando' && !item.cancelled;
-                isChecked = item.status !== 'preparando';
-              } else if (isEntregandoTab) {
-                isEnabled = item.status === 'entregando' && !item.cancelled;
-                isChecked = item.status === 'cobrando';
-              } else if (currentTab === 'resumen') {
-                showCheckbox = false;
-              }
+              const showCheckbox = true;
               
               // Create one line per individual item (not grouped)
               return Array.from({ length: item.quantity }, (_, quantityIndex) => {
@@ -1070,6 +1059,13 @@ export default function OrderManager() {
                   // In entregando tab: can only check items that are in 'entregando' status
                   individualItemEnabled = individualItemStatus === 'entregando' && !item.cancelled;
                   individualItemChecked = individualItemStatus === 'cobrando';
+                } else if (isResumenTab) {
+                  // In resumen tab: allow advancing items from preparando -> next, or entregando -> cobrando
+                  individualItemEnabled = !item.cancelled && (
+                    individualItemStatus === 'preparando' ||
+                    individualItemStatus === 'entregando'
+                  );
+                  individualItemChecked = individualItemStatus === 'cobrando';
                 }
                 
                 return (
@@ -1085,9 +1081,14 @@ export default function OrderManager() {
                               // Update individual item status
                               const updatedOrders = orders.map(o => {
                                 if (o.id === order.id) {
+                                  const nextIndividualStatus: 'preparando' | 'entregando' | 'cobrando' =
+                                    isPreparandoTab ? nextStatusAfterPreparando
+                                    : isResumenTab
+                                      ? (individualItemStatus === 'preparando' ? nextStatusAfterPreparando : 'cobrando')
+                                      : 'cobrando';
                                   const updatedIndividualItemsStatus: Record<string, 'preparando' | 'entregando' | 'cobrando'> = {
                                     ...o.individualItemsStatus,
-                                    [individualItemId]: isPreparandoTab ? nextStatusAfterPreparando : 'cobrando'
+                                    [individualItemId]: nextIndividualStatus
                                   };
                                   
                                   // Check if all individual items of this product are in the same status
@@ -1190,7 +1191,7 @@ export default function OrderManager() {
             )}
           </div>
           <div className="flex gap-2">
-            {order.status === 'cobrando' && currentTab === 'cobrando' && (
+            {order.status === 'cobrando' && (currentTab === 'cobrando' || currentTab === 'resumen') && (
               <>
                 {can.applyDiscount && (
                   <Button
