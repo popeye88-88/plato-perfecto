@@ -106,12 +106,16 @@ export default function SettingsManager() {
     setRoleHistoryRefresh(v => v + 1);
   };
 
-  const handleSettingChange = (key: keyof AppSettings, value: string | boolean) => {
-    setSettings(prev => ({
-      ...prev,
-      [key]: value
-    }));
+  const handleLanguageChange = (value: Language) => {
+    if (!currentBusiness) return;
+    updateBusiness(currentBusiness.id, { language: value });
   };
+
+  const handleCurrencyChange = (value: Currency) => {
+    if (!currentBusiness) return;
+    updateBusiness(currentBusiness.id, { currency: value });
+  };
+
 
   const handleBusinessSubmit = () => {
     if (!businessForm.name.trim()) return;
