@@ -470,8 +470,9 @@ export default function SettingsManager() {
               <div className="space-y-2">
                 <Label htmlFor="language">Idioma de la aplicación</Label>
                 <Select 
-                  value={settings.language} 
-                  onValueChange={(value) => handleSettingChange('language', value)}
+                  value={language} 
+                  onValueChange={(value) => handleLanguageChange(value as Language)}
+                  disabled={!currentBusiness}
                 >
                   <SelectTrigger id="language">
                     <SelectValue />
@@ -482,8 +483,9 @@ export default function SettingsManager() {
                   </SelectContent>
                 </Select>
                 <p className="text-sm text-muted-foreground">
-                  Idioma actual: {languageLabels[settings.language]}
+                  Idioma actual: {languageLabels[language]}
                 </p>
+
               </div>
             </CardContent>
           </Card>
