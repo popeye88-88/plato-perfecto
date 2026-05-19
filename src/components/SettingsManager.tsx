@@ -30,11 +30,8 @@ import { inviteUserToBusiness } from '@/lib/invitations';
 import { supabase } from '@/integrations/supabase/client';
 import UsersTab from '@/components/settings/UsersTab';
 
-interface AppSettings {
-  language: 'es' | 'en';
-  currency: 'MXN' | 'EUR' | 'USD';
-  ingredientManagement: boolean;
-}
+type Language = 'es' | 'en';
+type Currency = 'MXN' | 'EUR' | 'USD';
 
 const currencySymbols = {
   MXN: '$',
@@ -52,11 +49,10 @@ export default function SettingsManager() {
   const { currentUser, logout, getUsers } = useAuth();
   const { toast } = useToast();
   const { can, isOwner, isManager, role: myRole } = usePermissions();
-  const [settings, setSettings] = useState<AppSettings>({
-    language: 'es',
-    currency: 'MXN',
-    ingredientManagement: false
-  });
+
+  const language = ((currentBusiness?.language as Language) ?? 'es');
+  const currency = ((currentBusiness?.currency as Currency) ?? 'MXN');
+
   const [isBusinessDialogOpen, setIsBusinessDialogOpen] = useState(false);
   const [editingBusiness, setEditingBusiness] = useState<any>(null);
   const [businessForm, setBusinessForm] = useState({
