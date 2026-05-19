@@ -15,8 +15,11 @@ interface Business {
   description?: string;
   createdAt: Date;
   enableEntregandoStage?: boolean;
+  language?: string;
+  currency?: string;
   menuItems: MenuItem[];
 }
+
 
 interface MenuItem {
   id: string;
