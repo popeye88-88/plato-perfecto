@@ -40,11 +40,12 @@ export async function insertBusiness(business: { id: string; name: string; descr
   return error ? null : business;
 }
 
-export async function updateBusinessDb(id: string, updates: { name?: string; description?: string; enable_entregando_stage?: boolean }) {
+export async function updateBusinessDb(id: string, updates: { name?: string; description?: string; enable_entregando_stage?: boolean; language?: string; currency?: string }) {
   const { error } = await supabase.from('businesses').update(updates).eq('id', id);
   if (error) console.error('updateBusinessDb error:', error);
   return !error;
 }
+
 
 export async function deleteBusinessDb(id: string) {
   const { error } = await supabase.from('businesses').delete().eq('id', id);
