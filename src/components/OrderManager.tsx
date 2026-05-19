@@ -1191,7 +1191,7 @@ export default function OrderManager() {
             )}
           </div>
           <div className="flex gap-2">
-            {order.status === 'cobrando' && currentTab === 'cobrando' && (
+            {order.status === 'cobrando' && (currentTab === 'cobrando' || currentTab === 'resumen') && (
               <>
                 {can.applyDiscount && (
                   <Button
