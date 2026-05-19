@@ -49,25 +49,31 @@ export type Database = {
       businesses: {
         Row: {
           created_at: string
+          currency: string
           description: string | null
           enable_entregando_stage: boolean
           id: string
+          language: string
           name: string
           updated_at: string
         }
         Insert: {
           created_at?: string
+          currency?: string
           description?: string | null
           enable_entregando_stage?: boolean
           id?: string
+          language?: string
           name: string
           updated_at?: string
         }
         Update: {
           created_at?: string
+          currency?: string
           description?: string | null
           enable_entregando_stage?: boolean
           id?: string
+          language?: string
           name?: string
           updated_at?: string
         }
