@@ -195,23 +195,6 @@ export default function OrderManager() {
     saveOrders(updatedOrders);
   };
 
-  // Clear all orders for testing
-  const clearAllOrders = () => {
-    if (!currentBusiness?.id) {
-      toast({
-        title: "Negocio no seleccionado",
-        description: "Selecciona un negocio para administrar sus órdenes.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    saveOrders([]);
-    toast({
-      title: "Órdenes eliminadas",
-      description: "Todas las órdenes han sido eliminadas para testing",
-    });
-  };
 
   const getOrdersByStatus = (status: string) => {
     if (status === 'resumen') {

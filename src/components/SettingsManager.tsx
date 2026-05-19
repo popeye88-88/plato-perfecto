@@ -30,11 +30,8 @@ import { inviteUserToBusiness } from '@/lib/invitations';
 import { supabase } from '@/integrations/supabase/client';
 import UsersTab from '@/components/settings/UsersTab';
 
-interface AppSettings {
-  language: 'es' | 'en';
-  currency: 'MXN' | 'EUR' | 'USD';
-  ingredientManagement: boolean;
-}
+type Language = 'es' | 'en';
+type Currency = 'MXN' | 'EUR' | 'USD';
 
 const currencySymbols = {
   MXN: '$',
@@ -52,11 +49,10 @@ export default function SettingsManager() {
   const { currentUser, logout, getUsers } = useAuth();
   const { toast } = useToast();
   const { can, isOwner, isManager, role: myRole } = usePermissions();
-  const [settings, setSettings] = useState<AppSettings>({
-    language: 'es',
-    currency: 'MXN',
-    ingredientManagement: false
-  });
+
+  const language = ((currentBusiness?.language as Language) ?? 'es');
+  const currency = ((currentBusiness?.currency as Currency) ?? 'MXN');
+
   const [isBusinessDialogOpen, setIsBusinessDialogOpen] = useState(false);
   const [editingBusiness, setEditingBusiness] = useState<any>(null);
   const [businessForm, setBusinessForm] = useState({
@@ -110,12 +106,16 @@ export default function SettingsManager() {
     setRoleHistoryRefresh(v => v + 1);
   };
 
-  const handleSettingChange = (key: keyof AppSettings, value: string | boolean) => {
-    setSettings(prev => ({
-      ...prev,
-      [key]: value
-    }));
+  const handleLanguageChange = (value: Language) => {
+    if (!currentBusiness) return;
+    updateBusiness(currentBusiness.id, { language: value });
   };
+
+  const handleCurrencyChange = (value: Currency) => {
+    if (!currentBusiness) return;
+    updateBusiness(currentBusiness.id, { currency: value });
+  };
+
 
   const handleBusinessSubmit = () => {
     if (!businessForm.name.trim()) return;
@@ -393,8 +393,9 @@ export default function SettingsManager() {
               <div className="space-y-2">
                 <Label htmlFor="currency">Moneda principal</Label>
                 <Select
-                  value={settings.currency}
-                  onValueChange={(value) => handleSettingChange('currency', value)}
+                  value={currency}
+                  onValueChange={(value) => handleCurrencyChange(value as Currency)}
+                  disabled={!currentBusiness}
                 >
                   <SelectTrigger id="currency">
                     <SelectValue />
@@ -406,8 +407,9 @@ export default function SettingsManager() {
                   </SelectContent>
                 </Select>
                 <p className="text-sm text-muted-foreground">
-                  Moneda actual: {settings.currency} ({currencySymbols[settings.currency]})
+                  Moneda actual: {currency} ({currencySymbols[currency]})
                 </p>
+
               </div>
             </CardContent>
           </Card>
@@ -468,8 +470,9 @@ export default function SettingsManager() {
               <div className="space-y-2">
                 <Label htmlFor="language">Idioma de la aplicación</Label>
                 <Select 
-                  value={settings.language} 
-                  onValueChange={(value) => handleSettingChange('language', value)}
+                  value={language} 
+                  onValueChange={(value) => handleLanguageChange(value as Language)}
+                  disabled={!currentBusiness}
                 >
                   <SelectTrigger id="language">
                     <SelectValue />
@@ -480,8 +483,9 @@ export default function SettingsManager() {
                   </SelectContent>
                 </Select>
                 <p className="text-sm text-muted-foreground">
-                  Idioma actual: {languageLabels[settings.language]}
+                  Idioma actual: {languageLabels[language]}
                 </p>
+
               </div>
             </CardContent>
           </Card>
