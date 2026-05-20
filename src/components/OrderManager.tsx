@@ -271,7 +271,39 @@ export default function OrderManager() {
         });
       });
     }
+    if (status === 'pagado') {
+      return orders
+        .filter(order => order.status === 'pagado')
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    }
     return orders.filter(order => order.status === status);
+  };
+
+  // Filters for the "Pagado" tab
+  const [paidFilters, setPaidFilters] = useState<{
+    search: string;
+    paymentMethod: 'all' | 'efectivo' | 'tarjeta';
+    serviceType: 'all' | 'puesto' | 'takeaway' | 'delivery';
+    dateFrom: string;
+    dateTo: string;
+  }>({ search: '', paymentMethod: 'all', serviceType: 'all', dateFrom: '', dateTo: '' });
+
+  const getFilteredPaidOrders = () => {
+    const base = getOrdersByStatus('pagado');
+    const q = paidFilters.search.trim().toLowerCase();
+    const from = paidFilters.dateFrom ? new Date(paidFilters.dateFrom + 'T00:00:00') : null;
+    const to = paidFilters.dateTo ? new Date(paidFilters.dateTo + 'T23:59:59') : null;
+    return base.filter(o => {
+      if (paidFilters.paymentMethod !== 'all' && o.paymentMethod !== paidFilters.paymentMethod) return false;
+      if (paidFilters.serviceType !== 'all' && o.serviceType !== paidFilters.serviceType) return false;
+      if (from && o.createdAt < from) return false;
+      if (to && o.createdAt > to) return false;
+      if (q) {
+        const hay = `${o.number} ${o.customerName}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
   };
 
   const getStatusCount = (status: string) => {
