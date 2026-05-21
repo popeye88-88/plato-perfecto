@@ -112,47 +112,72 @@ export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       return;
     }
     try {
-      const { data: memberships, error: membErr } = await supabase
-        .from('business_members')
-        .select('business_id, user_id, role');
-      if (membErr) throw membErr;
+      // Parallelize memberships + businesses fetch
+      const [membRes, businessesData] = await Promise.all([
+        supabase.from('business_members').select('business_id, user_id, role'),
+        fetchBusinessesDb(),
+      ]);
+      if (membRes.error) throw membRes.error;
 
-      const accessData = (memberships || []).map((m) => ({
+      const accessData = (membRes.data || []).map((m) => ({
         businessId: m.business_id,
         userId: m.user_id,
         role: dbToApp(m.role as DbRole),
       }));
       setAccess(accessData);
 
-      const businessesData = await fetchBusinessesDb();
       const userBusinessIds = accessData
         .filter((a) => a.userId === currentUser.id)
         .map((a) => a.businessId);
       const userBizData = (businessesData || []).filter((b) => userBusinessIds.includes(b.id));
 
-      const withMenuItems = await Promise.all(
-        userBizData.map(async (b) => {
-          try {
-            const items = await fetchMenuItems(b.id);
-            return { ...b, menuItems: items || [] };
-          } catch {
-            return { ...b, menuItems: [] };
-          }
-        })
-      );
-      setBusinesses(withMenuItems);
-
+      // Determine current business first; only fetch menu items for it now
       const savedCurrent = localStorage.getItem(`currentBusiness_${currentUser.id}`);
       const parsed = savedCurrent
         ? (() => { try { return JSON.parse(savedCurrent); } catch { return null; } })()
         : null;
-      const found = withMenuItems.find((b) => b.id === parsed?.id);
-      setCurrentBusiness(found ?? withMenuItems[0] ?? null);
+      const activeBiz = userBizData.find((b) => b.id === parsed?.id) ?? userBizData[0] ?? null;
+
+      // Set businesses immediately (without menu items) so UI can render
+      const initial = userBizData.map((b) => ({ ...b, menuItems: [] as MenuItem[] }));
+      setBusinesses(initial);
+      setCurrentBusiness(activeBiz ? { ...activeBiz, menuItems: [] } : null);
+      setLoading(false);
+
+      // Load menu items for active business immediately
+      if (activeBiz) {
+        try {
+          const items = await fetchMenuItems(activeBiz.id);
+          setBusinesses((prev) => prev.map((b) => (b.id === activeBiz.id ? { ...b, menuItems: items || [] } : b)));
+          setCurrentBusiness((prev) => (prev && prev.id === activeBiz.id ? { ...prev, menuItems: items || [] } : prev));
+        } catch (e) {
+          console.error('menu items load error:', e);
+        }
+      }
+
+      // Lazy-load menu items for the remaining businesses in background
+      const others = userBizData.filter((b) => b.id !== activeBiz?.id);
+      Promise.all(
+        others.map(async (b) => {
+          try {
+            const items = await fetchMenuItems(b.id);
+            return { id: b.id, items: items || [] };
+          } catch {
+            return { id: b.id, items: [] };
+          }
+        })
+      ).then((results) => {
+        setBusinesses((prev) =>
+          prev.map((b) => {
+            const r = results.find((x) => x.id === b.id);
+            return r ? { ...b, menuItems: r.items } : b;
+          })
+        );
+      });
     } catch (error) {
       console.error('BusinessProvider load error:', error);
       setBusinesses([]);
       setCurrentBusiness(null);
-    } finally {
       setLoading(false);
     }
   }, [currentUser]);
