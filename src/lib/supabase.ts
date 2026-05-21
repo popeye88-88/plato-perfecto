@@ -96,14 +96,22 @@ export async function fetchOrders(businessId: string) {
     .order('created_at', { ascending: false });
   if (ordersError || !ordersData?.length) return [];
 
-  const orders = [];
-  for (const o of ordersData as OrderRow[]) {
-    const { data: itemsData } = await supabase
-      .from('order_items')
-      .select('*')
-      .eq('order_id', o.id)
-      .order('created_at');
-    const items = (itemsData || []).map((i: OrderItemRow) => ({
+  const orderIds = (ordersData as OrderRow[]).map((o) => o.id);
+  const { data: allItemsData } = await supabase
+    .from('order_items')
+    .select('*')
+    .in('order_id', orderIds)
+    .order('created_at');
+
+  const itemsByOrder = new Map<string, OrderItemRow[]>();
+  for (const it of (allItemsData || []) as OrderItemRow[]) {
+    const arr = itemsByOrder.get(it.order_id) || [];
+    arr.push(it);
+    itemsByOrder.set(it.order_id, arr);
+  }
+
+  return (ordersData as OrderRow[]).map((o) => {
+    const items = (itemsByOrder.get(o.id) || []).map((i) => ({
       id: i.id,
       name: i.name,
       price: parseFloat(String(i.price)),
@@ -115,7 +123,7 @@ export async function fetchOrders(businessId: string) {
       cancelledInStage: i.cancelled_in_stage,
       cancellationReason: i.cancellation_reason
     }));
-    orders.push({
+    return {
       id: o.id,
       number: o.number,
       customerName: o.customer_name,
@@ -135,9 +143,8 @@ export async function fetchOrders(businessId: string) {
         ...e,
         timestamp: new Date(e.timestamp)
       }))
-    });
-  }
-  return orders;
+    };
+  });
 }
 
 export async function saveOrders(businessId: string, orders: Array<{
