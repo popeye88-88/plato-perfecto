@@ -137,7 +137,7 @@ export async function fetchOrders(businessId: string) {
       discountAmount: o.discount_amount ? parseFloat(String(o.discount_amount)) : undefined,
       discountReason: o.discount_reason,
       paymentMethod: o.payment_method,
-      individualItemsStatus: o.individual_items_status as Record<string, string> | undefined,
+      individualItemsStatus: o.individual_items_status as Record<string, 'preparando' | 'entregando' | 'cobrando'> | undefined,
       initialItems: o.initial_items as Array<{ id: string; name: string; price: number; quantity: number }> | undefined,
       editHistory: (o.edit_history as Array<{ timestamp: string; action: string; stage: string; itemName?: string; quantity?: number; details?: string; userId?: string }> | undefined)?.map((e) => ({
         ...e,
