@@ -144,7 +144,7 @@ export async function fetchOrders(businessId: string) {
         timestamp: new Date(e.timestamp)
       }))
     };
-  });
+  }) as any;
 }
 
 export async function saveOrders(businessId: string, orders: Array<{
