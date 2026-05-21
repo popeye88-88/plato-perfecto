@@ -111,13 +111,13 @@ export async function fetchOrders(businessId: string) {
   }
 
   return (ordersData as OrderRow[]).map((o: any) => {
-    const items = (itemsByOrder.get(o.id) || []).map((i) => ({
+    const items = (itemsByOrder.get(o.id) || []).map((i: any) => ({
       id: i.id,
       name: i.name,
       price: parseFloat(String(i.price)),
       quantity: i.quantity,
       originalQuantity: i.original_quantity,
-      status: i.status,
+      status: i.status as 'preparando' | 'entregando' | 'cobrando' | 'pagado',
       cancelled: i.cancelled,
       cancelledAt: i.cancelled_at ? new Date(i.cancelled_at) : undefined,
       cancelledInStage: i.cancelled_in_stage,
