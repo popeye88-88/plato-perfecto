@@ -110,7 +110,7 @@ export async function fetchOrders(businessId: string) {
     itemsByOrder.set(it.order_id, arr);
   }
 
-  return (ordersData as OrderRow[]).map((o) => {
+  return (ordersData as OrderRow[]).map((o: any) => {
     const items = (itemsByOrder.get(o.id) || []).map((i) => ({
       id: i.id,
       name: i.name,
