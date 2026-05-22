@@ -426,7 +426,7 @@ export default function OrderManager() {
 
     const newOrder: Order = {
       id: generateOrderId(),
-      number: `ORD-${orders.length + 1}`,
+      number: computeNextOrderNumber(orders),
       customerName: newOrderForm.customerName,
       serviceType: newOrderForm.serviceType,
       diners: newOrderForm.diners,
