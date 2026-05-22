@@ -233,6 +233,14 @@ export function generateOrderId() {
   return crypto.randomUUID?.() || `order-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+export async function deleteOrderById(orderId: string) {
+  await supabase.from('order_items').delete().eq('order_id', orderId);
+  await supabase.from('order_edit_history').delete().eq('order_id', orderId);
+  const { error } = await supabase.from('orders').delete().eq('id', orderId);
+  if (error) console.error('deleteOrderById error:', error);
+  return !error;
+}
+
 // deleteBusinessAccess - removed: now using business_members table directly
 
 // Menu Items

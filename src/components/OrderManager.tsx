@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useBusinessContext } from '@/contexts/BusinessContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
-import { fetchOrders as fetchOrdersDb, saveOrders as persistOrdersDb, generateOrderId } from '@/lib/supabase';
+import { fetchOrders as fetchOrdersDb, saveOrders as persistOrdersDb, generateOrderId, deleteOrderById } from '@/lib/supabase';
 import { getMenuItemCardStyle } from '@/lib/menuItemColor';
 
 interface OrderItem {
@@ -178,11 +178,24 @@ export default function OrderManager() {
     const previousOrders = orders;
     setOrders(newOrders);
     if (!currentBusiness?.id) return;
+    const newIds = new Set(newOrders.map(o => o.id));
+    const removedOrders = previousOrders.filter(o => !newIds.has(o.id));
+    removedOrders.forEach(o => { deleteOrderById(o.id); });
     const changedOrders = newOrders.filter(newOrder => {
       const prev = previousOrders.find(o => o.id === newOrder.id);
       return !prev || JSON.stringify(prev) !== JSON.stringify(newOrder);
     });
     changedOrders.forEach(order => saveOrderToDb(order));
+  };
+
+  // Compute next order number based on the max ORD-N across all orders (numbers are never reused)
+  const computeNextOrderNumber = (existing: Order[]): string => {
+    let max = 0;
+    existing.forEach(o => {
+      const m = /^ORD-(\d+)$/.exec(o.number || '');
+      if (m) max = Math.max(max, parseInt(m[1], 10));
+    });
+    return `ORD-${max + 1}`;
   };
 
   // Add entry to edit history
@@ -413,7 +426,7 @@ export default function OrderManager() {
 
     const newOrder: Order = {
       id: generateOrderId(),
-      number: `ORD-${orders.length + 1}`,
+      number: computeNextOrderNumber(orders),
       customerName: newOrderForm.customerName,
       serviceType: newOrderForm.serviceType,
       diners: newOrderForm.diners,
@@ -843,11 +856,16 @@ export default function OrderManager() {
       }
       return order;
     });
-    
-    saveOrders(updatedOrders);
+
+    // If the order ended up with no active items, remove it completely (number is reserved via max+1)
+    const target = updatedOrders.find(o => o.id === orderId);
+    const stillActive = target ? target.items.some(i => !i.cancelled && i.quantity > 0) : true;
+    const finalOrders = stillActive ? updatedOrders : updatedOrders.filter(o => o.id !== orderId);
+
+    saveOrders(finalOrders);
     toast({
-      title: "Elemento eliminado",
-      description: "Elemento marcado como eliminado"
+      title: stillActive ? "Elemento eliminado" : "Orden eliminada",
+      description: stillActive ? "Elemento marcado como eliminado" : "La orden quedó sin elementos y fue eliminada"
     });
   };
 
@@ -2442,14 +2460,21 @@ export default function OrderManager() {
                       }
                       return order;
                     });
-                    
-                    saveOrders(updatedOrders);
+
+                    // If the edited order ended up with no active items, remove it completely
+                    const editedTarget = updatedOrders.find(o => o.id === selectedOrderForEdit.id);
+                    const editedHasActive = editedTarget ? editedTarget.items.some(i => !i.cancelled && i.quantity > 0) : true;
+                    const finalOrders = editedHasActive
+                      ? updatedOrders
+                      : updatedOrders.filter(o => o.id !== selectedOrderForEdit.id);
+
+                    saveOrders(finalOrders);
                     setIsEditOrderOpen(false);
                     setLocalEditQuantities({});
                     setReduceQuantityReasons({});
                     toast({
-                      title: "Orden actualizada",
-                      description: "Los cambios se han aplicado correctamente"
+                      title: editedHasActive ? "Orden actualizada" : "Orden eliminada",
+                      description: editedHasActive ? "Los cambios se han aplicado correctamente" : "La orden quedó sin elementos y fue eliminada"
                     });
                   }
                 }}
