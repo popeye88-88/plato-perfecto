@@ -2385,6 +2385,16 @@ export default function OrderManager() {
                         const finalItems = [...updatedItems, ...cancelledItems, ...removedQuantities];
 
                         const previousIndividualStatus = order.individualItemsStatus || {};
+                        const previousActiveQuantityById = new Map<string, number>();
+                        const previousActiveQuantityByName = new Map<string, number>();
+
+                        order.items
+                          .filter(item => !item.cancelled)
+                          .forEach(item => {
+                            previousActiveQuantityById.set(item.id, item.quantity);
+                            previousActiveQuantityByName.set(item.name, item.quantity);
+                          });
+
                         const getItemStatusForIndividual = (status: OrderItem['status']): 'preparando' | 'entregando' | 'cobrando' => {
                           if (status === 'pagado') return 'cobrando';
                           return status;
@@ -2393,9 +2403,12 @@ export default function OrderManager() {
 
                         finalItems.forEach(item => {
                           if (item.cancelled) return;
+                          const previousQuantity = previousActiveQuantityById.get(item.id) ?? previousActiveQuantityByName.get(item.name) ?? 0;
                           for (let i = 0; i < item.quantity; i++) {
                             const key = `${item.id}-${i}`;
-                            rebuiltIndividualStatus[key] = previousIndividualStatus[key] || getItemStatusForIndividual(item.status);
+                            rebuiltIndividualStatus[key] = i >= previousQuantity
+                              ? 'preparando'
+                              : previousIndividualStatus[key] || getItemStatusForIndividual(item.status);
                           }
                         });
                         
