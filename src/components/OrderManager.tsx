@@ -2460,14 +2460,21 @@ export default function OrderManager() {
                       }
                       return order;
                     });
-                    
-                    saveOrders(updatedOrders);
+
+                    // If the edited order ended up with no active items, remove it completely
+                    const editedTarget = updatedOrders.find(o => o.id === selectedOrderForEdit.id);
+                    const editedHasActive = editedTarget ? editedTarget.items.some(i => !i.cancelled && i.quantity > 0) : true;
+                    const finalOrders = editedHasActive
+                      ? updatedOrders
+                      : updatedOrders.filter(o => o.id !== selectedOrderForEdit.id);
+
+                    saveOrders(finalOrders);
                     setIsEditOrderOpen(false);
                     setLocalEditQuantities({});
                     setReduceQuantityReasons({});
                     toast({
-                      title: "Orden actualizada",
-                      description: "Los cambios se han aplicado correctamente"
+                      title: editedHasActive ? "Orden actualizada" : "Orden eliminada",
+                      description: editedHasActive ? "Los cambios se han aplicado correctamente" : "La orden quedó sin elementos y fue eliminada"
                     });
                   }
                 }}
