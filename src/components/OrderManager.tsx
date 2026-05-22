@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useBusinessContext } from '@/contexts/BusinessContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
-import { fetchOrders as fetchOrdersDb, saveOrders as persistOrdersDb, generateOrderId } from '@/lib/supabase';
+import { fetchOrders as fetchOrdersDb, saveOrders as persistOrdersDb, generateOrderId, deleteOrderById } from '@/lib/supabase';
 import { getMenuItemCardStyle } from '@/lib/menuItemColor';
 
 interface OrderItem {
