@@ -856,11 +856,16 @@ export default function OrderManager() {
       }
       return order;
     });
-    
-    saveOrders(updatedOrders);
+
+    // If the order ended up with no active items, remove it completely (number is reserved via max+1)
+    const target = updatedOrders.find(o => o.id === orderId);
+    const stillActive = target ? target.items.some(i => !i.cancelled && i.quantity > 0) : true;
+    const finalOrders = stillActive ? updatedOrders : updatedOrders.filter(o => o.id !== orderId);
+
+    saveOrders(finalOrders);
     toast({
-      title: "Elemento eliminado",
-      description: "Elemento marcado como eliminado"
+      title: stillActive ? "Elemento eliminado" : "Orden eliminada",
+      description: stillActive ? "Elemento marcado como eliminado" : "La orden quedó sin elementos y fue eliminada"
     });
   };
 
