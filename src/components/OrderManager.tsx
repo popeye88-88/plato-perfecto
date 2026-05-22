@@ -178,11 +178,24 @@ export default function OrderManager() {
     const previousOrders = orders;
     setOrders(newOrders);
     if (!currentBusiness?.id) return;
+    const newIds = new Set(newOrders.map(o => o.id));
+    const removedOrders = previousOrders.filter(o => !newIds.has(o.id));
+    removedOrders.forEach(o => { deleteOrderById(o.id); });
     const changedOrders = newOrders.filter(newOrder => {
       const prev = previousOrders.find(o => o.id === newOrder.id);
       return !prev || JSON.stringify(prev) !== JSON.stringify(newOrder);
     });
     changedOrders.forEach(order => saveOrderToDb(order));
+  };
+
+  // Compute next order number based on the max ORD-N across all orders (numbers are never reused)
+  const computeNextOrderNumber = (existing: Order[]): string => {
+    let max = 0;
+    existing.forEach(o => {
+      const m = /^ORD-(\d+)$/.exec(o.number || '');
+      if (m) max = Math.max(max, parseInt(m[1], 10));
+    });
+    return `ORD-${max + 1}`;
   };
 
   // Add entry to edit history
