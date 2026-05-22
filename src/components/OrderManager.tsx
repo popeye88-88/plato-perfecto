@@ -2353,32 +2353,42 @@ export default function OrderManager() {
                         });
                         
                         menuItems.forEach(menuItem => {
-                          const quantity = resolveQuantityValue(localEditQuantities, undefined, menuItem, 0);
-                          const keys = collectQuantityKeys(undefined, menuItem);
-                          const alreadyProcessed = keys.some(key => processedItems.has(key));
+                          const itemVariants = menuItem.hasSizes && menuItem.sizes?.length
+                            ? menuItem.sizes.map(size => ({
+                                id: `${menuItem.id}-size-${size.id}`,
+                                name: `${menuItem.name} — ${size.name}`,
+                                price: size.price
+                              }))
+                            : [{ id: menuItem.id, name: menuItem.name, price: menuItem.price }];
 
-                          if (!alreadyProcessed && quantity > 0) {
+                          itemVariants.forEach(itemVariant => {
+                            const quantity = resolveQuantityValue(localEditQuantities, undefined, itemVariant, 0);
+                            const keys = collectQuantityKeys(undefined, itemVariant);
+                            const alreadyProcessed = keys.some(key => processedItems.has(key));
+
+                            if (!alreadyProcessed && quantity > 0) {
                               updatedItems.push({
-                              id: menuItem.id,
-                                name: menuItem.name,
-                                price: menuItem.price,
-                              quantity,
-                              originalQuantity: quantity,
+                                id: itemVariant.id,
+                                name: itemVariant.name,
+                                price: itemVariant.price,
+                                quantity,
+                                originalQuantity: quantity,
                                 status: 'preparando' as const,
                                 cancelled: false
                               });
 
-                            editHistoryDelta.push({
-                              timestamp: new Date(),
-                              action: 'added',
-                              stage: currentStage,
-                              itemName: menuItem.name,
-                              quantity,
-                              userId: currentUser?.username
-                            });
+                              editHistoryDelta.push({
+                                timestamp: new Date(),
+                                action: 'added',
+                                stage: currentStage,
+                                itemName: itemVariant.name,
+                                quantity,
+                                userId: currentUser?.username
+                              });
 
-                            keys.forEach(key => processedItems.add(key));
-                          }
+                              keys.forEach(key => processedItems.add(key));
+                            }
+                          });
                         });
                         
                         // Combine updated items with existing cancelled items and new removed quantities
