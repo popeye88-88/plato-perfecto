@@ -2402,9 +2402,14 @@ export default function OrderManager() {
                         const newTotal = finalItems
                           .filter(item => !item.cancelled)
                           .reduce((sum, item) => sum + (item.price * item.quantity), 0);
-                        
+
+                        // If new items were added, move order back to Preparando so they're visible
+                        const hasAddedItems = editHistoryDelta.some(e => e.action === 'added');
+                        const newOrderStatus = hasAddedItems ? 'preparando' : order.status;
+
                         return {
                           ...order,
+                          status: newOrderStatus,
                           items: finalItems,
                           individualItemsStatus: rebuiltIndividualStatus,
                           total: newTotal,
