@@ -1,0 +1,1 @@
+DELETE FROM auth.users WHERE email IN ('gabrielasotodesimon@gmail.com','billy.alonsoromero@gmail.com');
