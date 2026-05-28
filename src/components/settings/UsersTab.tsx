@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Users, Mail, History, Lock, X, ChevronDown, Trash2, UserPlus } from 'lucide-react';
+import { Users, Mail, History, Lock, X, ChevronDown, Trash2, UserPlus, Link2, Copy } from 'lucide-react';
 import { useBusinessContext, type BusinessRole, type RoleHistoryRow, type PendingInvitationRow } from '@/contexts/BusinessContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePermissions, ROLE_LABELS, ROLE_BADGE_CLASS } from '@/hooks/usePermissions';
@@ -59,6 +59,11 @@ export default function UsersTab() {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<BusinessRole>('staff');
   const [inviting, setInviting] = useState(false);
+
+  // Shareable link
+  const [linkRole, setLinkRole] = useState<BusinessRole>('staff');
+  const [generatingLink, setGeneratingLink] = useState(false);
+  const [generatedLink, setGeneratedLink] = useState<string | null>(null);
 
   // Confirm dialogs
   const [roleChange, setRoleChange] = useState<{ userId: string; from: BusinessRole; to: BusinessRole } | null>(null);
@@ -158,6 +163,38 @@ export default function UsersTab() {
     refresh();
   };
 
+  const generateShareableLink = async () => {
+    if (!businessId || !currentUser) return;
+    setGeneratingLink(true);
+    setGeneratedLink(null);
+    try {
+      const role = isManager && !isOwner ? 'staff' : linkRole;
+      const dbRole = role === 'owner' ? 'admin' : role;
+      const code = (crypto.randomUUID().replace(/-/g, '') + Math.random().toString(36).slice(2))
+        .slice(0, 24);
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      const { error } = await supabase.from('pending_invitations').insert({
+        business_id: businessId,
+        role: dbRole as 'admin' | 'manager' | 'staff',
+        invited_by: currentUser.id,
+        code,
+        expires_at: expiresAt,
+        email: null,
+      });
+      if (error) {
+        toast({ title: 'Error', description: error.message, variant: 'destructive' });
+        return;
+      }
+      const url = `${window.location.origin}/?invite=${code}`;
+      setGeneratedLink(url);
+      try { await navigator.clipboard.writeText(url); } catch { /* ignore */ }
+      toast({ title: 'Enlace generado', description: 'Copiado al portapapeles. Válido 7 días.' });
+      refresh();
+    } finally {
+      setGeneratingLink(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -211,6 +248,58 @@ export default function UsersTab() {
                 {inviting ? 'Enviando...' : 'Invitar'}
               </Button>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* SHAREABLE LINK */}
+      {(can.inviteStaff || can.inviteManager || can.inviteOwner) && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Link2 className="h-5 w-5" />
+              Enlace de invitación compartible
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Genera un enlace que cualquier persona puede usar para crear su cuenta y unirse a este negocio. No requiere validar el email. Válido 7 días.
+            </p>
+            <div className="grid sm:grid-cols-[180px_auto] gap-3 items-end">
+              <div>
+                <Label>Rol</Label>
+                {isOwner ? (
+                  <Select value={linkRole} onValueChange={(v) => setLinkRole(v as BusinessRole)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="manager">{ROLE_LABELS.manager}</SelectItem>
+                      <SelectItem value="staff">{ROLE_LABELS.staff}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="h-10 flex items-center px-3 border border-input rounded-md bg-muted/40 text-sm">
+                    {ROLE_LABELS.staff}
+                  </div>
+                )}
+              </div>
+              <Button onClick={generateShareableLink} disabled={generatingLink} className="bg-gradient-primary hover:opacity-90">
+                {generatingLink ? 'Generando...' : 'Generar enlace'}
+              </Button>
+            </div>
+            {generatedLink && (
+              <div className="flex items-center gap-2 p-3 border border-border rounded-lg bg-muted/30">
+                <Input readOnly value={generatedLink} onFocus={(e) => e.currentTarget.select()} className="flex-1" />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={async () => {
+                    try { await navigator.clipboard.writeText(generatedLink); toast({ title: 'Copiado' }); } catch { /* ignore */ }
+                  }}
+                >
+                  <Copy className="h-4 w-4 mr-1" /> Copiar
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -313,26 +402,53 @@ export default function UsersTab() {
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {pending.map((inv) => (
-                <div key={inv.id} className="flex items-center justify-between gap-3 p-3 border border-border rounded-lg bg-card flex-wrap">
-                  <div className="min-w-0 flex-1">
-                    <div className="font-medium text-foreground truncate">{inv.email}</div>
-                    <div className="text-xs text-muted-foreground">
-                      Enviada: {new Date(inv.created_at).toLocaleDateString('es-ES')}
+              {pending.map((inv) => {
+                const isLink = !inv.email && !!inv.code;
+                const shareUrl = isLink ? `${window.location.origin}/?invite=${inv.code}` : null;
+                const expired = inv.expires_at ? new Date(inv.expires_at) < new Date() : false;
+                return (
+                  <div key={inv.id} className="flex items-center justify-between gap-3 p-3 border border-border rounded-lg bg-card flex-wrap">
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium text-foreground truncate flex items-center gap-2">
+                        {isLink ? (
+                          <><Link2 className="h-4 w-4" /> Enlace compartible</>
+                        ) : (
+                          inv.email
+                        )}
+                        {expired && <span className="text-xs text-destructive">(caducado)</span>}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Creada: {new Date(inv.created_at).toLocaleDateString('es-ES')}
+                        {inv.expires_at && ` · Caduca: ${new Date(inv.expires_at).toLocaleDateString('es-ES')}`}
+                      </div>
+                      {shareUrl && (
+                        <div className="text-xs text-muted-foreground truncate mt-1">{shareUrl}</div>
+                      )}
                     </div>
+                    <Badge className={ROLE_BADGE_CLASS[dbRoleToApp(inv.role)]}>
+                      {ROLE_LABELS[dbRoleToApp(inv.role)]}
+                    </Badge>
+                    {shareUrl && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={async () => {
+                          try { await navigator.clipboard.writeText(shareUrl); toast({ title: 'Copiado' }); } catch { /* ignore */ }
+                        }}
+                      >
+                        <Copy className="h-4 w-4 mr-1" /> Copiar
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={async () => { await cancelInvitation(inv.id); refresh(); }}
+                    >
+                      <X className="h-4 w-4 mr-1" /> Cancelar
+                    </Button>
                   </div>
-                  <Badge className={ROLE_BADGE_CLASS[dbRoleToApp(inv.role)]}>
-                    {ROLE_LABELS[dbRoleToApp(inv.role)]}
-                  </Badge>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={async () => { await cancelInvitation(inv.id); refresh(); }}
-                  >
-                    <X className="h-4 w-4 mr-1" /> Cancelar
-                  </Button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </CardContent>
         </Card>
