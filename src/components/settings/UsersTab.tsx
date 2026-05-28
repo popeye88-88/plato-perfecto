@@ -402,26 +402,53 @@ export default function UsersTab() {
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {pending.map((inv) => (
-                <div key={inv.id} className="flex items-center justify-between gap-3 p-3 border border-border rounded-lg bg-card flex-wrap">
-                  <div className="min-w-0 flex-1">
-                    <div className="font-medium text-foreground truncate">{inv.email}</div>
-                    <div className="text-xs text-muted-foreground">
-                      Enviada: {new Date(inv.created_at).toLocaleDateString('es-ES')}
+              {pending.map((inv) => {
+                const isLink = !inv.email && !!inv.code;
+                const shareUrl = isLink ? `${window.location.origin}/?invite=${inv.code}` : null;
+                const expired = inv.expires_at ? new Date(inv.expires_at) < new Date() : false;
+                return (
+                  <div key={inv.id} className="flex items-center justify-between gap-3 p-3 border border-border rounded-lg bg-card flex-wrap">
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium text-foreground truncate flex items-center gap-2">
+                        {isLink ? (
+                          <><Link2 className="h-4 w-4" /> Enlace compartible</>
+                        ) : (
+                          inv.email
+                        )}
+                        {expired && <span className="text-xs text-destructive">(caducado)</span>}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Creada: {new Date(inv.created_at).toLocaleDateString('es-ES')}
+                        {inv.expires_at && ` · Caduca: ${new Date(inv.expires_at).toLocaleDateString('es-ES')}`}
+                      </div>
+                      {shareUrl && (
+                        <div className="text-xs text-muted-foreground truncate mt-1">{shareUrl}</div>
+                      )}
                     </div>
+                    <Badge className={ROLE_BADGE_CLASS[dbRoleToApp(inv.role)]}>
+                      {ROLE_LABELS[dbRoleToApp(inv.role)]}
+                    </Badge>
+                    {shareUrl && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={async () => {
+                          try { await navigator.clipboard.writeText(shareUrl); toast({ title: 'Copiado' }); } catch { /* ignore */ }
+                        }}
+                      >
+                        <Copy className="h-4 w-4 mr-1" /> Copiar
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={async () => { await cancelInvitation(inv.id); refresh(); }}
+                    >
+                      <X className="h-4 w-4 mr-1" /> Cancelar
+                    </Button>
                   </div>
-                  <Badge className={ROLE_BADGE_CLASS[dbRoleToApp(inv.role)]}>
-                    {ROLE_LABELS[dbRoleToApp(inv.role)]}
-                  </Badge>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={async () => { await cancelInvitation(inv.id); refresh(); }}
-                  >
-                    <X className="h-4 w-4 mr-1" /> Cancelar
-                  </Button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </CardContent>
         </Card>
