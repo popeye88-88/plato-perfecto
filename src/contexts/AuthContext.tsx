@@ -11,7 +11,7 @@ export interface User {
 interface AuthContextType {
   currentUser: User | null;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  signup: (email: string, password: string, fullName: string) => Promise<{ success: boolean; error?: string }>;
+  signup: (email: string, password: string, fullName: string, invitationCode?: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
   loading: boolean;
@@ -82,12 +82,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { success: true };
   };
 
-  const signup = async (email: string, password: string, fullName: string): Promise<{ success: boolean; error?: string }> => {
+  const signup = async (email: string, password: string, fullName: string, invitationCode?: string): Promise<{ success: boolean; error?: string }> => {
+    const meta: Record<string, string> = { full_name: fullName };
+    if (invitationCode) meta.invitation_code = invitationCode;
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: { full_name: fullName },
+        data: meta,
         emailRedirectTo: window.location.origin,
       },
     });
