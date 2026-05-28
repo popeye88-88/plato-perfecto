@@ -309,8 +309,10 @@ export type Database = {
         Row: {
           accepted_at: string | null
           business_id: string
+          code: string | null
           created_at: string
-          email: string
+          email: string | null
+          expires_at: string | null
           id: string
           invited_by: string
           role: Database["public"]["Enums"]["app_role"]
@@ -318,8 +320,10 @@ export type Database = {
         Insert: {
           accepted_at?: string | null
           business_id: string
+          code?: string | null
           created_at?: string
-          email: string
+          email?: string | null
+          expires_at?: string | null
           id?: string
           invited_by: string
           role: Database["public"]["Enums"]["app_role"]
@@ -327,8 +331,10 @@ export type Database = {
         Update: {
           accepted_at?: string | null
           business_id?: string
+          code?: string | null
           created_at?: string
-          email?: string
+          email?: string | null
+          expires_at?: string | null
           id?: string
           invited_by?: string
           role?: Database["public"]["Enums"]["app_role"]
@@ -436,6 +442,15 @@ export type Database = {
         Returns: boolean
       }
       is_staff: { Args: { _user_id: string }; Returns: boolean }
+      lookup_invitation_by_code: {
+        Args: { _code: string }
+        Returns: {
+          business_id: string
+          business_name: string
+          expired: boolean
+          role: Database["public"]["Enums"]["app_role"]
+        }[]
+      }
     }
     Enums: {
       app_role: "admin" | "staff" | "manager"
