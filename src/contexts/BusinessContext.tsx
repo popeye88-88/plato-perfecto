@@ -61,6 +61,12 @@ export interface PendingInvitationRow {
   expires_at?: string | null;
 }
 
+interface BusinessUserAccess {
+  businessId: string;
+  userId: string;
+  role: BusinessRole;
+}
+
 interface BusinessContextType {
   currentBusiness: Business | null;
   businesses: Business[];
