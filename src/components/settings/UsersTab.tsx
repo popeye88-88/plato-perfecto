@@ -252,6 +252,58 @@ export default function UsersTab() {
         </Card>
       )}
 
+      {/* SHAREABLE LINK */}
+      {(can.inviteStaff || can.inviteManager || can.inviteOwner) && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Link2 className="h-5 w-5" />
+              Enlace de invitación compartible
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Genera un enlace que cualquier persona puede usar para crear su cuenta y unirse a este negocio. No requiere validar el email. Válido 7 días.
+            </p>
+            <div className="grid sm:grid-cols-[180px_auto] gap-3 items-end">
+              <div>
+                <Label>Rol</Label>
+                {isOwner ? (
+                  <Select value={linkRole} onValueChange={(v) => setLinkRole(v as BusinessRole)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="manager">{ROLE_LABELS.manager}</SelectItem>
+                      <SelectItem value="staff">{ROLE_LABELS.staff}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="h-10 flex items-center px-3 border border-input rounded-md bg-muted/40 text-sm">
+                    {ROLE_LABELS.staff}
+                  </div>
+                )}
+              </div>
+              <Button onClick={generateShareableLink} disabled={generatingLink} className="bg-gradient-primary hover:opacity-90">
+                {generatingLink ? 'Generando...' : 'Generar enlace'}
+              </Button>
+            </div>
+            {generatedLink && (
+              <div className="flex items-center gap-2 p-3 border border-border rounded-lg bg-muted/30">
+                <Input readOnly value={generatedLink} onFocus={(e) => e.currentTarget.select()} className="flex-1" />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={async () => {
+                    try { await navigator.clipboard.writeText(generatedLink); toast({ title: 'Copiado' }); } catch { /* ignore */ }
+                  }}
+                >
+                  <Copy className="h-4 w-4 mr-1" /> Copiar
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* MEMBERS LIST */}
       <Card>
         <CardHeader>
