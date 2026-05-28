@@ -39,6 +39,16 @@ type DbRole = 'admin' | 'manager' | 'staff';
 const dbToApp = (r: DbRole): BusinessRole => (r === 'admin' ? 'owner' : r === 'manager' ? 'manager' : 'staff');
 const appToDb = (r: BusinessRole): DbRole => (r === 'owner' ? 'admin' : r === 'manager' ? 'manager' : 'staff');
 
+export interface RoleHistoryRow {
+  id: string;
+  business_id: string;
+  changed_by: string;
+  target_user_id: string;
+  old_role: DbRole | null;
+  new_role: DbRole;
+  created_at: string;
+}
+
 export interface PendingInvitationRow {
   id: string;
   email: string | null;
@@ -49,22 +59,6 @@ export interface PendingInvitationRow {
   accepted_at: string | null;
   code?: string | null;
   expires_at?: string | null;
-}
-  changed_by: string;
-  target_user_id: string;
-  old_role: DbRole | null;
-  new_role: DbRole;
-  created_at: string;
-}
-
-export interface PendingInvitationRow {
-  id: string;
-  email: string;
-  business_id: string;
-  role: DbRole;
-  invited_by: string;
-  created_at: string;
-  accepted_at: string | null;
 }
 
 interface BusinessContextType {
