@@ -163,6 +163,38 @@ export default function UsersTab() {
     refresh();
   };
 
+  const generateShareableLink = async () => {
+    if (!businessId || !currentUser) return;
+    setGeneratingLink(true);
+    setGeneratedLink(null);
+    try {
+      const role = isManager && !isOwner ? 'staff' : linkRole;
+      const dbRole = role === 'owner' ? 'admin' : role;
+      const code = (crypto.randomUUID().replace(/-/g, '') + Math.random().toString(36).slice(2))
+        .slice(0, 24);
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      const { error } = await supabase.from('pending_invitations').insert({
+        business_id: businessId,
+        role: dbRole as 'admin' | 'manager' | 'staff',
+        invited_by: currentUser.id,
+        code,
+        expires_at: expiresAt,
+        email: null,
+      });
+      if (error) {
+        toast({ title: 'Error', description: error.message, variant: 'destructive' });
+        return;
+      }
+      const url = `${window.location.origin}/?invite=${code}`;
+      setGeneratedLink(url);
+      try { await navigator.clipboard.writeText(url); } catch { /* ignore */ }
+      toast({ title: 'Enlace generado', description: 'Copiado al portapapeles. Válido 7 días.' });
+      refresh();
+    } finally {
+      setGeneratingLink(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
