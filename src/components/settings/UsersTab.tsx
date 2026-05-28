@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Users, Mail, History, Lock, X, ChevronDown, Trash2, UserPlus } from 'lucide-react';
+import { Users, Mail, History, Lock, X, ChevronDown, Trash2, UserPlus, Link2, Copy } from 'lucide-react';
 import { useBusinessContext, type BusinessRole, type RoleHistoryRow, type PendingInvitationRow } from '@/contexts/BusinessContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePermissions, ROLE_LABELS, ROLE_BADGE_CLASS } from '@/hooks/usePermissions';
@@ -59,6 +59,11 @@ export default function UsersTab() {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<BusinessRole>('staff');
   const [inviting, setInviting] = useState(false);
+
+  // Shareable link
+  const [linkRole, setLinkRole] = useState<BusinessRole>('staff');
+  const [generatingLink, setGeneratingLink] = useState(false);
+  const [generatedLink, setGeneratedLink] = useState<string | null>(null);
 
   // Confirm dialogs
   const [roleChange, setRoleChange] = useState<{ userId: string; from: BusinessRole; to: BusinessRole } | null>(null);
