@@ -2024,7 +2024,7 @@ export default function OrderManager() {
                         hasItemInCobrando = itemKeys.some(key => selectedOrderForEdit.individualItemsStatus?.[key] === 'cobrando');
                       }
                       if (isOrderInCobrando && (isItemInCobrando || hasItemInCobrando)) {
-                        setItemToReduce({ menuItemId: fakeId, menuItemName: displayName, currentQuantity });
+                        setItemToReduce({ menuItemId: fakeId, menuItemName: displayName, currentQuantity, orderItemId: orderItem?.id, fakeMenuItem });
                         setIsReduceQuantityDialogOpen(true);
                       } else {
                         setLocalEditQuantities(prev => {
