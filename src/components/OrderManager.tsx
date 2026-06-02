@@ -2601,31 +2601,38 @@ export default function OrderManager() {
               variant="destructive"
               onClick={() => {
                 if (!reduceQuantityReason.trim() || !itemToReduce) return;
-                
-                // Find the menu item and order item
-                const menuItem = menuItems.find(m => m.id === itemToReduce.menuItemId);
-                const orderItem = selectedOrderForEdit?.items.find(item => 
-                  !item.cancelled && (item.id === menuItem?.id || item.name === menuItem?.name)
+
+                // Use the references captured when the dialog was opened so this
+                // works for both plain items and size-variant items.
+                const fakeMenuItem = itemToReduce.fakeMenuItem
+                  ?? menuItems.find(m => m.id === itemToReduce.menuItemId)
+                  ?? { id: itemToReduce.menuItemId, name: itemToReduce.menuItemName, price: 0 };
+                const orderItem = selectedOrderForEdit?.items.find(item =>
+                  !item.cancelled && (
+                    (itemToReduce.orderItemId && item.id === itemToReduce.orderItemId) ||
+                    item.id === fakeMenuItem.id ||
+                    item.name === fakeMenuItem.name
+                  )
                 );
-                
+
                 // Create a key to identify this item
-                const itemKey = orderItem?.id || menuItem?.id || itemToReduce.menuItemId;
-                
+                const itemKey = orderItem?.id || fakeMenuItem.id;
+
                 // Store the reason
                 setReduceQuantityReasons(prev => ({
                   ...prev,
                   [itemKey]: reduceQuantityReason.trim()
                 }));
-                
+
                 // Reduce quantity
                 setLocalEditQuantities(prev => {
                   const newQuantity = Math.max(
                     0,
-                    resolveQuantityValue(prev, orderItem, menuItem, 0) - 1
+                    resolveQuantityValue(prev, orderItem, fakeMenuItem, 0) - 1
                   );
-                  return applyQuantityUpdate(prev, newQuantity, orderItem, menuItem);
+                  return applyQuantityUpdate(prev, newQuantity, orderItem, fakeMenuItem);
                 });
-                
+
                 setIsReduceQuantityDialogOpen(false);
                 setReduceQuantityReason('');
                 setItemToReduce(null);
