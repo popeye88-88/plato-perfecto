@@ -1068,50 +1068,64 @@ export default function OrderManager() {
               const isPreparandoTab = currentTab === 'preparando';
               const isEntregandoTab = currentTab === 'entregando';
               const isResumenTab = currentTab === 'resumen';
-              
+
               const showCheckbox = true;
-              
-              // Create one line per individual item (not grouped)
-              return Array.from({ length: item.quantity }, (_, quantityIndex) => {
-                // Create unique ID for each individual item
+
+              // Split individual sub-items into "done" (already in cobrando) and "pending"
+              const indices = Array.from({ length: item.quantity }, (_, idx) => idx);
+              const doneIndices = indices.filter(idx => (order.individualItemsStatus?.[`${item.id}-${idx}`] || 'preparando') === 'cobrando');
+              const pendingIndices = indices.filter(idx => !doneIndices.includes(idx));
+
+              const rows: JSX.Element[] = [];
+
+              // Grouped "done" line — Nx Name with checkmark
+              if (doneIndices.length > 0) {
+                rows.push(
+                  <div key={`${item.id}-grouped-done`} className="flex items-center justify-between text-sm py-2 border-b border-border/50 last:border-b-0">
+                    <div className="flex items-center">
+                      <Checkbox checked disabled className="h-4 w-4" />
+                    </div>
+                    <div className="flex-1 px-3 text-foreground">
+                      <span className="font-medium">{doneIndices.length}x {item.name}</span>
+                    </div>
+                    <div className="flex items-center">
+                      <span className="text-lg">{getStatusSymbol('cobrando')}</span>
+                    </div>
+                  </div>
+                );
+              }
+
+              // Pending sub-items rendered individually with checkboxes
+              return rows.concat(pendingIndices.map((quantityIndex) => {
                 const individualItemId = `${item.id}-${quantityIndex}`;
-                
-                // Get the current status of this individual item
                 const individualItemStatus = order.individualItemsStatus?.[individualItemId] || 'preparando';
-                
-                // Determine if this individual item should be enabled for checking
+
                 let individualItemEnabled = false;
                 let individualItemChecked = false;
-                
+
                 if (isPreparandoTab) {
-                  // In preparando tab: can check items in 'preparando' status
-                  // When entregando is disabled, also allow checking 'entregando' items (legacy data)
                   individualItemEnabled = (individualItemStatus === 'preparando' || (!enableEntregandoStage && individualItemStatus === 'entregando')) && !item.cancelled;
-                  individualItemChecked = false; // Never checked in preparando tab
+                  individualItemChecked = false;
                 } else if (isEntregandoTab) {
-                  // In entregando tab: can only check items that are in 'entregando' status
                   individualItemEnabled = individualItemStatus === 'entregando' && !item.cancelled;
-                  individualItemChecked = individualItemStatus === 'cobrando';
+                  individualItemChecked = false;
                 } else if (isResumenTab) {
-                  // In resumen tab: allow advancing items from preparando -> next, or entregando -> cobrando
                   individualItemEnabled = !item.cancelled && (
                     individualItemStatus === 'preparando' ||
                     individualItemStatus === 'entregando'
                   );
-                  individualItemChecked = individualItemStatus === 'cobrando';
+                  individualItemChecked = false;
                 }
-                
+
                 return (
                   <div key={individualItemId} className="flex items-center justify-between text-sm py-2 border-b border-border/50 last:border-b-0">
-                    {/* Left column - Check mark */}
                     <div className="flex items-center">
                       {showCheckbox && (
-                  <Checkbox
+                        <Checkbox
                           checked={individualItemChecked}
                           disabled={!individualItemEnabled}
-                    onCheckedChange={(checked) => {
+                          onCheckedChange={(checked) => {
                             if (checked && individualItemEnabled) {
-                              // Update individual item status
                               const updatedOrders = orders.map(o => {
                                 if (o.id === order.id) {
                                   const nextIndividualStatus: 'preparando' | 'entregando' | 'cobrando' =
@@ -1123,16 +1137,14 @@ export default function OrderManager() {
                                     ...o.individualItemsStatus,
                                     [individualItemId]: nextIndividualStatus
                                   };
-                                  
-                                  // Check if all individual items of this product are in the same status
-                                  const allItemsInSameStatus = Array.from({ length: item.quantity }, (_, idx) => 
+
+                                  const allItemsInSameStatus = Array.from({ length: item.quantity }, (_, idx) =>
                                     `${item.id}-${idx}`
                                   ).every(id => {
                                     const status = updatedIndividualItemsStatus[id];
                                     return status === updatedIndividualItemsStatus[individualItemId];
                                   });
-                                  
-                                  // Update the main item status when ALL individual items are in the same status
+
                                   let updatedItems = o.items;
                                   if (allItemsInSameStatus) {
                                     updatedItems = o.items.map(i => {
@@ -1147,26 +1159,23 @@ export default function OrderManager() {
                                       return i;
                                     });
                                   }
-                                  
-                                  // Check if ALL individual items of the entire order are 'cobrando'
+
                                   const allOrderItemsReadyForPayment = o.items.every(orderItem => {
-                                    if (orderItem.cancelled) return true; // Skip cancelled items
-                                    return Array.from({ length: orderItem.quantity }, (_, idx) => 
+                                    if (orderItem.cancelled) return true;
+                                    return Array.from({ length: orderItem.quantity }, (_, idx) =>
                                       `${orderItem.id}-${idx}`
                                     ).every(id => updatedIndividualItemsStatus[id] === 'cobrando');
                                   });
-                                  
-                                  // If all order items are ready for payment, move order to 'cobrando'
+
                                   let updatedOrderStatus = o.status;
                                   if (allOrderItemsReadyForPayment && o.status !== 'pagado') {
                                     updatedOrderStatus = 'cobrando';
-                                    // Update all items to 'cobrando' status
                                     updatedItems = updatedItems.map(i => ({
                                       ...i,
                                       status: 'cobrando' as const
                                     }));
                                   }
-                                  
+
                                   return {
                                     ...o,
                                     status: updatedOrderStatus,
@@ -1176,41 +1185,39 @@ export default function OrderManager() {
                                 }
                                 return o;
                               });
-                              
+
                               saveOrders(updatedOrders);
-                      }
-                    }}
-                    className="h-4 w-4"
-                  />
-                )}
+                            }
+                          }}
+                          className="h-4 w-4"
+                        />
+                      )}
                     </div>
-                    
-                    {/* Center column - Item name */}
+
                     <div className={`flex-1 px-3 ${(!individualItemEnabled && showCheckbox) ? 'text-muted-foreground' : 'text-foreground'}`}>
                       <span className="font-medium text-foreground">
                         {item.name}
-                </span>
-                      {/* Warning badge for legacy 'entregando' items when stage is disabled */}
+                      </span>
                       {!enableEntregandoStage && individualItemStatus === 'entregando' && isPreparandoTab && (
                         <Badge variant="outline" className="ml-2 text-xs bg-yellow-50 text-yellow-700 border-yellow-300">
                           Pendiente de asignar
                         </Badge>
                       )}
-              </div>
-                    
-                    {/* Right column - Status symbol */}
+                    </div>
+
                     <div className="flex items-center">
                       {!isCobrandoOrPagado && (
                         <span className="text-lg">
                           {getStatusSymbol(individualItemStatus)}
                         </span>
                       )}
-            </div>
+                    </div>
                   </div>
                 );
-              });
+              }));
             })
           )}
+
         </div>
         
         {/* Footer with total and actions */}
