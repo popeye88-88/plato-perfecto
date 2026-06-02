@@ -118,7 +118,7 @@ export default function OrderManager() {
   const [itemToCancel, setItemToCancel] = useState<{orderId: string, itemId: string, individualId?: string} | null>(null);
   const [cancelReason, setCancelReason] = useState('');
   const [isReduceQuantityDialogOpen, setIsReduceQuantityDialogOpen] = useState(false);
-  const [itemToReduce, setItemToReduce] = useState<{menuItemId: string, menuItemName: string, currentQuantity: number} | null>(null);
+  const [itemToReduce, setItemToReduce] = useState<{menuItemId: string, menuItemName: string, currentQuantity: number, orderItemId?: string, fakeMenuItem?: {id: string, name: string, price: number, category?: string}} | null>(null);
   const [reduceQuantityReason, setReduceQuantityReason] = useState('');
   const [reduceQuantityReasons, setReduceQuantityReasons] = useState<Record<string, string>>({});
 
