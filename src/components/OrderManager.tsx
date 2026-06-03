@@ -1614,6 +1614,7 @@ export default function OrderManager() {
                       <SelectItem value="all">Todos</SelectItem>
                       <SelectItem value="efectivo">Efectivo</SelectItem>
                       <SelectItem value="tarjeta">Tarjeta</SelectItem>
+                      <SelectItem value="transferencia">Transferencia</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
