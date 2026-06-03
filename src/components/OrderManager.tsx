@@ -53,7 +53,7 @@ interface Order {
   edited?: boolean;
   discountAmount?: number;
   discountReason?: string;
-  paymentMethod?: 'tarjeta' | 'efectivo';
+  paymentMethod?: 'tarjeta' | 'efectivo' | 'transferencia';
   individualItemsStatus?: Record<string, 'preparando' | 'entregando' | 'cobrando'>;
   individualItemsCancelled?: Record<string, boolean>;
   editHistory?: EditHistoryEntry[];
@@ -110,7 +110,7 @@ export default function OrderManager() {
   const [discountReason, setDiscountReason] = useState('');
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [selectedOrderForPayment, setSelectedOrderForPayment] = useState<Order | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<'tarjeta' | 'efectivo' | ''>('');
+  const [paymentMethod, setPaymentMethod] = useState<'tarjeta' | 'efectivo' | 'transferencia' | ''>('');
   const [isEditOrderOpen, setIsEditOrderOpen] = useState(false);
   const [selectedOrderForEdit, setSelectedOrderForEdit] = useState<Order | null>(null);
   const [localEditQuantities, setLocalEditQuantities] = useState<Record<string, number>>({});
@@ -295,7 +295,7 @@ export default function OrderManager() {
   // Filters for the "Pagado" tab
   const [paidFilters, setPaidFilters] = useState<{
     search: string;
-    paymentMethod: 'all' | 'efectivo' | 'tarjeta';
+    paymentMethod: 'all' | 'efectivo' | 'tarjeta' | 'transferencia';
     serviceType: 'all' | 'puesto' | 'takeaway' | 'delivery';
     dateFrom: string;
     dateTo: string;
@@ -623,7 +623,7 @@ export default function OrderManager() {
 
     toast({
       title: "Pago procesado",
-      description: `Orden pagada con ${paymentMethod === 'tarjeta' ? 'tarjeta' : 'efectivo'}`
+      description: `Orden pagada con ${paymentMethod === 'tarjeta' ? 'tarjeta' : paymentMethod === 'transferencia' ? 'transferencia' : 'efectivo'}`
     });
   };
 
@@ -1614,6 +1614,7 @@ export default function OrderManager() {
                       <SelectItem value="all">Todos</SelectItem>
                       <SelectItem value="efectivo">Efectivo</SelectItem>
                       <SelectItem value="tarjeta">Tarjeta</SelectItem>
+                      <SelectItem value="transferencia">Transferencia</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1950,20 +1951,27 @@ export default function OrderManager() {
             
             <div>
               <Label>Método de pago:</Label>
-              <div className="flex gap-4 mt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
                           <Button 
                   variant={paymentMethod === 'tarjeta' ? 'default' : 'outline'}
                   onClick={() => setPaymentMethod('tarjeta')}
-                  className="flex-1"
+                  className="w-full"
                 >
                   💳 Tarjeta
                           </Button>
                 <Button
                   variant={paymentMethod === 'efectivo' ? 'default' : 'outline'}
                   onClick={() => setPaymentMethod('efectivo')}
-                  className="flex-1"
+                  className="w-full"
                 >
                   💵 Efectivo
+                </Button>
+                <Button
+                  variant={paymentMethod === 'transferencia' ? 'default' : 'outline'}
+                  onClick={() => setPaymentMethod('transferencia')}
+                  className="w-full"
+                >
+                  📱 Transferencia
                 </Button>
               </div>
             </div>
