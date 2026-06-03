@@ -1951,20 +1951,27 @@ export default function OrderManager() {
             
             <div>
               <Label>Método de pago:</Label>
-              <div className="flex gap-4 mt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
                           <Button 
                   variant={paymentMethod === 'tarjeta' ? 'default' : 'outline'}
                   onClick={() => setPaymentMethod('tarjeta')}
-                  className="flex-1"
+                  className="w-full"
                 >
                   💳 Tarjeta
                           </Button>
                 <Button
                   variant={paymentMethod === 'efectivo' ? 'default' : 'outline'}
                   onClick={() => setPaymentMethod('efectivo')}
-                  className="flex-1"
+                  className="w-full"
                 >
                   💵 Efectivo
+                </Button>
+                <Button
+                  variant={paymentMethod === 'transferencia' ? 'default' : 'outline'}
+                  onClick={() => setPaymentMethod('transferencia')}
+                  className="w-full"
+                >
+                  📱 Transferencia
                 </Button>
               </div>
             </div>
