@@ -295,7 +295,7 @@ export default function OrderManager() {
   // Filters for the "Pagado" tab
   const [paidFilters, setPaidFilters] = useState<{
     search: string;
-    paymentMethod: 'all' | 'efectivo' | 'tarjeta';
+    paymentMethod: 'all' | 'efectivo' | 'tarjeta' | 'transferencia';
     serviceType: 'all' | 'puesto' | 'takeaway' | 'delivery';
     dateFrom: string;
     dateTo: string;
