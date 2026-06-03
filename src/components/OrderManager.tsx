@@ -623,7 +623,7 @@ export default function OrderManager() {
 
     toast({
       title: "Pago procesado",
-      description: `Orden pagada con ${paymentMethod === 'tarjeta' ? 'tarjeta' : 'efectivo'}`
+      description: `Orden pagada con ${paymentMethod === 'tarjeta' ? 'tarjeta' : paymentMethod === 'transferencia' ? 'transferencia' : 'efectivo'}`
     });
   };
 
