@@ -110,7 +110,7 @@ export default function OrderManager() {
   const [discountReason, setDiscountReason] = useState('');
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [selectedOrderForPayment, setSelectedOrderForPayment] = useState<Order | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<'tarjeta' | 'efectivo' | ''>('');
+  const [paymentMethod, setPaymentMethod] = useState<'tarjeta' | 'efectivo' | 'transferencia' | ''>('');
   const [isEditOrderOpen, setIsEditOrderOpen] = useState(false);
   const [selectedOrderForEdit, setSelectedOrderForEdit] = useState<Order | null>(null);
   const [localEditQuantities, setLocalEditQuantities] = useState<Record<string, number>>({});
