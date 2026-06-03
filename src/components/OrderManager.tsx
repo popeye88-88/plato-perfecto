@@ -53,7 +53,7 @@ interface Order {
   edited?: boolean;
   discountAmount?: number;
   discountReason?: string;
-  paymentMethod?: 'tarjeta' | 'efectivo';
+  paymentMethod?: 'tarjeta' | 'efectivo' | 'transferencia';
   individualItemsStatus?: Record<string, 'preparando' | 'entregando' | 'cobrando'>;
   individualItemsCancelled?: Record<string, boolean>;
   editHistory?: EditHistoryEntry[];
