@@ -92,10 +92,12 @@ export default function NewOrderDialog({ open, onOpenChange, menuItems, onCreate
 
   const handleSubmit = () => {
     if (!customerName.trim()) return;
-    onCreateOrder({ items: selectedItems, serviceType, diners, customerName: customerName.trim(), deliveryCharge });
+    if (typeof diners !== 'number' || diners < 1) return;
+    onCreateOrder({ items: selectedItems, serviceType, diners, customerName: customerName.trim(), deliveryCharge, repeat });
     setCustomerName('');
     setServiceType('puesto');
-    setDiners(1);
+    setDiners('');
+    setRepeat(false);
     setDeliveryCharge(0);
     setSelectedItems([]);
     onOpenChange(false);
