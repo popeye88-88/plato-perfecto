@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Plus, Minus, ChevronDown } from 'lucide-react';
 import { getMenuItemCardStyle, type ColorStyle } from '@/lib/menuItemColor';
 
@@ -30,13 +31,15 @@ interface NewOrderDialogProps {
     diners: number;
     customerName: string;
     deliveryCharge: number;
+    repeat?: boolean;
   }) => void;
 }
 
 export default function NewOrderDialog({ open, onOpenChange, menuItems, onCreateOrder }: NewOrderDialogProps) {
   const [customerName, setCustomerName] = useState('');
   const [serviceType, setServiceType] = useState<'puesto' | 'takeaway' | 'delivery'>('puesto');
-  const [diners, setDiners] = useState(1);
+  const [diners, setDiners] = useState<number | ''>('');
+  const [repeat, setRepeat] = useState(false);
   const [deliveryCharge, setDeliveryCharge] = useState(0);
   const [selectedItems, setSelectedItems] = useState<Array<{menuItem: {id: string; name: string; price: number; category: string}, quantity: number, customIngredients?: string[]}>>([]);
   const [sizePickerOpen, setSizePickerOpen] = useState<string | null>(null);
@@ -89,10 +92,12 @@ export default function NewOrderDialog({ open, onOpenChange, menuItems, onCreate
 
   const handleSubmit = () => {
     if (!customerName.trim()) return;
-    onCreateOrder({ items: selectedItems, serviceType, diners, customerName: customerName.trim(), deliveryCharge });
+    if (typeof diners !== 'number' || diners < 1) return;
+    onCreateOrder({ items: selectedItems, serviceType, diners, customerName: customerName.trim(), deliveryCharge, repeat });
     setCustomerName('');
     setServiceType('puesto');
-    setDiners(1);
+    setDiners('');
+    setRepeat(false);
     setDeliveryCharge(0);
     setSelectedItems([]);
     onOpenChange(false);
@@ -124,7 +129,22 @@ export default function NewOrderDialog({ open, onOpenChange, menuItems, onCreate
             </div>
             <div>
               <Label htmlFor="diners">Comensales</Label>
-              <Input id="diners" type="number" min="1" value={diners} onChange={(e) => setDiners(parseInt(e.target.value) || 1)} />
+              <Input
+                id="diners"
+                type="number"
+                min="1"
+                required
+                value={diners}
+                placeholder="Nº de comensales"
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setDiners(v === '' ? '' : (parseInt(v) || ''));
+                }}
+              />
+              <label className="flex items-center gap-2 mt-2 text-sm cursor-pointer">
+                <Checkbox checked={repeat} onCheckedChange={(c) => setRepeat(c === true)} />
+                <span>Repiten</span>
+              </label>
             </div>
           </div>
 
@@ -255,7 +275,7 @@ export default function NewOrderDialog({ open, onOpenChange, menuItems, onCreate
 
           <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-            <Button onClick={handleSubmit} className="bg-gradient-primary hover:opacity-90" disabled={!customerName.trim() || selectedItems.length === 0}>
+            <Button onClick={handleSubmit} className="bg-gradient-primary hover:opacity-90" disabled={!customerName.trim() || selectedItems.length === 0 || typeof diners !== 'number' || diners < 1}>
               Crear Orden
             </Button>
           </div>
