@@ -50,6 +50,7 @@ interface Order {
   createdAt: Date;
   serviceType?: 'puesto' | 'takeaway' | 'delivery';
   diners?: number;
+  repeat?: boolean;
   edited?: boolean;
   discountAmount?: number;
   discountReason?: string;
@@ -99,7 +100,8 @@ export default function OrderManager() {
   const [newOrderForm, setNewOrderForm] = useState({
     customerName: '',
     serviceType: 'puesto' as 'puesto' | 'takeaway' | 'delivery',
-    diners: 1,
+    diners: '' as number | '',
+    repeat: false,
     selectedItems: [] as Array<{id: string, name: string, price: number, quantity: number}>
   });
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -407,6 +409,15 @@ export default function OrderManager() {
       return;
     }
 
+    if (typeof newOrderForm.diners !== 'number' || newOrderForm.diners < 1) {
+      toast({
+        title: "Error",
+        description: "Por favor ingresa el número de comensales",
+        variant: "destructive"
+      });
+      return;
+    }
+
     if (newOrderForm.selectedItems.length === 0) {
       toast({
         title: "Error",
@@ -429,7 +440,8 @@ export default function OrderManager() {
       number: computeNextOrderNumber(orders),
       customerName: newOrderForm.customerName,
       serviceType: newOrderForm.serviceType,
-      diners: newOrderForm.diners,
+      diners: newOrderForm.diners as number,
+      repeat: newOrderForm.repeat,
       items: newOrderForm.selectedItems.map(item => ({
         ...item,
         originalQuantity: item.quantity,
@@ -455,7 +467,8 @@ export default function OrderManager() {
     setNewOrderForm({
       customerName: '',
       serviceType: 'puesto',
-      diners: 1,
+      diners: '',
+      repeat: false,
       selectedItems: []
     });
     setIsNewOrderDialogOpen(false);
@@ -470,7 +483,8 @@ export default function OrderManager() {
     setNewOrderForm({
       customerName: '',
       serviceType: 'puesto',
-      diners: 1,
+      diners: '',
+      repeat: false,
       selectedItems: []
     });
     setIsNewOrderDialogOpen(false);
@@ -1350,10 +1364,22 @@ export default function OrderManager() {
                     id="diners"
                     type="number"
                     min="1"
+                    required
+                    placeholder="Nº de comensales"
                     value={newOrderForm.diners}
-                    onChange={(e) => setNewOrderForm(prev => ({ ...prev, diners: parseInt(e.target.value) || 1 }))}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setNewOrderForm(prev => ({ ...prev, diners: v === '' ? '' : (parseInt(v) || '') }));
+                    }}
                     className="mt-2"
                   />
+                  <label className="flex items-center gap-2 mt-3 text-sm cursor-pointer">
+                    <Checkbox
+                      checked={newOrderForm.repeat}
+                      onCheckedChange={(c) => setNewOrderForm(prev => ({ ...prev, repeat: c === true }))}
+                    />
+                    <span>Cliente habitual (repite)</span>
+                  </label>
                       </div>
                 </div>
                 
