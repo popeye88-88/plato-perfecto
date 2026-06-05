@@ -31,6 +31,7 @@ interface NewOrderDialogProps {
     diners: number;
     customerName: string;
     deliveryCharge: number;
+    repeat?: boolean;
   }) => void;
 }
 
