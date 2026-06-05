@@ -50,6 +50,18 @@ export default function NewOrderDialog({ open, onOpenChange, menuItems, onCreate
     return next;
   });
 
+  useEffect(() => {
+    if (open) {
+      setCustomerName('');
+      setServiceType('puesto');
+      setDiners('');
+      setRepeat(false);
+      setDeliveryCharge(0);
+      setSelectedItems([]);
+      setExpandedItems(new Set());
+    }
+  }, [open]);
+
   const addItem = (menuItem: MenuItem, size?: { id: string; name: string; price: number }) => {
     const itemId = size ? `${menuItem.id}-size-${size.id}` : menuItem.id;
     const itemName = size ? `${menuItem.name} — ${size.name}` : menuItem.name;
