@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -49,6 +49,18 @@ export default function NewOrderDialog({ open, onOpenChange, menuItems, onCreate
     next.has(id) ? next.delete(id) : next.add(id);
     return next;
   });
+
+  useEffect(() => {
+    if (open) {
+      setCustomerName('');
+      setServiceType('puesto');
+      setDiners('');
+      setRepeat(false);
+      setDeliveryCharge(0);
+      setSelectedItems([]);
+      setExpandedItems(new Set());
+    }
+  }, [open]);
 
   const addItem = (menuItem: MenuItem, size?: { id: string; name: string; price: number }) => {
     const itemId = size ? `${menuItem.id}-size-${size.id}` : menuItem.id;
