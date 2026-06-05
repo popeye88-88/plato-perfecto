@@ -275,7 +275,7 @@ export default function NewOrderDialog({ open, onOpenChange, menuItems, onCreate
 
           <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-            <Button onClick={handleSubmit} className="bg-gradient-primary hover:opacity-90" disabled={!customerName.trim() || selectedItems.length === 0}>
+            <Button onClick={handleSubmit} className="bg-gradient-primary hover:opacity-90" disabled={!customerName.trim() || selectedItems.length === 0 || typeof diners !== 'number' || diners < 1}>
               Crear Orden
             </Button>
           </div>
