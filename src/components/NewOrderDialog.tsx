@@ -37,7 +37,8 @@ interface NewOrderDialogProps {
 export default function NewOrderDialog({ open, onOpenChange, menuItems, onCreateOrder }: NewOrderDialogProps) {
   const [customerName, setCustomerName] = useState('');
   const [serviceType, setServiceType] = useState<'puesto' | 'takeaway' | 'delivery'>('puesto');
-  const [diners, setDiners] = useState(1);
+  const [diners, setDiners] = useState<number | ''>('');
+  const [repeat, setRepeat] = useState(false);
   const [deliveryCharge, setDeliveryCharge] = useState(0);
   const [selectedItems, setSelectedItems] = useState<Array<{menuItem: {id: string; name: string; price: number; category: string}, quantity: number, customIngredients?: string[]}>>([]);
   const [sizePickerOpen, setSizePickerOpen] = useState<string | null>(null);
