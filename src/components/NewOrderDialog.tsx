@@ -129,7 +129,22 @@ export default function NewOrderDialog({ open, onOpenChange, menuItems, onCreate
             </div>
             <div>
               <Label htmlFor="diners">Comensales</Label>
-              <Input id="diners" type="number" min="1" value={diners} onChange={(e) => setDiners(parseInt(e.target.value) || 1)} />
+              <Input
+                id="diners"
+                type="number"
+                min="1"
+                required
+                value={diners}
+                placeholder="Nº de comensales"
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setDiners(v === '' ? '' : (parseInt(v) || ''));
+                }}
+              />
+              <label className="flex items-center gap-2 mt-2 text-sm cursor-pointer">
+                <Checkbox checked={repeat} onCheckedChange={(c) => setRepeat(c === true)} />
+                <span>Repiten</span>
+              </label>
             </div>
           </div>
 
