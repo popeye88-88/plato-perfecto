@@ -206,8 +206,8 @@ export async function saveOrders(businessId: string, orders: Array<{
 
     await supabase.from('order_items').delete().eq('order_id', order.id);
     if (order.items.length > 0) {
-      const itemRows = order.items.map((item, idx) => ({
-        id: `${order.id}-item-${idx}`,
+      const itemRows = order.items.map((item) => ({
+        id: item.id,
         order_id: order.id,
         name: item.name,
         price: item.price,
