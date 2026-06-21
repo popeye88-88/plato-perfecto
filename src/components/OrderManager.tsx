@@ -240,11 +240,9 @@ export default function OrderManager() {
         
         const activeItems = order.items.filter(item => !item.cancelled);
         return activeItems.some(item => {
-          return Array.from({ length: item.quantity }, (_, idx) => 
-            `${item.id}-${idx}`
-          ).some(id => {
-            const individualStatus = order.individualItemsStatus?.[id];
-            if (!individualStatus || individualStatus === 'preparando') return true;
+          return Array.from({ length: item.quantity }, (_, idx) => idx).some(idx => {
+            const individualStatus = getIndividualStatus(order, item, idx);
+            if (individualStatus === 'preparando') return true;
             // When entregando is disabled, treat 'entregando' items as belonging to preparando tab
             if (!enableEntregandoStage && individualStatus === 'entregando') return true;
             return false;
