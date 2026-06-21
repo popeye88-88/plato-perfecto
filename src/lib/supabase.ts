@@ -215,6 +215,21 @@ export async function saveOrders(businessId: string, orders: Array<{
   editHistory?: Array<{ timestamp: Date; action: string; stage: string; itemName?: string; quantity?: number; details?: string; userId?: string }>;
 }>) {
   for (const order of orders) {
+    const itemRows = order.items.map((item, index) => ({
+      id: getPersistedOrderItemId(order.id, item.id, index),
+      order_id: order.id,
+      name: item.name,
+      price: item.price,
+      quantity: item.quantity,
+      status: item.status || 'preparando',
+      cancelled: item.cancelled ?? false,
+      cancellation_reason: item.cancellationReason || null,
+      original_quantity: item.originalQuantity ?? null,
+      cancelled_at: item.cancelledAt?.toISOString() || null,
+      cancelled_in_stage: item.cancelledInStage || null
+    }));
+    const itemIdByClientId = new Map(order.items.map((item, index) => [item.id, itemRows[index].id]));
+
     // Guard: never overwrite individual_items_status with empty/null if the DB already has data.
     let individualItemsStatusToSave: Record<string, string> | null =
       order.individualItemsStatus && Object.keys(order.individualItemsStatus).length > 0
@@ -231,6 +246,22 @@ export async function saveOrders(businessId: string, orders: Array<{
       if (existingStatus && Object.keys(existingStatus).length > 0) {
         individualItemsStatusToSave = existingStatus;
       }
+    }
+
+    if (individualItemsStatusToSave) {
+      const normalizedStatus: Record<string, string> = {};
+      for (const item of order.items) {
+        const persistedItemId = itemIdByClientId.get(item.id) || item.id;
+        for (let quantityIndex = 0; quantityIndex < item.quantity; quantityIndex++) {
+          const persistedKey = `${persistedItemId}-${quantityIndex}`;
+          const clientKey = `${item.id}-${quantityIndex}`;
+          normalizedStatus[persistedKey] =
+            individualItemsStatusToSave[persistedKey] ||
+            individualItemsStatusToSave[clientKey] ||
+            toIndividualStatus(item.status);
+        }
+      }
+      individualItemsStatusToSave = normalizedStatus;
     }
 
     const orderRow = {
@@ -261,20 +292,7 @@ export async function saveOrders(businessId: string, orders: Array<{
     }
 
     await supabase.from('order_items').delete().eq('order_id', order.id);
-    if (order.items.length > 0) {
-      const itemRows = order.items.map((item) => ({
-        id: item.id,
-        order_id: order.id,
-        name: item.name,
-        price: item.price,
-        quantity: item.quantity,
-        status: item.status || 'preparando',
-        cancelled: item.cancelled ?? false,
-        cancellation_reason: item.cancellationReason || null,
-        original_quantity: item.originalQuantity ?? null,
-        cancelled_at: item.cancelledAt?.toISOString() || null,
-        cancelled_in_stage: item.cancelledInStage || null
-      }));
+    if (itemRows.length > 0) {
       const { error: itemsError } = await supabase.from('order_items').insert(itemRows);
       if (itemsError) {
         console.error('Order items insert error:', JSON.stringify(itemsError, null, 2));
