@@ -1,12 +1,13 @@
-import { useBusinessContext } from '@/contexts/BusinessContext';
+import { useOptionalBusinessContext } from '@/contexts/BusinessContext';
 import { useAuth } from '@/contexts/AuthContext';
 
 export function usePermissions() {
-  const { currentBusiness, getUserRole } = useBusinessContext();
+  const businessContext = useOptionalBusinessContext();
   const { currentUser } = useAuth();
+  const currentBusiness = businessContext?.currentBusiness;
 
-  const role = currentBusiness && currentUser
-    ? getUserRole(currentBusiness.id, currentUser.id)
+  const role = currentBusiness && currentUser && businessContext
+    ? businessContext.getUserRole(currentBusiness.id, currentUser.id)
     : undefined;
 
   const isOwner = role === 'owner';
