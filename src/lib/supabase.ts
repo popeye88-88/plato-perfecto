@@ -88,6 +88,38 @@ interface OrderItemRow {
   cancelled_in_stage?: string;
 }
 
+const toIndividualStatus = (status?: string): 'preparando' | 'entregando' | 'cobrando' => {
+  if (status === 'cobrando' || status === 'pagado') return 'cobrando';
+  if (status === 'entregando') return 'entregando';
+  return 'preparando';
+};
+
+const toOrderStatus = (status?: string): 'preparando' | 'entregando' | 'cobrando' | 'pagado' => {
+  if (status === 'entregando' || status === 'cobrando' || status === 'pagado') return status;
+  return 'preparando';
+};
+
+const toServiceType = (serviceType?: string): 'puesto' | 'takeaway' | 'delivery' | undefined => {
+  return serviceType === 'puesto' || serviceType === 'takeaway' || serviceType === 'delivery' ? serviceType : undefined;
+};
+
+const toPaymentMethod = (paymentMethod?: string): 'tarjeta' | 'efectivo' | 'transferencia' | undefined => {
+  return paymentMethod === 'tarjeta' || paymentMethod === 'efectivo' || paymentMethod === 'transferencia' ? paymentMethod : undefined;
+};
+
+const toEditAction = (action?: string): 'added' | 'removed' | 'discount_applied' | 'payment_processed' => {
+  if (action === 'removed' || action === 'discount_applied' || action === 'payment_processed') return action;
+  return 'added';
+};
+
+const getPersistedOrderItemId = (orderId: string, itemId: string, index: number) => {
+  return itemId?.startsWith(`${orderId}-item-`) ? itemId : `${orderId}-item-${index}`;
+};
+
+const toCancelledStage = (stage?: string): 'preparando' | 'entregando' | 'cobrando' | undefined => {
+  return stage === 'preparando' || stage === 'entregando' || stage === 'cobrando' ? stage : undefined;
+};
+
 export async function fetchOrders(businessId: string) {
   const { data: ordersData, error: ordersError } = await supabase
     .from('orders')
@@ -110,41 +142,71 @@ export async function fetchOrders(businessId: string) {
     itemsByOrder.set(it.order_id, arr);
   }
 
-  return (ordersData as OrderRow[]).map((o: any) => {
-    const items = (itemsByOrder.get(o.id) || []).map((i: any) => ({
-      id: i.id,
-      name: i.name,
-      price: parseFloat(String(i.price)),
-      quantity: i.quantity,
-      originalQuantity: i.original_quantity,
-      status: i.status as 'preparando' | 'entregando' | 'cobrando' | 'pagado',
-      cancelled: i.cancelled,
-      cancelledAt: i.cancelled_at ? new Date(i.cancelled_at) : undefined,
-      cancelledInStage: i.cancelled_in_stage,
-      cancellationReason: i.cancellation_reason
-    }));
+  return (ordersData as OrderRow[]).map((o: OrderRow) => {
+    const initialItems = (o.initial_items as Array<{ id: string; name: string; price: number; quantity: number }> | undefined) || [];
+    const rawItems = itemsByOrder.get(o.id) || [];
+    const sourceItems = rawItems.length > 0
+      ? rawItems
+      : initialItems.map((item, index) => ({
+          id: getPersistedOrderItemId(o.id, item.id, index),
+          order_id: o.id,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+          status: 'preparando',
+          cancelled: false
+        } as OrderItemRow));
+    const storedIndividualStatus = (o.individual_items_status || {}) as Record<string, 'preparando' | 'entregando' | 'cobrando'>;
+    const normalizedIndividualStatus: Record<string, 'preparando' | 'entregando' | 'cobrando'> = {};
+
+    const items = sourceItems.map((i: OrderItemRow, itemIndex: number) => {
+      const initialItem = initialItems[itemIndex] || initialItems.find((item) => item.name === i.name && Number(item.price) === Number(i.price));
+      for (let quantityIndex = 0; quantityIndex < Number(i.quantity || 0); quantityIndex++) {
+        const persistedKey = `${i.id}-${quantityIndex}`;
+        const legacyKey = initialItem?.id ? `${initialItem.id}-${quantityIndex}` : undefined;
+        normalizedIndividualStatus[persistedKey] =
+          storedIndividualStatus[persistedKey] ||
+          (legacyKey ? storedIndividualStatus[legacyKey] : undefined) ||
+          toIndividualStatus(i.status);
+      }
+
+      return {
+        id: i.id,
+        name: i.name,
+        price: parseFloat(String(i.price)),
+        quantity: i.quantity,
+        originalQuantity: i.original_quantity,
+        status: toOrderStatus(i.status),
+        cancelled: i.cancelled,
+        cancelledAt: i.cancelled_at ? new Date(i.cancelled_at) : undefined,
+        cancelledInStage: toCancelledStage(i.cancelled_in_stage),
+        cancellationReason: i.cancellation_reason
+      };
+    });
     return {
       id: o.id,
       number: o.number,
       customerName: o.customer_name,
       items,
       total: parseFloat(String(o.total)),
-      status: o.status,
+      status: toOrderStatus(o.status),
       createdAt: new Date(o.created_at),
-      serviceType: o.service_type,
+      serviceType: toServiceType(o.service_type),
       diners: o.diners,
       edited: o.edited,
       discountAmount: o.discount_amount ? parseFloat(String(o.discount_amount)) : undefined,
       discountReason: o.discount_reason,
-      paymentMethod: o.payment_method,
-      individualItemsStatus: o.individual_items_status as Record<string, 'preparando' | 'entregando' | 'cobrando'> | undefined,
-      initialItems: o.initial_items as Array<{ id: string; name: string; price: number; quantity: number }> | undefined,
+      paymentMethod: toPaymentMethod(o.payment_method),
+      individualItemsStatus: Object.keys(normalizedIndividualStatus).length > 0 ? normalizedIndividualStatus : undefined,
+      initialItems: initialItems.length > 0 ? initialItems : undefined,
       editHistory: (o.edit_history as Array<{ timestamp: string; action: string; stage: string; itemName?: string; quantity?: number; details?: string; userId?: string }> | undefined)?.map((e) => ({
         ...e,
+        action: toEditAction(e.action),
+        stage: toIndividualStatus(e.stage),
         timestamp: new Date(e.timestamp)
       }))
     };
-  }) as any;
+  });
 }
 
 export async function saveOrders(businessId: string, orders: Array<{
@@ -177,6 +239,21 @@ export async function saveOrders(businessId: string, orders: Array<{
   editHistory?: Array<{ timestamp: Date; action: string; stage: string; itemName?: string; quantity?: number; details?: string; userId?: string }>;
 }>) {
   for (const order of orders) {
+    const itemRows = order.items.map((item, index) => ({
+      id: getPersistedOrderItemId(order.id, item.id, index),
+      order_id: order.id,
+      name: item.name,
+      price: item.price,
+      quantity: item.quantity,
+      status: item.status || 'preparando',
+      cancelled: item.cancelled ?? false,
+      cancellation_reason: item.cancellationReason || null,
+      original_quantity: item.originalQuantity ?? null,
+      cancelled_at: item.cancelledAt?.toISOString() || null,
+      cancelled_in_stage: item.cancelledInStage || null
+    }));
+    const itemIdByClientId = new Map(order.items.map((item, index) => [item.id, itemRows[index].id]));
+
     // Guard: never overwrite individual_items_status with empty/null if the DB already has data.
     let individualItemsStatusToSave: Record<string, string> | null =
       order.individualItemsStatus && Object.keys(order.individualItemsStatus).length > 0
@@ -189,10 +266,26 @@ export async function saveOrders(businessId: string, orders: Array<{
         .select('individual_items_status')
         .eq('id', order.id)
         .maybeSingle();
-      const existingStatus = (existing as any)?.individual_items_status as Record<string, string> | null | undefined;
+      const existingStatus = (existing as { individual_items_status?: Record<string, string> | null } | null)?.individual_items_status;
       if (existingStatus && Object.keys(existingStatus).length > 0) {
         individualItemsStatusToSave = existingStatus;
       }
+    }
+
+    if (individualItemsStatusToSave) {
+      const normalizedStatus: Record<string, string> = {};
+      for (const item of order.items) {
+        const persistedItemId = itemIdByClientId.get(item.id) || item.id;
+        for (let quantityIndex = 0; quantityIndex < item.quantity; quantityIndex++) {
+          const persistedKey = `${persistedItemId}-${quantityIndex}`;
+          const clientKey = `${item.id}-${quantityIndex}`;
+          normalizedStatus[persistedKey] =
+            individualItemsStatusToSave[persistedKey] ||
+            individualItemsStatusToSave[clientKey] ||
+            toIndividualStatus(item.status);
+        }
+      }
+      individualItemsStatusToSave = normalizedStatus;
     }
 
     const orderRow = {
@@ -223,20 +316,7 @@ export async function saveOrders(businessId: string, orders: Array<{
     }
 
     await supabase.from('order_items').delete().eq('order_id', order.id);
-    if (order.items.length > 0) {
-      const itemRows = order.items.map((item) => ({
-        id: item.id,
-        order_id: order.id,
-        name: item.name,
-        price: item.price,
-        quantity: item.quantity,
-        status: item.status || 'preparando',
-        cancelled: item.cancelled ?? false,
-        cancellation_reason: item.cancellationReason || null,
-        original_quantity: item.originalQuantity ?? null,
-        cancelled_at: item.cancelledAt?.toISOString() || null,
-        cancelled_in_stage: item.cancelledInStage || null
-      }));
+    if (itemRows.length > 0) {
       const { error: itemsError } = await supabase.from('order_items').insert(itemRows);
       if (itemsError) {
         console.error('Order items insert error:', JSON.stringify(itemsError, null, 2));
