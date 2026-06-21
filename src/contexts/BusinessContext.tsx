@@ -98,6 +98,10 @@ export const useBusinessContext = () => {
   return context;
 };
 
+export const useOptionalBusinessContext = () => {
+  return useContext(BusinessContext);
+};
+
 export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { currentUser } = useAuth();
   const [currentBusiness, setCurrentBusiness] = useState<Business | null>(null);
