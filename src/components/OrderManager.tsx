@@ -261,11 +261,8 @@ export default function OrderManager() {
         
         // Check if ALL individual items are in 'cobrando' - if so, exclude from 'entregando'
         const allItemsReadyForPayment = activeItems.every(item => {
-          return Array.from({ length: item.quantity }, (_, idx) => 
-            `${item.id}-${idx}`
-          ).every(id => {
-            const individualStatus = order.individualItemsStatus?.[id];
-            return individualStatus === 'cobrando';
+          return Array.from({ length: item.quantity }, (_, idx) => idx).every(idx => {
+            return getIndividualStatus(order, item, idx) === 'cobrando';
           });
         });
         
@@ -273,10 +270,8 @@ export default function OrderManager() {
         
         return activeItems.some(item => {
           // Check if there are any individual items in 'entregando' or 'cobrando' status
-          return Array.from({ length: item.quantity }, (_, idx) => 
-            `${item.id}-${idx}`
-          ).some(id => {
-            const individualStatus = order.individualItemsStatus?.[id];
+          return Array.from({ length: item.quantity }, (_, idx) => idx).some(idx => {
+            const individualStatus = getIndividualStatus(order, item, idx);
             return individualStatus === 'entregando' || individualStatus === 'cobrando';
           });
         });
@@ -292,11 +287,8 @@ export default function OrderManager() {
         
         // Check if ALL individual items are 'cobrando'
         return activeItems.every(item => {
-          return Array.from({ length: item.quantity }, (_, idx) => 
-            `${item.id}-${idx}`
-          ).every(id => {
-            const individualStatus = order.individualItemsStatus?.[id];
-            return individualStatus === 'cobrando';
+          return Array.from({ length: item.quantity }, (_, idx) => idx).every(idx => {
+            return getIndividualStatus(order, item, idx) === 'cobrando';
           });
         });
       });
