@@ -1119,7 +1119,7 @@ export default function OrderManager() {
               // Pending sub-items rendered individually with checkboxes
               return rows.concat(pendingIndices.map((quantityIndex) => {
                 const individualItemId = `${item.id}-${quantityIndex}`;
-                const individualItemStatus = order.individualItemsStatus?.[individualItemId] || 'preparando';
+                const individualItemStatus = getIndividualStatus(order, item, quantityIndex);
 
                 let individualItemEnabled = false;
                 let individualItemChecked = false;
