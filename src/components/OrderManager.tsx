@@ -1094,7 +1094,7 @@ export default function OrderManager() {
 
               // Split individual sub-items into "done" (already in cobrando) and "pending"
               const indices = Array.from({ length: item.quantity }, (_, idx) => idx);
-              const doneIndices = indices.filter(idx => (order.individualItemsStatus?.[`${item.id}-${idx}`] || 'preparando') === 'cobrando');
+              const doneIndices = indices.filter(idx => getIndividualStatus(order, item, idx) === 'cobrando');
               const pendingIndices = indices.filter(idx => !doneIndices.includes(idx));
 
               const rows: JSX.Element[] = [];
