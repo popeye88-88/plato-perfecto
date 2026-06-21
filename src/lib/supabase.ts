@@ -177,6 +177,24 @@ export async function saveOrders(businessId: string, orders: Array<{
   editHistory?: Array<{ timestamp: Date; action: string; stage: string; itemName?: string; quantity?: number; details?: string; userId?: string }>;
 }>) {
   for (const order of orders) {
+    // Guard: never overwrite individual_items_status with empty/null if the DB already has data.
+    let individualItemsStatusToSave: Record<string, string> | null =
+      order.individualItemsStatus && Object.keys(order.individualItemsStatus).length > 0
+        ? order.individualItemsStatus
+        : null;
+
+    if (!individualItemsStatusToSave) {
+      const { data: existing } = await supabase
+        .from('orders')
+        .select('individual_items_status')
+        .eq('id', order.id)
+        .maybeSingle();
+      const existingStatus = (existing as any)?.individual_items_status as Record<string, string> | null | undefined;
+      if (existingStatus && Object.keys(existingStatus).length > 0) {
+        individualItemsStatusToSave = existingStatus;
+      }
+    }
+
     const orderRow = {
       id: order.id,
       number: order.number,
@@ -191,7 +209,7 @@ export async function saveOrders(businessId: string, orders: Array<{
       discount_amount: order.discountAmount ?? null,
       discount_reason: order.discountReason || null,
       payment_method: order.paymentMethod || null,
-      individual_items_status: order.individualItemsStatus || null,
+      individual_items_status: individualItemsStatusToSave,
       initial_items: order.initialItems || null,
       edit_history: order.editHistory?.map((e) => ({
         ...e,
