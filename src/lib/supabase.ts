@@ -98,6 +98,10 @@ const getPersistedOrderItemId = (orderId: string, itemId: string, index: number)
   return itemId?.startsWith(`${orderId}-item-`) ? itemId : `${orderId}-item-${index}`;
 };
 
+const toCancelledStage = (stage?: string): 'preparando' | 'entregando' | 'cobrando' | undefined => {
+  return stage === 'preparando' || stage === 'entregando' || stage === 'cobrando' ? stage : undefined;
+};
+
 export async function fetchOrders(businessId: string) {
   const { data: ordersData, error: ordersError } = await supabase
     .from('orders')
@@ -157,7 +161,7 @@ export async function fetchOrders(businessId: string) {
         status: i.status as 'preparando' | 'entregando' | 'cobrando' | 'pagado',
         cancelled: i.cancelled,
         cancelledAt: i.cancelled_at ? new Date(i.cancelled_at) : undefined,
-        cancelledInStage: i.cancelled_in_stage,
+        cancelledInStage: toCancelledStage(i.cancelled_in_stage),
         cancellationReason: i.cancellation_reason
       };
     });
@@ -242,7 +246,7 @@ export async function saveOrders(businessId: string, orders: Array<{
         .select('individual_items_status')
         .eq('id', order.id)
         .maybeSingle();
-      const existingStatus = (existing as any)?.individual_items_status as Record<string, string> | null | undefined;
+      const existingStatus = (existing as { individual_items_status?: Record<string, string> | null } | null)?.individual_items_status;
       if (existingStatus && Object.keys(existingStatus).length > 0) {
         individualItemsStatusToSave = existingStatus;
       }
