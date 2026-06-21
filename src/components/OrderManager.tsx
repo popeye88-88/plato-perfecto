@@ -211,6 +211,23 @@ export default function OrderManager() {
   };
 
 
+  // Resolve the status of a single sub-unit of an item, with fallback to item.status
+  // when individualItemsStatus is missing/desynced from item.id (e.g., legacy orders
+  // where order_items.id was rewritten and no longer matches the stored map keys).
+  const getIndividualStatus = (
+    order: Order,
+    item: OrderItem,
+    idx: number
+  ): 'preparando' | 'entregando' | 'cobrando' => {
+    const direct = order.individualItemsStatus?.[`${item.id}-${idx}`];
+    if (direct) return direct;
+    // Fallback: derive from item.status
+    if (item.status === 'cobrando' || item.status === 'pagado') return 'cobrando';
+    if (item.status === 'entregando') return 'entregando';
+    return 'preparando';
+  };
+
+
   const getOrdersByStatus = (status: string) => {
     if (status === 'resumen') {
       return orders.filter(order => order.status !== 'pagado');
@@ -223,11 +240,9 @@ export default function OrderManager() {
         
         const activeItems = order.items.filter(item => !item.cancelled);
         return activeItems.some(item => {
-          return Array.from({ length: item.quantity }, (_, idx) => 
-            `${item.id}-${idx}`
-          ).some(id => {
-            const individualStatus = order.individualItemsStatus?.[id];
-            if (!individualStatus || individualStatus === 'preparando') return true;
+          return Array.from({ length: item.quantity }, (_, idx) => idx).some(idx => {
+            const individualStatus = getIndividualStatus(order, item, idx);
+            if (individualStatus === 'preparando') return true;
             // When entregando is disabled, treat 'entregando' items as belonging to preparando tab
             if (!enableEntregandoStage && individualStatus === 'entregando') return true;
             return false;
@@ -246,11 +261,8 @@ export default function OrderManager() {
         
         // Check if ALL individual items are in 'cobrando' - if so, exclude from 'entregando'
         const allItemsReadyForPayment = activeItems.every(item => {
-          return Array.from({ length: item.quantity }, (_, idx) => 
-            `${item.id}-${idx}`
-          ).every(id => {
-            const individualStatus = order.individualItemsStatus?.[id];
-            return individualStatus === 'cobrando';
+          return Array.from({ length: item.quantity }, (_, idx) => idx).every(idx => {
+            return getIndividualStatus(order, item, idx) === 'cobrando';
           });
         });
         
@@ -258,10 +270,8 @@ export default function OrderManager() {
         
         return activeItems.some(item => {
           // Check if there are any individual items in 'entregando' or 'cobrando' status
-          return Array.from({ length: item.quantity }, (_, idx) => 
-            `${item.id}-${idx}`
-          ).some(id => {
-            const individualStatus = order.individualItemsStatus?.[id];
+          return Array.from({ length: item.quantity }, (_, idx) => idx).some(idx => {
+            const individualStatus = getIndividualStatus(order, item, idx);
             return individualStatus === 'entregando' || individualStatus === 'cobrando';
           });
         });
@@ -277,11 +287,8 @@ export default function OrderManager() {
         
         // Check if ALL individual items are 'cobrando'
         return activeItems.every(item => {
-          return Array.from({ length: item.quantity }, (_, idx) => 
-            `${item.id}-${idx}`
-          ).every(id => {
-            const individualStatus = order.individualItemsStatus?.[id];
-            return individualStatus === 'cobrando';
+          return Array.from({ length: item.quantity }, (_, idx) => idx).every(idx => {
+            return getIndividualStatus(order, item, idx) === 'cobrando';
           });
         });
       });
@@ -1087,7 +1094,7 @@ export default function OrderManager() {
 
               // Split individual sub-items into "done" (already in cobrando) and "pending"
               const indices = Array.from({ length: item.quantity }, (_, idx) => idx);
-              const doneIndices = indices.filter(idx => (order.individualItemsStatus?.[`${item.id}-${idx}`] || 'preparando') === 'cobrando');
+              const doneIndices = indices.filter(idx => getIndividualStatus(order, item, idx) === 'cobrando');
               const pendingIndices = indices.filter(idx => !doneIndices.includes(idx));
 
               const rows: JSX.Element[] = [];
@@ -1112,7 +1119,7 @@ export default function OrderManager() {
               // Pending sub-items rendered individually with checkboxes
               return rows.concat(pendingIndices.map((quantityIndex) => {
                 const individualItemId = `${item.id}-${quantityIndex}`;
-                const individualItemStatus = order.individualItemsStatus?.[individualItemId] || 'preparando';
+                const individualItemStatus = getIndividualStatus(order, item, quantityIndex);
 
                 let individualItemEnabled = false;
                 let individualItemChecked = false;
@@ -1176,9 +1183,12 @@ export default function OrderManager() {
 
                                   const allOrderItemsReadyForPayment = o.items.every(orderItem => {
                                     if (orderItem.cancelled) return true;
-                                    return Array.from({ length: orderItem.quantity }, (_, idx) =>
-                                      `${orderItem.id}-${idx}`
-                                    ).every(id => updatedIndividualItemsStatus[id] === 'cobrando');
+                                    return Array.from({ length: orderItem.quantity }, (_, idx) => idx).every(idx => {
+                                      const key = `${orderItem.id}-${idx}`;
+                                      const status = updatedIndividualItemsStatus[key]
+                                        ?? (orderItem.status === 'cobrando' || orderItem.status === 'pagado' ? 'cobrando' : undefined);
+                                      return status === 'cobrando';
+                                    });
                                   });
 
                                   let updatedOrderStatus = o.status;
