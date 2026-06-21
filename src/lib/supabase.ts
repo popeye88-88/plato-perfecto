@@ -94,6 +94,24 @@ const toIndividualStatus = (status?: string): 'preparando' | 'entregando' | 'cob
   return 'preparando';
 };
 
+const toOrderStatus = (status?: string): 'preparando' | 'entregando' | 'cobrando' | 'pagado' => {
+  if (status === 'entregando' || status === 'cobrando' || status === 'pagado') return status;
+  return 'preparando';
+};
+
+const toServiceType = (serviceType?: string): 'puesto' | 'takeaway' | 'delivery' | undefined => {
+  return serviceType === 'puesto' || serviceType === 'takeaway' || serviceType === 'delivery' ? serviceType : undefined;
+};
+
+const toPaymentMethod = (paymentMethod?: string): 'tarjeta' | 'efectivo' | 'transferencia' | undefined => {
+  return paymentMethod === 'tarjeta' || paymentMethod === 'efectivo' || paymentMethod === 'transferencia' ? paymentMethod : undefined;
+};
+
+const toEditAction = (action?: string): 'added' | 'removed' | 'discount_applied' | 'payment_processed' => {
+  if (action === 'removed' || action === 'discount_applied' || action === 'payment_processed') return action;
+  return 'added';
+};
+
 const getPersistedOrderItemId = (orderId: string, itemId: string, index: number) => {
   return itemId?.startsWith(`${orderId}-item-`) ? itemId : `${orderId}-item-${index}`;
 };
@@ -158,7 +176,7 @@ export async function fetchOrders(businessId: string) {
         price: parseFloat(String(i.price)),
         quantity: i.quantity,
         originalQuantity: i.original_quantity,
-        status: i.status as 'preparando' | 'entregando' | 'cobrando' | 'pagado',
+        status: toOrderStatus(i.status),
         cancelled: i.cancelled,
         cancelledAt: i.cancelled_at ? new Date(i.cancelled_at) : undefined,
         cancelledInStage: toCancelledStage(i.cancelled_in_stage),
@@ -171,18 +189,20 @@ export async function fetchOrders(businessId: string) {
       customerName: o.customer_name,
       items,
       total: parseFloat(String(o.total)),
-      status: o.status,
+      status: toOrderStatus(o.status),
       createdAt: new Date(o.created_at),
-      serviceType: o.service_type,
+      serviceType: toServiceType(o.service_type),
       diners: o.diners,
       edited: o.edited,
       discountAmount: o.discount_amount ? parseFloat(String(o.discount_amount)) : undefined,
       discountReason: o.discount_reason,
-      paymentMethod: o.payment_method,
+      paymentMethod: toPaymentMethod(o.payment_method),
       individualItemsStatus: Object.keys(normalizedIndividualStatus).length > 0 ? normalizedIndividualStatus : undefined,
       initialItems: initialItems.length > 0 ? initialItems : undefined,
       editHistory: (o.edit_history as Array<{ timestamp: string; action: string; stage: string; itemName?: string; quantity?: number; details?: string; userId?: string }> | undefined)?.map((e) => ({
         ...e,
+        action: toEditAction(e.action),
+        stage: toIndividualStatus(e.stage),
         timestamp: new Date(e.timestamp)
       }))
     };
