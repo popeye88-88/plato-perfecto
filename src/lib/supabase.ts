@@ -120,7 +120,7 @@ export async function fetchOrders(businessId: string) {
     itemsByOrder.set(it.order_id, arr);
   }
 
-  return (ordersData as OrderRow[]).map((o: any) => {
+  return (ordersData as OrderRow[]).map((o: OrderRow) => {
     const initialItems = (o.initial_items as Array<{ id: string; name: string; price: number; quantity: number }> | undefined) || [];
     const rawItems = itemsByOrder.get(o.id) || [];
     const sourceItems = rawItems.length > 0
@@ -137,7 +137,7 @@ export async function fetchOrders(businessId: string) {
     const storedIndividualStatus = (o.individual_items_status || {}) as Record<string, 'preparando' | 'entregando' | 'cobrando'>;
     const normalizedIndividualStatus: Record<string, 'preparando' | 'entregando' | 'cobrando'> = {};
 
-    const items = sourceItems.map((i: any, itemIndex: number) => {
+    const items = sourceItems.map((i: OrderItemRow, itemIndex: number) => {
       const initialItem = initialItems[itemIndex] || initialItems.find((item) => item.name === i.name && Number(item.price) === Number(i.price));
       for (let quantityIndex = 0; quantityIndex < Number(i.quantity || 0); quantityIndex++) {
         const persistedKey = `${i.id}-${quantityIndex}`;
@@ -148,18 +148,18 @@ export async function fetchOrders(businessId: string) {
           toIndividualStatus(i.status);
       }
 
-      return ({
-      id: i.id,
-      name: i.name,
-      price: parseFloat(String(i.price)),
-      quantity: i.quantity,
-      originalQuantity: i.original_quantity,
-      status: i.status as 'preparando' | 'entregando' | 'cobrando' | 'pagado',
-      cancelled: i.cancelled,
-      cancelledAt: i.cancelled_at ? new Date(i.cancelled_at) : undefined,
-      cancelledInStage: i.cancelled_in_stage,
-      cancellationReason: i.cancellation_reason
-      });
+      return {
+        id: i.id,
+        name: i.name,
+        price: parseFloat(String(i.price)),
+        quantity: i.quantity,
+        originalQuantity: i.original_quantity,
+        status: i.status as 'preparando' | 'entregando' | 'cobrando' | 'pagado',
+        cancelled: i.cancelled,
+        cancelledAt: i.cancelled_at ? new Date(i.cancelled_at) : undefined,
+        cancelledInStage: i.cancelled_in_stage,
+        cancellationReason: i.cancellation_reason
+      };
     });
     return {
       id: o.id,
@@ -182,7 +182,7 @@ export async function fetchOrders(businessId: string) {
         timestamp: new Date(e.timestamp)
       }))
     };
-  }) as any;
+  });
 }
 
 export async function saveOrders(businessId: string, orders: Array<{
