@@ -1183,9 +1183,12 @@ export default function OrderManager() {
 
                                   const allOrderItemsReadyForPayment = o.items.every(orderItem => {
                                     if (orderItem.cancelled) return true;
-                                    return Array.from({ length: orderItem.quantity }, (_, idx) =>
-                                      `${orderItem.id}-${idx}`
-                                    ).every(id => updatedIndividualItemsStatus[id] === 'cobrando');
+                                    return Array.from({ length: orderItem.quantity }, (_, idx) => idx).every(idx => {
+                                      const key = `${orderItem.id}-${idx}`;
+                                      const status = updatedIndividualItemsStatus[key]
+                                        ?? (orderItem.status === 'cobrando' || orderItem.status === 'pagado' ? 'cobrando' : undefined);
+                                      return status === 'cobrando';
+                                    });
                                   });
 
                                   let updatedOrderStatus = o.status;
