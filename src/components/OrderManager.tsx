@@ -211,6 +211,23 @@ export default function OrderManager() {
   };
 
 
+  // Resolve the status of a single sub-unit of an item, with fallback to item.status
+  // when individualItemsStatus is missing/desynced from item.id (e.g., legacy orders
+  // where order_items.id was rewritten and no longer matches the stored map keys).
+  const getIndividualStatus = (
+    order: Order,
+    item: OrderItem,
+    idx: number
+  ): 'preparando' | 'entregando' | 'cobrando' => {
+    const direct = order.individualItemsStatus?.[`${item.id}-${idx}`];
+    if (direct) return direct;
+    // Fallback: derive from item.status
+    if (item.status === 'cobrando' || item.status === 'pagado') return 'cobrando';
+    if (item.status === 'entregando') return 'entregando';
+    return 'preparando';
+  };
+
+
   const getOrdersByStatus = (status: string) => {
     if (status === 'resumen') {
       return orders.filter(order => order.status !== 'pagado');
