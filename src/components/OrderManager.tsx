@@ -14,6 +14,7 @@ import { useBusinessContext } from '@/contexts/BusinessContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { fetchOrders as fetchOrdersDb, saveOrders as persistOrdersDb, generateOrderId, deleteOrderById } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { getMenuItemCardStyle } from '@/lib/menuItemColor';
 
 interface OrderItem {
