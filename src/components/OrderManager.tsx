@@ -14,6 +14,7 @@ import { useBusinessContext } from '@/contexts/BusinessContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { fetchOrders as fetchOrdersDb, saveOrders as persistOrdersDb, generateOrderId, deleteOrderById } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { getMenuItemCardStyle } from '@/lib/menuItemColor';
 
 interface OrderItem {
@@ -397,7 +398,7 @@ export default function OrderManager() {
     return newOrderForm.selectedItems.reduce((total, item) => total + (item.price * item.quantity), 0);
   };
 
-  const createNewOrder = () => {
+  const createNewOrder = async () => {
     if (!currentBusiness) {
       toast({
         title: "Negocio no disponible",
@@ -442,9 +443,23 @@ export default function OrderManager() {
       }
     });
 
+    // Atomic server-side allocation of next ORD-N (per business, race-safe)
+    const { data: nextNum, error: numErr } = await supabase.rpc('next_order_number', {
+      _business_id: currentBusiness.id,
+    });
+    if (numErr || !nextNum) {
+      console.error('next_order_number error:', numErr);
+      toast({
+        title: "Error",
+        description: "No se pudo asignar el número de orden. Inténtalo de nuevo.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     const newOrder: Order = {
       id: generateOrderId(),
-      number: computeNextOrderNumber(orders),
+      number: nextNum as string,
       customerName: newOrderForm.customerName,
       serviceType: newOrderForm.serviceType,
       diners: newOrderForm.diners as number,
