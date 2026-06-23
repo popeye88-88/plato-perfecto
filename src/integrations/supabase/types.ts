@@ -451,6 +451,7 @@ export type Database = {
           role: Database["public"]["Enums"]["app_role"]
         }[]
       }
+      next_order_number: { Args: { _business_id: string }; Returns: string }
     }
     Enums: {
       app_role: "admin" | "staff" | "manager"
