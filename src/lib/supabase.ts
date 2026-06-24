@@ -129,11 +129,29 @@ export async function fetchOrders(businessId: string) {
   if (ordersError || !ordersData?.length) return [];
 
   const orderIds = (ordersData as OrderRow[]).map((o) => o.id);
-  const { data: allItemsData } = await supabase
-    .from('order_items')
-    .select('*')
-    .in('order_id', orderIds)
-    .order('created_at');
+  // Paginate to bypass PostgREST's default 1000-row cap.
+  const allItemsData: OrderItemRow[] = [];
+  const PAGE = 1000;
+  // Also chunk order_ids to keep URL length reasonable.
+  const ID_CHUNK = 200;
+  for (let i = 0; i < orderIds.length; i += ID_CHUNK) {
+    const idsChunk = orderIds.slice(i, i + ID_CHUNK);
+    let from = 0;
+    // Loop until a page returns fewer than PAGE rows.
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const { data: page, error: pageErr } = await supabase
+        .from('order_items')
+        .select('*')
+        .in('order_id', idsChunk)
+        .order('created_at')
+        .range(from, from + PAGE - 1);
+      if (pageErr || !page || page.length === 0) break;
+      allItemsData.push(...(page as OrderItemRow[]));
+      if (page.length < PAGE) break;
+      from += PAGE;
+    }
+  }
 
   const itemsByOrder = new Map<string, OrderItemRow[]>();
   for (const it of (allItemsData || []) as OrderItemRow[]) {
