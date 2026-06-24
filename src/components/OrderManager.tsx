@@ -1552,7 +1552,7 @@ export default function OrderManager() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className={`grid w-full ${enableEntregandoStage ? 'grid-cols-5' : 'grid-cols-4'}`}>
+        <TabsList className={`grid w-full ${enableEntregandoStage ? 'grid-cols-4' : 'grid-cols-3'}`}>
           <TabsTrigger value="resumen" className="flex items-center gap-2">
             Resumen ({getStatusCount('resumen')})
           </TabsTrigger>
@@ -1566,9 +1566,6 @@ export default function OrderManager() {
           )}
           <TabsTrigger value="cobrando" className="flex items-center gap-2">
             Cobrando ({getStatusCount('cobrando')})
-          </TabsTrigger>
-          <TabsTrigger value="pagado" className="flex items-center gap-2">
-            Pagado ({getStatusCount('pagado')})
           </TabsTrigger>
         </TabsList>
 
