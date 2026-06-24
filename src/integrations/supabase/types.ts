@@ -452,6 +452,23 @@ export type Database = {
         }[]
       }
       next_order_number: { Args: { _business_id: string }; Returns: string }
+      orders_analytics: {
+        Args: { _business_id: string; _end: string; _start: string }
+        Returns: {
+          avg_order: number
+          paid_orders: number
+          total_orders: number
+          total_revenue: number
+        }[]
+      }
+      orders_revenue_by_day: {
+        Args: { _business_id: string; _end: string; _start: string }
+        Returns: {
+          day: string
+          orders_count: number
+          revenue: number
+        }[]
+      }
     }
     Enums: {
       app_role: "admin" | "staff" | "manager"

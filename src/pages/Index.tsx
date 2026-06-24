@@ -3,6 +3,7 @@ import Layout from '@/components/Layout';
 import Dashboard from '@/components/Dashboard';
 import MenuManager from '@/components/MenuManager';
 import OrderManager from '@/components/OrderManager';
+import Reports from '@/components/Reports';
 import SettingsManager from '@/components/SettingsManager';
 import Login from '@/components/Login';
 import CreateFirstBusiness from '@/components/CreateFirstBusiness';
@@ -43,6 +44,8 @@ const AppContentInner = () => {
         return <MenuManager />;
       case 'orders':
         return <OrderManager />;
+      case 'reports':
+        return can.viewDashboard ? <Reports /> : <OrderManager />;
       case 'settings':
         return <SettingsManager />;
       default:

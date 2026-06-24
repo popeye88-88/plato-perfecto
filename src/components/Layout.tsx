@@ -1,7 +1,7 @@
 import { ReactNode, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Menu, Settings, ClipboardList, BarChart3, ChefHat } from 'lucide-react';
+import { Menu, Settings, ClipboardList, BarChart3, ChefHat, LineChart } from 'lucide-react';
 
 interface LayoutProps {
   children: ReactNode;
@@ -12,8 +12,9 @@ interface LayoutProps {
 
 const allNavItems = [
   { id: 'dashboard', label: 'Dashboard', icon: BarChart3, requiresDashboard: true },
-  { id: 'menu', label: 'Menú', icon: ChefHat, requiresDashboard: false },
   { id: 'orders', label: 'Comandas', icon: ClipboardList, requiresDashboard: false },
+  { id: 'menu', label: 'Menú', icon: ChefHat, requiresDashboard: false },
+  { id: 'reports', label: 'Reportes', icon: LineChart, requiresDashboard: true },
   { id: 'settings', label: 'Ajustes', icon: Settings, requiresDashboard: false },
 ];
 

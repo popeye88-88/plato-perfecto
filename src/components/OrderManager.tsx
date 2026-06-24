@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useBusinessContext } from '@/contexts/BusinessContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
-import { fetchOrders as fetchOrdersDb, saveOrders as persistOrdersDb, generateOrderId, deleteOrderById } from '@/lib/supabase';
+import { fetchActiveOrders as fetchOrdersDb, saveOrders as persistOrdersDb, generateOrderId, deleteOrderById } from '@/lib/supabase';
 import { supabase } from '@/integrations/supabase/client';
 import { getMenuItemCardStyle } from '@/lib/menuItemColor';
 
@@ -125,18 +125,25 @@ export default function OrderManager() {
   const [reduceQuantityReason, setReduceQuantityReason] = useState('');
   const [reduceQuantityReasons, setReduceQuantityReasons] = useState<Record<string, string>>({});
 
-  // Load orders for the current business from Supabase
+  // Load active orders for the current business (only today, only non-paid) + 30s polling.
   useEffect(() => {
     if (!currentBusiness?.id) {
       setOrders([]);
       return;
     }
-
+    let cancelled = false;
     const load = async () => {
       const data = await fetchOrdersDb(currentBusiness.id);
-      setOrders(data);
+      if (!cancelled) setOrders(data);
     };
     load();
+    const interval = window.setInterval(() => {
+      // Skip polling while a dialog is open to avoid clobbering in-flight edits.
+      if (isEditOrderOpen || isPaymentOpen || isDiscountOpen || isNewOrderDialogOpen || isCancelItemDialogOpen || isReduceQuantityDialogOpen) return;
+      load();
+    }, 30000);
+    return () => { cancelled = true; window.clearInterval(interval); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentBusiness?.id]);
 
   // Update selectedOrderForEdit when orders change
@@ -179,7 +186,9 @@ export default function OrderManager() {
   // Save orders to Supabase (only the ones that changed)
   const saveOrders = (newOrders: Order[]) => {
     const previousOrders = orders;
-    setOrders(newOrders);
+    // Drop pagado orders from active view — they live in Reportes now.
+    const activeOnly = newOrders.filter(o => o.status !== 'pagado');
+    setOrders(activeOnly);
     if (!currentBusiness?.id) return;
     const newIds = new Set(newOrders.map(o => o.id));
     const removedOrders = previousOrders.filter(o => !newIds.has(o.id));
@@ -1543,7 +1552,7 @@ export default function OrderManager() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className={`grid w-full ${enableEntregandoStage ? 'grid-cols-5' : 'grid-cols-4'}`}>
+        <TabsList className={`grid w-full ${enableEntregandoStage ? 'grid-cols-4' : 'grid-cols-3'}`}>
           <TabsTrigger value="resumen" className="flex items-center gap-2">
             Resumen ({getStatusCount('resumen')})
           </TabsTrigger>
@@ -1557,9 +1566,6 @@ export default function OrderManager() {
           )}
           <TabsTrigger value="cobrando" className="flex items-center gap-2">
             Cobrando ({getStatusCount('cobrando')})
-          </TabsTrigger>
-          <TabsTrigger value="pagado" className="flex items-center gap-2">
-            Pagado ({getStatusCount('pagado')})
           </TabsTrigger>
         </TabsList>
 
@@ -1639,101 +1645,6 @@ export default function OrderManager() {
         </TabsContent>
         ))}
 
-        <TabsContent value="pagado" className="space-y-4">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">Filtros</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                <div className="space-y-1">
-                  <Label className="text-xs">Buscar</Label>
-                  <Input
-                    placeholder="Nº orden o cliente"
-                    value={paidFilters.search}
-                    onChange={(e) => setPaidFilters(p => ({ ...p, search: e.target.value }))}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Método de pago</Label>
-                  <Select
-                    value={paidFilters.paymentMethod}
-                    onValueChange={(v: typeof paidFilters.paymentMethod) => setPaidFilters(p => ({ ...p, paymentMethod: v }))}
-                  >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos</SelectItem>
-                      <SelectItem value="efectivo">Efectivo</SelectItem>
-                      <SelectItem value="tarjeta">Tarjeta</SelectItem>
-                      <SelectItem value="transferencia">Transferencia</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Tipo de servicio</Label>
-                  <Select
-                    value={paidFilters.serviceType}
-                    onValueChange={(v: typeof paidFilters.serviceType) => setPaidFilters(p => ({ ...p, serviceType: v }))}
-                  >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos</SelectItem>
-                      <SelectItem value="puesto">En Puesto</SelectItem>
-                      <SelectItem value="takeaway">Take Away</SelectItem>
-                      <SelectItem value="delivery">Delivery</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Desde</Label>
-                  <Input
-                    type="date"
-                    value={paidFilters.dateFrom}
-                    onChange={(e) => setPaidFilters(p => ({ ...p, dateFrom: e.target.value }))}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Hasta</Label>
-                  <Input
-                    type="date"
-                    value={paidFilters.dateTo}
-                    onChange={(e) => setPaidFilters(p => ({ ...p, dateTo: e.target.value }))}
-                  />
-                </div>
-              </div>
-              {(paidFilters.search || paidFilters.paymentMethod !== 'all' || paidFilters.serviceType !== 'all' || paidFilters.dateFrom || paidFilters.dateTo) && (
-                <div className="mt-3">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setPaidFilters({ search: '', paymentMethod: 'all', serviceType: 'all', dateFrom: '', dateTo: '' })}
-                  >
-                    Limpiar filtros
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {getFilteredPaidOrders().map((order) => renderOrderCard(order, 'pagado'))}
-            {getFilteredPaidOrders().length === 0 && (
-              <div className="col-span-full text-center text-muted-foreground py-8">
-                <div className="flex flex-col items-center">
-                  <DollarSign className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-foreground mb-2 mt-4">
-                    No hay órdenes pagadas
-                  </h3>
-                  <p className="text-muted-foreground">
-                    {orders.some(o => o.status === 'pagado')
-                      ? 'No hay órdenes que coincidan con los filtros'
-                      : 'Las órdenes aparecerán aquí cuando se paguen'}
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-        </TabsContent>
       </Tabs>
 
       {/* Discount Dialog */}
