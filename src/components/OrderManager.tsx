@@ -186,7 +186,9 @@ export default function OrderManager() {
   // Save orders to Supabase (only the ones that changed)
   const saveOrders = (newOrders: Order[]) => {
     const previousOrders = orders;
-    setOrders(newOrders);
+    // Drop pagado orders from active view — they live in Reportes now.
+    const activeOnly = newOrders.filter(o => o.status !== 'pagado');
+    setOrders(activeOnly);
     if (!currentBusiness?.id) return;
     const newIds = new Set(newOrders.map(o => o.id));
     const removedOrders = previousOrders.filter(o => !newIds.has(o.id));
