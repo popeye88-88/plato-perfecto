@@ -44,6 +44,8 @@ const AppContentInner = () => {
         return <MenuManager />;
       case 'orders':
         return <OrderManager />;
+      case 'reports':
+        return can.viewDashboard ? <Reports /> : <OrderManager />;
       case 'settings':
         return <SettingsManager />;
       default:
