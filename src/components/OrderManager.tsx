@@ -125,18 +125,25 @@ export default function OrderManager() {
   const [reduceQuantityReason, setReduceQuantityReason] = useState('');
   const [reduceQuantityReasons, setReduceQuantityReasons] = useState<Record<string, string>>({});
 
-  // Load orders for the current business from Supabase
+  // Load active orders for the current business (only today, only non-paid) + 30s polling.
   useEffect(() => {
     if (!currentBusiness?.id) {
       setOrders([]);
       return;
     }
-
+    let cancelled = false;
     const load = async () => {
       const data = await fetchOrdersDb(currentBusiness.id);
-      setOrders(data);
+      if (!cancelled) setOrders(data);
     };
     load();
+    const interval = window.setInterval(() => {
+      // Skip polling while a dialog is open to avoid clobbering in-flight edits.
+      if (isEditOrderOpen || isPaymentOpen || isDiscountOpen || isNewOrderDialogOpen || isCancelItemDialogOpen || isReduceQuantityDialogOpen) return;
+      load();
+    }, 30000);
+    return () => { cancelled = true; window.clearInterval(interval); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentBusiness?.id]);
 
   // Update selectedOrderForEdit when orders change
