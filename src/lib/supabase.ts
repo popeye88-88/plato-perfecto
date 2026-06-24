@@ -154,7 +154,7 @@ export async function fetchOrders(businessId: string) {
   }
 
   const itemsByOrder = new Map<string, OrderItemRow[]>();
-  for (const it of (allItemsData || []) as OrderItemRow[]) {
+  for (const it of allItemsData) {
     const arr = itemsByOrder.get(it.order_id) || [];
     arr.push(it);
     itemsByOrder.set(it.order_id, arr);
