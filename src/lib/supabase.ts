@@ -120,24 +120,105 @@ const toCancelledStage = (stage?: string): 'preparando' | 'entregando' | 'cobran
   return stage === 'preparando' || stage === 'entregando' || stage === 'cobrando' ? stage : undefined;
 };
 
-export async function fetchOrders(businessId: string) {
-  const { data: ordersData, error: ordersError } = await supabase
-    .from('orders')
-    .select('*')
-    .eq('business_id', businessId)
-    .order('created_at', { ascending: false });
-  if (ordersError || !ordersData?.length) return [];
+// ---- Shared mapping ----
+type FetchOrdersOptions = {
+  status?: string[];           // filter by order.status
+  createdAfter?: string;       // ISO
+  createdBefore?: string;      // ISO
+  rangeFrom?: number;          // pagination start (inclusive)
+  rangeTo?: number;            // pagination end (inclusive)
+  withCount?: boolean;         // include total count
+  paginateItems?: boolean;     // for big result sets (analytics)
+};
 
-  const orderIds = (ordersData as OrderRow[]).map((o) => o.id);
-  // Paginate to bypass PostgREST's default 1000-row cap.
-  const allItemsData: OrderItemRow[] = [];
+type FetchOrdersResult = {
+  orders: ReturnType<typeof mapOrderRow>[];
+  total: number | null;
+};
+
+function mapOrderRow(o: OrderRow, items: OrderItemRow[]) {
+  const initialItems = (o.initial_items as Array<{ id: string; name: string; price: number; quantity: number }> | undefined) || [];
+  const sourceItems = items.length > 0
+    ? items
+    : initialItems.map((item, index) => ({
+        id: getPersistedOrderItemId(o.id, item.id, index),
+        order_id: o.id,
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        status: 'preparando',
+        cancelled: false
+      } as OrderItemRow));
+  const storedIndividualStatus = (o.individual_items_status || {}) as Record<string, 'preparando' | 'entregando' | 'cobrando'>;
+  const normalizedIndividualStatus: Record<string, 'preparando' | 'entregando' | 'cobrando'> = {};
+
+  const mappedItems = sourceItems.map((i: OrderItemRow, itemIndex: number) => {
+    const initialItem = initialItems[itemIndex] || initialItems.find((item) => item.name === i.name && Number(item.price) === Number(i.price));
+    for (let quantityIndex = 0; quantityIndex < Number(i.quantity || 0); quantityIndex++) {
+      const persistedKey = `${i.id}-${quantityIndex}`;
+      const legacyKey = initialItem?.id ? `${initialItem.id}-${quantityIndex}` : undefined;
+      normalizedIndividualStatus[persistedKey] =
+        storedIndividualStatus[persistedKey] ||
+        (legacyKey ? storedIndividualStatus[legacyKey] : undefined) ||
+        toIndividualStatus(i.status);
+    }
+    return {
+      id: i.id,
+      name: i.name,
+      price: parseFloat(String(i.price)),
+      quantity: i.quantity,
+      originalQuantity: i.original_quantity,
+      status: toOrderStatus(i.status),
+      cancelled: i.cancelled,
+      cancelledAt: i.cancelled_at ? new Date(i.cancelled_at) : undefined,
+      cancelledInStage: toCancelledStage(i.cancelled_in_stage),
+      cancellationReason: i.cancellation_reason
+    };
+  });
+
+  return {
+    id: o.id,
+    number: o.number,
+    customerName: o.customer_name,
+    items: mappedItems,
+    total: parseFloat(String(o.total)),
+    status: toOrderStatus(o.status),
+    createdAt: new Date(o.created_at),
+    serviceType: toServiceType(o.service_type),
+    diners: o.diners,
+    edited: o.edited,
+    discountAmount: o.discount_amount ? parseFloat(String(o.discount_amount)) : undefined,
+    discountReason: o.discount_reason,
+    paymentMethod: toPaymentMethod(o.payment_method),
+    individualItemsStatus: Object.keys(normalizedIndividualStatus).length > 0 ? normalizedIndividualStatus : undefined,
+    initialItems: initialItems.length > 0 ? initialItems : undefined,
+    editHistory: (o.edit_history as Array<{ timestamp: string; action: string; stage: string; itemName?: string; quantity?: number; details?: string; userId?: string }> | undefined)?.map((e) => ({
+      ...e,
+      action: toEditAction(e.action),
+      stage: toIndividualStatus(e.stage),
+      timestamp: new Date(e.timestamp)
+    }))
+  };
+}
+
+async function fetchItemsForOrders(orderIds: string[], paginate: boolean): Promise<OrderItemRow[]> {
+  if (orderIds.length === 0) return [];
+  const all: OrderItemRow[] = [];
   const PAGE = 1000;
-  // Also chunk order_ids to keep URL length reasonable.
   const ID_CHUNK = 200;
   for (let i = 0; i < orderIds.length; i += ID_CHUNK) {
     const idsChunk = orderIds.slice(i, i + ID_CHUNK);
+    if (!paginate) {
+      const { data, error } = await supabase
+        .from('order_items')
+        .select('*')
+        .in('order_id', idsChunk)
+        .order('created_at');
+      if (error) { console.error('fetchItemsForOrders error:', error); continue; }
+      all.push(...((data || []) as OrderItemRow[]));
+      continue;
+    }
     let from = 0;
-    // Loop until a page returns fewer than PAGE rows.
     // eslint-disable-next-line no-constant-condition
     while (true) {
       const { data: page, error: pageErr } = await supabase
@@ -147,84 +228,84 @@ export async function fetchOrders(businessId: string) {
         .order('created_at')
         .range(from, from + PAGE - 1);
       if (pageErr || !page || page.length === 0) break;
-      allItemsData.push(...(page as OrderItemRow[]));
+      all.push(...(page as OrderItemRow[]));
       if (page.length < PAGE) break;
       from += PAGE;
     }
   }
+  return all;
+}
 
-  const itemsByOrder = new Map<string, OrderItemRow[]>();
-  for (const it of allItemsData) {
-    const arr = itemsByOrder.get(it.order_id) || [];
-    arr.push(it);
-    itemsByOrder.set(it.order_id, arr);
+async function queryOrders(businessId: string, opts: FetchOrdersOptions): Promise<FetchOrdersResult> {
+  let q = supabase
+    .from('orders')
+    .select('*', opts.withCount ? { count: 'exact' } : undefined)
+    .eq('business_id', businessId);
+  if (opts.status && opts.status.length > 0) q = q.in('status', opts.status);
+  if (opts.createdAfter) q = q.gte('created_at', opts.createdAfter);
+  if (opts.createdBefore) q = q.lte('created_at', opts.createdBefore);
+  q = q.order('created_at', { ascending: false });
+  if (typeof opts.rangeFrom === 'number' && typeof opts.rangeTo === 'number') {
+    q = q.range(opts.rangeFrom, opts.rangeTo);
   }
+  const { data, error, count } = await q;
+  if (error || !data?.length) {
+    if (error) console.error('queryOrders error:', error);
+    return { orders: [], total: opts.withCount ? (count ?? 0) : null };
+  }
+  const orderIds = (data as OrderRow[]).map((o) => o.id);
+  const items = await fetchItemsForOrders(orderIds, !!opts.paginateItems);
+  const byOrder = new Map<string, OrderItemRow[]>();
+  for (const it of items) {
+    const arr = byOrder.get(it.order_id) || [];
+    arr.push(it);
+    byOrder.set(it.order_id, arr);
+  }
+  const orders = (data as OrderRow[]).map((o) => mapOrderRow(o, byOrder.get(o.id) || []));
+  return { orders, total: opts.withCount ? (count ?? orders.length) : null };
+}
 
-  return (ordersData as OrderRow[]).map((o: OrderRow) => {
-    const initialItems = (o.initial_items as Array<{ id: string; name: string; price: number; quantity: number }> | undefined) || [];
-    const rawItems = itemsByOrder.get(o.id) || [];
-    const sourceItems = rawItems.length > 0
-      ? rawItems
-      : initialItems.map((item, index) => ({
-          id: getPersistedOrderItemId(o.id, item.id, index),
-          order_id: o.id,
-          name: item.name,
-          price: item.price,
-          quantity: item.quantity,
-          status: 'preparando',
-          cancelled: false
-        } as OrderItemRow));
-    const storedIndividualStatus = (o.individual_items_status || {}) as Record<string, 'preparando' | 'entregando' | 'cobrando'>;
-    const normalizedIndividualStatus: Record<string, 'preparando' | 'entregando' | 'cobrando'> = {};
-
-    const items = sourceItems.map((i: OrderItemRow, itemIndex: number) => {
-      const initialItem = initialItems[itemIndex] || initialItems.find((item) => item.name === i.name && Number(item.price) === Number(i.price));
-      for (let quantityIndex = 0; quantityIndex < Number(i.quantity || 0); quantityIndex++) {
-        const persistedKey = `${i.id}-${quantityIndex}`;
-        const legacyKey = initialItem?.id ? `${initialItem.id}-${quantityIndex}` : undefined;
-        normalizedIndividualStatus[persistedKey] =
-          storedIndividualStatus[persistedKey] ||
-          (legacyKey ? storedIndividualStatus[legacyKey] : undefined) ||
-          toIndividualStatus(i.status);
-      }
-
-      return {
-        id: i.id,
-        name: i.name,
-        price: parseFloat(String(i.price)),
-        quantity: i.quantity,
-        originalQuantity: i.original_quantity,
-        status: toOrderStatus(i.status),
-        cancelled: i.cancelled,
-        cancelledAt: i.cancelled_at ? new Date(i.cancelled_at) : undefined,
-        cancelledInStage: toCancelledStage(i.cancelled_in_stage),
-        cancellationReason: i.cancellation_reason
-      };
-    });
-    return {
-      id: o.id,
-      number: o.number,
-      customerName: o.customer_name,
-      items,
-      total: parseFloat(String(o.total)),
-      status: toOrderStatus(o.status),
-      createdAt: new Date(o.created_at),
-      serviceType: toServiceType(o.service_type),
-      diners: o.diners,
-      edited: o.edited,
-      discountAmount: o.discount_amount ? parseFloat(String(o.discount_amount)) : undefined,
-      discountReason: o.discount_reason,
-      paymentMethod: toPaymentMethod(o.payment_method),
-      individualItemsStatus: Object.keys(normalizedIndividualStatus).length > 0 ? normalizedIndividualStatus : undefined,
-      initialItems: initialItems.length > 0 ? initialItems : undefined,
-      editHistory: (o.edit_history as Array<{ timestamp: string; action: string; stage: string; itemName?: string; quantity?: number; details?: string; userId?: string }> | undefined)?.map((e) => ({
-        ...e,
-        action: toEditAction(e.action),
-        stage: toIndividualStatus(e.stage),
-        timestamp: new Date(e.timestamp)
-      }))
-    };
+/**
+ * Active orders: ONLY today (local timezone) with status in preparando/entregando/cobrando.
+ * Capped at 50. No pagination. Items loaded in a single query.
+ */
+export async function fetchActiveOrders(businessId: string) {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const { orders } = await queryOrders(businessId, {
+    status: ['preparando', 'entregando', 'cobrando'],
+    createdAfter: start.toISOString(),
+    rangeFrom: 0,
+    rangeTo: 49,
+    paginateItems: false,
   });
+  return orders;
+}
+
+/**
+ * Historical/analytics orders. Paginated.
+ */
+export async function fetchAnalyticsOrders(
+  businessId: string,
+  params: { startDate?: Date; endDate?: Date; status?: string[]; page?: number; pageSize?: number } = {}
+) {
+  const pageSize = params.pageSize ?? 100;
+  const page = params.page ?? 0;
+  return queryOrders(businessId, {
+    status: params.status,
+    createdAfter: params.startDate?.toISOString(),
+    createdBefore: params.endDate?.toISOString(),
+    rangeFrom: page * pageSize,
+    rangeTo: page * pageSize + pageSize - 1,
+    withCount: true,
+    paginateItems: true,
+  });
+}
+
+/** @deprecated Use fetchActiveOrders for live view and fetchAnalyticsOrders for history. */
+export async function fetchOrders(businessId: string) {
+  const { orders } = await queryOrders(businessId, { paginateItems: true });
+  return orders;
 }
 
 export async function saveOrders(businessId: string, orders: Array<{
