@@ -1940,15 +1940,54 @@ export default function OrderManager() {
                 </Button>
               </div>
             </div>
-            
+
+            {paymentMethod === 'efectivo' && selectedOrderForPayment && (() => {
+              const total = selectedOrderForPayment.total;
+              const given = parseFloat(cashGiven.replace(',', '.'));
+              const validGiven = !isNaN(given) && given >= 0;
+              const change = validGiven ? given - total : 0;
+              return (
+                <div className="space-y-2 p-4 border border-border rounded-lg bg-card">
+                  <Label htmlFor="cashGiven">Dinero recibido</Label>
+                  <Input
+                    id="cashGiven"
+                    type="number"
+                    inputMode="decimal"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    value={cashGiven}
+                    onChange={(e) => setCashGiven(e.target.value)}
+                    autoFocus
+                    className="text-lg"
+                  />
+                  <div className="flex justify-between items-center pt-2">
+                    <span className="text-sm text-muted-foreground">Cambio a entregar:</span>
+                    <span className={`text-2xl font-bold ${validGiven && change >= 0 ? 'text-primary' : 'text-destructive'}`}>
+                      {validGiven ? `$${change.toFixed(2)}` : '—'}
+                    </span>
+                  </div>
+                  {validGiven && change < 0 && (
+                    <p className="text-sm text-destructive">Faltan ${Math.abs(change).toFixed(2)} para cubrir el total.</p>
+                  )}
+                </div>
+              );
+            })()}
+
             <div className="flex justify-end space-x-2">
               <Button variant="outline" onClick={() => setIsPaymentOpen(false)}>
                 Cancelar
               </Button>
-              <Button 
-                onClick={processPayment} 
+              <Button
+                onClick={processPayment}
                 className="bg-gradient-primary hover:opacity-90"
-                disabled={!paymentMethod}
+                disabled={
+                  !paymentMethod ||
+                  (paymentMethod === 'efectivo' && (() => {
+                    const g = parseFloat(cashGiven.replace(',', '.'));
+                    return isNaN(g) || g < (selectedOrderForPayment?.total ?? 0);
+                  })())
+                }
               >
                 Procesar Pago
               </Button>
