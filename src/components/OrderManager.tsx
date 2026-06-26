@@ -1299,6 +1299,8 @@ export default function OrderManager() {
                   size="sm" 
                   onClick={() => {
                     setSelectedOrderForPayment(order);
+                    setPaymentMethod('');
+                    setCashGiven('');
                     setIsPaymentOpen(true);
                   }}
                   className="bg-gradient-primary hover:opacity-90 font-medium"
