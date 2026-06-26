@@ -121,10 +121,6 @@ export default function OrderManager() {
   const [isCancelItemDialogOpen, setIsCancelItemDialogOpen] = useState(false);
   const [itemToCancel, setItemToCancel] = useState<{orderId: string, itemId: string, individualId?: string} | null>(null);
   const [cancelReason, setCancelReason] = useState('');
-  const [isReduceQuantityDialogOpen, setIsReduceQuantityDialogOpen] = useState(false);
-  const [itemToReduce, setItemToReduce] = useState<{menuItemId: string, menuItemName: string, currentQuantity: number, orderItemId?: string, fakeMenuItem?: {id: string, name: string, price: number, category?: string}} | null>(null);
-  const [reduceQuantityReason, setReduceQuantityReason] = useState('');
-  const [reduceQuantityReasons, setReduceQuantityReasons] = useState<Record<string, string>>({});
 
   // Load active orders for the current business (only today, only non-paid) + 30s polling.
   useEffect(() => {
@@ -140,7 +136,7 @@ export default function OrderManager() {
     load();
     const interval = window.setInterval(() => {
       // Skip polling while a dialog is open to avoid clobbering in-flight edits.
-      if (isEditOrderOpen || isPaymentOpen || isDiscountOpen || isNewOrderDialogOpen || isCancelItemDialogOpen || isReduceQuantityDialogOpen) return;
+      if (isEditOrderOpen || isPaymentOpen || isDiscountOpen || isNewOrderDialogOpen || isCancelItemDialogOpen) return;
       load();
     }, 30000);
     return () => { cancelled = true; window.clearInterval(interval); };
@@ -168,7 +164,6 @@ export default function OrderManager() {
     setIsDiscountOpen(false);
     setIsPaymentOpen(false);
     setLocalEditQuantities({});
-    setReduceQuantityReasons({});
   }, [currentBusiness?.id]);
 
   // Save a single order to Supabase with error handling
@@ -2030,23 +2025,11 @@ export default function OrderManager() {
                       });
                     });
 
-                    const handleDecrement = (orderItem: any, fakeMenuItem: any, currentQuantity: number, displayName: string, fakeId: string) => {
-                      const isOrderInCobrando = selectedOrderForEdit.status === 'cobrando';
-                      const isItemInCobrando = orderItem && orderItem.status === 'cobrando';
-                      let hasItemInCobrando = false;
-                      if (orderItem && selectedOrderForEdit.individualItemsStatus) {
-                        const itemKeys = Array.from({ length: orderItem.quantity }, (_, idx) => `${orderItem.id}-${idx}`);
-                        hasItemInCobrando = itemKeys.some(key => selectedOrderForEdit.individualItemsStatus?.[key] === 'cobrando');
-                      }
-                      if (isOrderInCobrando && (isItemInCobrando || hasItemInCobrando)) {
-                        setItemToReduce({ menuItemId: fakeId, menuItemName: displayName, currentQuantity, orderItemId: orderItem?.id, fakeMenuItem });
-                        setIsReduceQuantityDialogOpen(true);
-                      } else {
-                        setLocalEditQuantities(prev => {
-                          const newQuantity = Math.max(0, resolveQuantityValue(prev, orderItem, fakeMenuItem, 0) - 1);
-                          return applyQuantityUpdate(prev, newQuantity, orderItem, fakeMenuItem);
-                        });
-                      }
+                    const handleDecrement = (orderItem: any, fakeMenuItem: any, _currentQuantity: number, _displayName: string, _fakeId: string) => {
+                      setLocalEditQuantities(prev => {
+                        const newQuantity = Math.max(0, resolveQuantityValue(prev, orderItem, fakeMenuItem, 0) - 1);
+                        return applyQuantityUpdate(prev, newQuantity, orderItem, fakeMenuItem);
+                      });
                     };
 
                     return categories.map(category => (
@@ -2303,7 +2286,6 @@ export default function OrderManager() {
                       onClick={() => {
                   setIsEditOrderOpen(false);
                   setLocalEditQuantities({});
-                  setReduceQuantityReasons({});
                 }} 
                 className="px-6"
                     >
@@ -2365,10 +2347,6 @@ export default function OrderManager() {
 
                             const removedQuantity = Math.max(0, item.quantity - newQuantity);
                             if (removedQuantity > 0) {
-                              // Get the reason if it was provided (for items reduced in 'cobrando' stage)
-                              const itemKey = item.id || matchingMenuItem?.id;
-                              const reason = itemKey ? reduceQuantityReasons[itemKey] : undefined;
-                              
                               removedQuantities.push({
                                 ...item,
                                 quantity: removedQuantity,
@@ -2376,7 +2354,6 @@ export default function OrderManager() {
                                 cancelled: true,
                                 cancelledAt: new Date(),
                                 cancelledInStage: currentStage,
-                                cancellationReason: reason
                               });
 
                               editHistoryDelta.push({
@@ -2385,7 +2362,6 @@ export default function OrderManager() {
                                 stage: currentStage,
                                 itemName: item.name,
                                 quantity: removedQuantity,
-                                details: reason,
                                 userId: currentUser?.username
                               });
                             }
@@ -2493,7 +2469,6 @@ export default function OrderManager() {
                     saveOrders(finalOrders);
                     setIsEditOrderOpen(false);
                     setLocalEditQuantities({});
-                    setReduceQuantityReasons({});
                     toast({
                       title: editedHasActive ? "Orden actualizada" : "Orden eliminada",
                       description: editedHasActive ? "Los cambios se han aplicado correctamente" : "La orden quedó sin elementos y fue eliminada"
@@ -2563,100 +2538,6 @@ export default function OrderManager() {
               Confirmar Eliminación
             </Button>
               </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Reduce Quantity Reason Dialog */}
-      <Dialog open={isReduceQuantityDialogOpen} onOpenChange={setIsReduceQuantityDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Motivo de Reducción</DialogTitle>
-          </DialogHeader>
-          
-          <div className="space-y-4">
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-              <div className="flex items-start gap-3">
-                <span className="text-yellow-600 text-xl">⚠️</span>
-                <div>
-                  <p className="font-semibold text-yellow-900">Advertencia</p>
-                  <p className="text-sm text-yellow-700 mt-1">
-                    Estás reduciendo unidades de un elemento que está en etapa de cobro. Debes indicar el motivo.
-                  </p>
-      </div>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="reduceQuantityReason" className="text-sm font-medium">Motivo *</Label>
-              <Input
-                id="reduceQuantityReason"
-                placeholder="Ej: Cliente canceló, producto defectuoso, etc."
-                value={reduceQuantityReason}
-                onChange={(e) => setReduceQuantityReason(e.target.value)}
-              />
-            </div>
-
-            <p className="text-xs text-muted-foreground">
-              * Campo obligatorio. Explica por qué se reduce la cantidad de este elemento.
-            </p>
-          </div>
-
-          <div className="flex justify-end gap-3 mt-6">
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                setIsReduceQuantityDialogOpen(false);
-                setReduceQuantityReason('');
-                setItemToReduce(null);
-              }}
-            >
-              Cancelar
-            </Button>
-            <Button 
-              variant="destructive"
-              onClick={() => {
-                if (!reduceQuantityReason.trim() || !itemToReduce) return;
-
-                // Use the references captured when the dialog was opened so this
-                // works for both plain items and size-variant items.
-                const fakeMenuItem = itemToReduce.fakeMenuItem
-                  ?? menuItems.find(m => m.id === itemToReduce.menuItemId)
-                  ?? { id: itemToReduce.menuItemId, name: itemToReduce.menuItemName, price: 0 };
-                const orderItem = selectedOrderForEdit?.items.find(item =>
-                  !item.cancelled && (
-                    (itemToReduce.orderItemId && item.id === itemToReduce.orderItemId) ||
-                    item.id === fakeMenuItem.id ||
-                    item.name === fakeMenuItem.name
-                  )
-                );
-
-                // Create a key to identify this item
-                const itemKey = orderItem?.id || fakeMenuItem.id;
-
-                // Store the reason
-                setReduceQuantityReasons(prev => ({
-                  ...prev,
-                  [itemKey]: reduceQuantityReason.trim()
-                }));
-
-                // Reduce quantity
-                setLocalEditQuantities(prev => {
-                  const newQuantity = Math.max(
-                    0,
-                    resolveQuantityValue(prev, orderItem, fakeMenuItem, 0) - 1
-                  );
-                  return applyQuantityUpdate(prev, newQuantity, orderItem, fakeMenuItem);
-                });
-
-                setIsReduceQuantityDialogOpen(false);
-                setReduceQuantityReason('');
-                setItemToReduce(null);
-              }}
-              disabled={!reduceQuantityReason.trim()}
-            >
-              Confirmar Reducción
-            </Button>
-          </div>
         </DialogContent>
       </Dialog>
     </div>
