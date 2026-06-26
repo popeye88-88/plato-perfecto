@@ -121,10 +121,6 @@ export default function OrderManager() {
   const [isCancelItemDialogOpen, setIsCancelItemDialogOpen] = useState(false);
   const [itemToCancel, setItemToCancel] = useState<{orderId: string, itemId: string, individualId?: string} | null>(null);
   const [cancelReason, setCancelReason] = useState('');
-  const [isReduceQuantityDialogOpen, setIsReduceQuantityDialogOpen] = useState(false);
-  const [itemToReduce, setItemToReduce] = useState<{menuItemId: string, menuItemName: string, currentQuantity: number, orderItemId?: string, fakeMenuItem?: {id: string, name: string, price: number, category?: string}} | null>(null);
-  const [reduceQuantityReason, setReduceQuantityReason] = useState('');
-  const [reduceQuantityReasons, setReduceQuantityReasons] = useState<Record<string, string>>({});
 
   // Load active orders for the current business (only today, only non-paid) + 30s polling.
   useEffect(() => {
@@ -140,7 +136,7 @@ export default function OrderManager() {
     load();
     const interval = window.setInterval(() => {
       // Skip polling while a dialog is open to avoid clobbering in-flight edits.
-      if (isEditOrderOpen || isPaymentOpen || isDiscountOpen || isNewOrderDialogOpen || isCancelItemDialogOpen || isReduceQuantityDialogOpen) return;
+      if (isEditOrderOpen || isPaymentOpen || isDiscountOpen || isNewOrderDialogOpen || isCancelItemDialogOpen) return;
       load();
     }, 30000);
     return () => { cancelled = true; window.clearInterval(interval); };
@@ -2030,23 +2026,11 @@ export default function OrderManager() {
                       });
                     });
 
-                    const handleDecrement = (orderItem: any, fakeMenuItem: any, currentQuantity: number, displayName: string, fakeId: string) => {
-                      const isOrderInCobrando = selectedOrderForEdit.status === 'cobrando';
-                      const isItemInCobrando = orderItem && orderItem.status === 'cobrando';
-                      let hasItemInCobrando = false;
-                      if (orderItem && selectedOrderForEdit.individualItemsStatus) {
-                        const itemKeys = Array.from({ length: orderItem.quantity }, (_, idx) => `${orderItem.id}-${idx}`);
-                        hasItemInCobrando = itemKeys.some(key => selectedOrderForEdit.individualItemsStatus?.[key] === 'cobrando');
-                      }
-                      if (isOrderInCobrando && (isItemInCobrando || hasItemInCobrando)) {
-                        setItemToReduce({ menuItemId: fakeId, menuItemName: displayName, currentQuantity, orderItemId: orderItem?.id, fakeMenuItem });
-                        setIsReduceQuantityDialogOpen(true);
-                      } else {
-                        setLocalEditQuantities(prev => {
-                          const newQuantity = Math.max(0, resolveQuantityValue(prev, orderItem, fakeMenuItem, 0) - 1);
-                          return applyQuantityUpdate(prev, newQuantity, orderItem, fakeMenuItem);
-                        });
-                      }
+                    const handleDecrement = (orderItem: any, fakeMenuItem: any, _currentQuantity: number, _displayName: string, _fakeId: string) => {
+                      setLocalEditQuantities(prev => {
+                        const newQuantity = Math.max(0, resolveQuantityValue(prev, orderItem, fakeMenuItem, 0) - 1);
+                        return applyQuantityUpdate(prev, newQuantity, orderItem, fakeMenuItem);
+                      });
                     };
 
                     return categories.map(category => (
@@ -2365,10 +2349,6 @@ export default function OrderManager() {
 
                             const removedQuantity = Math.max(0, item.quantity - newQuantity);
                             if (removedQuantity > 0) {
-                              // Get the reason if it was provided (for items reduced in 'cobrando' stage)
-                              const itemKey = item.id || matchingMenuItem?.id;
-                              const reason = itemKey ? reduceQuantityReasons[itemKey] : undefined;
-                              
                               removedQuantities.push({
                                 ...item,
                                 quantity: removedQuantity,
@@ -2376,7 +2356,6 @@ export default function OrderManager() {
                                 cancelled: true,
                                 cancelledAt: new Date(),
                                 cancelledInStage: currentStage,
-                                cancellationReason: reason
                               });
 
                               editHistoryDelta.push({
@@ -2385,7 +2364,6 @@ export default function OrderManager() {
                                 stage: currentStage,
                                 itemName: item.name,
                                 quantity: removedQuantity,
-                                details: reason,
                                 userId: currentUser?.username
                               });
                             }
