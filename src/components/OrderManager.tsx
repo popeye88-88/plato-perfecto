@@ -1952,13 +1952,15 @@ export default function OrderManager() {
                   <Label htmlFor="cashGiven">Dinero recibido</Label>
                   <Input
                     id="cashGiven"
-                    type="number"
+                    type="text"
                     inputMode="decimal"
-                    step="0.01"
-                    min="0"
+                    pattern="[0-9]*[.,]?[0-9]*"
                     placeholder="0.00"
                     value={cashGiven}
-                    onChange={(e) => setCashGiven(e.target.value)}
+                    onChange={(e) => {
+                      const v = e.target.value.replace(/[^0-9.,]/g, '');
+                      setCashGiven(v);
+                    }}
                     autoFocus
                     className="text-lg"
                   />
