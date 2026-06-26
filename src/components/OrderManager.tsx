@@ -665,6 +665,7 @@ export default function OrderManager() {
 
     setIsPaymentOpen(false);
     setPaymentMethod('');
+    setCashGiven('');
     setSelectedOrderForPayment(null);
 
     toast({
