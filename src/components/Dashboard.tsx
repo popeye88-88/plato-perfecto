@@ -32,16 +32,18 @@ interface ChartData {
 
 type OrderType = Awaited<ReturnType<typeof fetchOrders>>[number];
 
-function bucketKey(date: Date, groupBy: 'day' | 'week' | 'month'): { key: string; label: string; sortDate: Date } {
+function bucketKey(date: Date, groupBy: 'day' | 'week' | 'month', tz: string): { key: string; label: string; sortDate: Date } {
+  // Bucket by the business's local wall clock, not the browser's local time.
+  const wall = toZonedWallClock(date, tz);
   if (groupBy === 'day') {
-    const d = startOfDay(date);
+    const d = startOfDay(wall);
     return { key: d.toISOString(), label: format(d, 'dd/MM'), sortDate: d };
   }
   if (groupBy === 'week') {
-    const d = startOfISOWeek(date);
+    const d = startOfISOWeek(wall);
     return { key: d.toISOString(), label: `Sem ${format(d, 'dd/MM')}`, sortDate: d };
   }
-  const d = startOfMonth(date);
+  const d = startOfMonth(wall);
   return { key: d.toISOString(), label: format(d, 'MMM yyyy', { locale: es }), sortDate: d };
 }
 
