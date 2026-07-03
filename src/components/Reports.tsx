@@ -11,15 +11,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Download, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { DEFAULT_TZ, formatInTz, parseDateStrInTz, endOfDayInTz, ymdInTz } from '@/lib/timezone';
 
 type OrderRow = Awaited<ReturnType<typeof fetchAnalyticsOrders>>['orders'][number];
 
 const PAGE_SIZE = 100;
 
-const todayISO = (offsetDays = 0) => {
+const todayISOInTz = (tz: string, offsetDays = 0) => {
   const d = new Date();
   d.setDate(d.getDate() + offsetDays);
-  return d.toISOString().slice(0, 10);
+  return ymdInTz(d, tz);
 };
 
 const fmtMoney = (n: number, currency = 'MXN') =>
