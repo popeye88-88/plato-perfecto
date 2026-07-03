@@ -924,13 +924,15 @@ export default function OrderManager() {
   const getTimestamp = (t: Date | string | number): number => toDate(t).getTime();
 
   const formatDateTime = (date: Date) => {
-    return date.toLocaleString('es-ES', {
+    return new Intl.DateTimeFormat('es-MX', {
+      timeZone: currentBusiness?.timezone || 'America/Mexico_City',
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
-      hour: '2-digit', 
-      minute: '2-digit' 
-    });
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).format(date);
   };
 
   const getStatusSymbol = (status: string) => {
