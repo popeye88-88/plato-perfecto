@@ -17,6 +17,7 @@ interface Business {
   enableEntregandoStage?: boolean;
   language?: string;
   currency?: string;
+  timezone?: string;
   menuItems: MenuItem[];
 }
 
