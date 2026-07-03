@@ -202,7 +202,7 @@ export default function Reports() {
               </Select>
             </div>
             <div className="flex items-end">
-              <Button variant="outline" size="sm" onClick={() => { setDateFrom(todayISO(-6)); setDateTo(todayISO(0)); setStatusFilter('all'); }}>
+              <Button variant="outline" size="sm" onClick={() => { setDateFrom(todayISOInTz(tz, -6)); setDateTo(todayISOInTz(tz, 0)); setStatusFilter('all'); }}>
                 Restablecer
               </Button>
             </div>
