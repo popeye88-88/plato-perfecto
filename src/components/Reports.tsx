@@ -286,7 +286,7 @@ export default function Reports() {
                   {orders.map((o) => (
                     <TableRow key={o.id}>
                       <TableCell className="font-mono">{o.number}</TableCell>
-                      <TableCell className="whitespace-nowrap text-xs">{o.createdAt.toLocaleString()}</TableCell>
+                      <TableCell className="whitespace-nowrap text-xs">{formatInTz(o.createdAt, tz)}</TableCell>
                       <TableCell>{o.customerName || '—'}</TableCell>
                       <TableCell className="text-right">{o.diners ?? '—'}</TableCell>
                       <TableCell className="max-w-md truncate text-xs text-muted-foreground">
