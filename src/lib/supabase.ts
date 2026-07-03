@@ -268,12 +268,11 @@ async function queryOrders(businessId: string, opts: FetchOrdersOptions): Promis
 }
 
 /**
- * Active orders: ONLY today (local timezone) with status in preparando/entregando/cobrando.
+ * Active orders: ONLY today (business timezone) with status in preparando/entregando/cobrando.
  * Capped at 50. No pagination. Items loaded in a single query.
  */
-export async function fetchActiveOrders(businessId: string) {
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
+export async function fetchActiveOrders(businessId: string, tz: string = DEFAULT_TZ) {
+  const start = startOfDayInTz(new Date(), tz);
   const { orders } = await queryOrders(businessId, {
     status: ['preparando', 'entregando', 'cobrando'],
     createdAfter: start.toISOString(),
