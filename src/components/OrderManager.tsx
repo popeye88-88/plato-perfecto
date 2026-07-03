@@ -130,7 +130,7 @@ export default function OrderManager() {
     }
     let cancelled = false;
     const load = async () => {
-      const data = await fetchOrdersDb(currentBusiness.id);
+      const data = await fetchOrdersDb(currentBusiness.id, currentBusiness.timezone);
       if (!cancelled) setOrders(data);
     };
     load();
