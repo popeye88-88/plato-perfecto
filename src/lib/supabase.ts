@@ -23,6 +23,7 @@ export async function fetchBusinesses() {
       enableEntregandoStage: b.enable_entregando_stage ?? true,
       language: b.language ?? 'es',
       currency: b.currency ?? 'MXN',
+      timezone: b.timezone ?? DEFAULT_TZ,
       menuItems: []
     }));
 
