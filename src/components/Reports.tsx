@@ -30,9 +30,10 @@ export default function Reports() {
   const { currentBusiness } = useBusinessContext();
   const { toast } = useToast();
   const currency = currentBusiness?.currency || 'MXN';
+  const tz = currentBusiness?.timezone || DEFAULT_TZ;
 
-  const [dateFrom, setDateFrom] = useState(todayISO(-6));
-  const [dateTo, setDateTo] = useState(todayISO(0));
+  const [dateFrom, setDateFrom] = useState(() => todayISOInTz(tz, -6));
+  const [dateTo, setDateTo] = useState(() => todayISOInTz(tz, 0));
   const [statusFilter, setStatusFilter] = useState<'all' | 'pagado' | 'preparando' | 'entregando' | 'cobrando'>('all');
   const [page, setPage] = useState(0);
 
@@ -44,8 +45,8 @@ export default function Reports() {
   const [revenueByDay, setRevenueByDay] = useState<Array<{ day: string; orders_count: number; revenue: number }>>([]);
   const [exporting, setExporting] = useState(false);
 
-  const startDate = new Date(dateFrom + 'T00:00:00');
-  const endDate = new Date(dateTo + 'T23:59:59');
+  const startDate = parseDateStrInTz(dateFrom, tz);
+  const endDate = endOfDayInTz(parseDateStrInTz(dateTo, tz), tz);
 
   const load = useCallback(async () => {
     if (!currentBusiness?.id) return;
