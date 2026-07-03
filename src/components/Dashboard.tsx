@@ -65,6 +65,7 @@ function pctDiff(current: number, previous: number): string {
 
 export default function Dashboard() {
   const { currentBusiness } = useBusinessContext();
+  const tz = currentBusiness?.timezone || DEFAULT_TZ;
   const [filters, setFilters] = useState<DashboardFilters>({
     dateRange: {
       from: startOfWeek(new Date(), { weekStartsOn: 1 }),
