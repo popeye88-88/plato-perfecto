@@ -55,6 +55,7 @@ export type Database = {
           id: string
           language: string
           name: string
+          timezone: string
           updated_at: string
         }
         Insert: {
@@ -65,6 +66,7 @@ export type Database = {
           id?: string
           language?: string
           name: string
+          timezone?: string
           updated_at?: string
         }
         Update: {
@@ -75,6 +77,7 @@ export type Database = {
           id?: string
           language?: string
           name?: string
+          timezone?: string
           updated_at?: string
         }
         Relationships: []
@@ -461,14 +464,28 @@ export type Database = {
           total_revenue: number
         }[]
       }
-      orders_revenue_by_day: {
-        Args: { _business_id: string; _end: string; _start: string }
-        Returns: {
-          day: string
-          orders_count: number
-          revenue: number
-        }[]
-      }
+      orders_revenue_by_day:
+        | {
+            Args: { _business_id: string; _end: string; _start: string }
+            Returns: {
+              day: string
+              orders_count: number
+              revenue: number
+            }[]
+          }
+        | {
+            Args: {
+              _business_id: string
+              _end: string
+              _start: string
+              _tz?: string
+            }
+            Returns: {
+              day: string
+              orders_count: number
+              revenue: number
+            }[]
+          }
     }
     Enums: {
       app_role: "admin" | "staff" | "manager"

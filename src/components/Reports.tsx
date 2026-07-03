@@ -11,15 +11,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Download, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { DEFAULT_TZ, formatInTz, parseDateStrInTz, endOfDayInTz, ymdInTz } from '@/lib/timezone';
 
 type OrderRow = Awaited<ReturnType<typeof fetchAnalyticsOrders>>['orders'][number];
 
 const PAGE_SIZE = 100;
 
-const todayISO = (offsetDays = 0) => {
+const todayISOInTz = (tz: string, offsetDays = 0) => {
   const d = new Date();
   d.setDate(d.getDate() + offsetDays);
-  return d.toISOString().slice(0, 10);
+  return ymdInTz(d, tz);
 };
 
 const fmtMoney = (n: number, currency = 'MXN') =>
@@ -29,9 +30,10 @@ export default function Reports() {
   const { currentBusiness } = useBusinessContext();
   const { toast } = useToast();
   const currency = currentBusiness?.currency || 'MXN';
+  const tz = currentBusiness?.timezone || DEFAULT_TZ;
 
-  const [dateFrom, setDateFrom] = useState(todayISO(-6));
-  const [dateTo, setDateTo] = useState(todayISO(0));
+  const [dateFrom, setDateFrom] = useState(() => todayISOInTz(tz, -6));
+  const [dateTo, setDateTo] = useState(() => todayISOInTz(tz, 0));
   const [statusFilter, setStatusFilter] = useState<'all' | 'pagado' | 'preparando' | 'entregando' | 'cobrando'>('all');
   const [page, setPage] = useState(0);
 
@@ -43,8 +45,8 @@ export default function Reports() {
   const [revenueByDay, setRevenueByDay] = useState<Array<{ day: string; orders_count: number; revenue: number }>>([]);
   const [exporting, setExporting] = useState(false);
 
-  const startDate = new Date(dateFrom + 'T00:00:00');
-  const endDate = new Date(dateTo + 'T23:59:59');
+  const startDate = parseDateStrInTz(dateFrom, tz);
+  const endDate = endOfDayInTz(parseDateStrInTz(dateTo, tz), tz);
 
   const load = useCallback(async () => {
     if (!currentBusiness?.id) return;
@@ -80,6 +82,7 @@ export default function Reports() {
         _business_id: currentBusiness.id,
         _start: startDate.toISOString(),
         _end: endDate.toISOString(),
+        _tz: tz,
       }),
     ]);
     if (!m.error && m.data && m.data[0]) {
@@ -130,7 +133,7 @@ export default function Reports() {
       const headers = ['Numero', 'Fecha', 'Cliente', 'Comensales', 'Servicio', 'Items', 'Total', 'Metodo de pago', 'Estado'];
       const rows = all.map(o => [
         o.number,
-        o.createdAt.toISOString(),
+        formatInTz(o.createdAt, tz, { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }),
         o.customerName || '',
         o.diners ?? '',
         o.serviceType || '',
@@ -200,7 +203,7 @@ export default function Reports() {
               </Select>
             </div>
             <div className="flex items-end">
-              <Button variant="outline" size="sm" onClick={() => { setDateFrom(todayISO(-6)); setDateTo(todayISO(0)); setStatusFilter('all'); }}>
+              <Button variant="outline" size="sm" onClick={() => { setDateFrom(todayISOInTz(tz, -6)); setDateTo(todayISOInTz(tz, 0)); setStatusFilter('all'); }}>
                 Restablecer
               </Button>
             </div>
@@ -283,7 +286,7 @@ export default function Reports() {
                   {orders.map((o) => (
                     <TableRow key={o.id}>
                       <TableCell className="font-mono">{o.number}</TableCell>
-                      <TableCell className="whitespace-nowrap text-xs">{o.createdAt.toLocaleString()}</TableCell>
+                      <TableCell className="whitespace-nowrap text-xs">{formatInTz(o.createdAt, tz)}</TableCell>
                       <TableCell>{o.customerName || '—'}</TableCell>
                       <TableCell className="text-right">{o.diners ?? '—'}</TableCell>
                       <TableCell className="max-w-md truncate text-xs text-muted-foreground">

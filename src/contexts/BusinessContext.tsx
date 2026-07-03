@@ -17,6 +17,7 @@ interface Business {
   enableEntregandoStage?: boolean;
   language?: string;
   currency?: string;
+  timezone?: string;
   menuItems: MenuItem[];
 }
 
@@ -220,12 +221,13 @@ export const BusinessProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const updateBusiness = (id: string, updates: Partial<Business>) => {
-    const dbUpdates: { name?: string; description?: string; enable_entregando_stage?: boolean; language?: string; currency?: string } = {};
+    const dbUpdates: { name?: string; description?: string; enable_entregando_stage?: boolean; language?: string; currency?: string; timezone?: string } = {};
     if (updates.name !== undefined) dbUpdates.name = updates.name;
     if (updates.description !== undefined) dbUpdates.description = updates.description;
     if (updates.enableEntregandoStage !== undefined) dbUpdates.enable_entregando_stage = updates.enableEntregandoStage;
     if (updates.language !== undefined) dbUpdates.language = updates.language;
     if (updates.currency !== undefined) dbUpdates.currency = updates.currency;
+    if (updates.timezone !== undefined) dbUpdates.timezone = updates.timezone;
     if (Object.keys(dbUpdates).length > 0) updateBusinessDb(id, dbUpdates);
     const apply = (b: Business) => (b.id === id ? { ...b, ...updates } : b);
     setBusinesses((prev) => prev.map(apply));

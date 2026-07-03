@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { DEFAULT_TZ, startOfDayInTz } from '@/lib/timezone';
 
 
 // App Users - removed: now using Supabase Auth (supabase.auth.signInWithPassword)
@@ -22,6 +23,7 @@ export async function fetchBusinesses() {
       enableEntregandoStage: b.enable_entregando_stage ?? true,
       language: b.language ?? 'es',
       currency: b.currency ?? 'MXN',
+      timezone: b.timezone ?? DEFAULT_TZ,
       menuItems: []
     }));
 
@@ -40,7 +42,7 @@ export async function insertBusiness(business: { id: string; name: string; descr
   return error ? null : business;
 }
 
-export async function updateBusinessDb(id: string, updates: { name?: string; description?: string; enable_entregando_stage?: boolean; language?: string; currency?: string }) {
+export async function updateBusinessDb(id: string, updates: { name?: string; description?: string; enable_entregando_stage?: boolean; language?: string; currency?: string; timezone?: string }) {
   const { error } = await supabase.from('businesses').update(updates).eq('id', id);
   if (error) console.error('updateBusinessDb error:', error);
   return !error;
@@ -266,12 +268,11 @@ async function queryOrders(businessId: string, opts: FetchOrdersOptions): Promis
 }
 
 /**
- * Active orders: ONLY today (local timezone) with status in preparando/entregando/cobrando.
+ * Active orders: ONLY today (business timezone) with status in preparando/entregando/cobrando.
  * Capped at 50. No pagination. Items loaded in a single query.
  */
-export async function fetchActiveOrders(businessId: string) {
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
+export async function fetchActiveOrders(businessId: string, tz: string = DEFAULT_TZ) {
+  const start = startOfDayInTz(new Date(), tz);
   const { orders } = await queryOrders(businessId, {
     status: ['preparando', 'entregando', 'cobrando'],
     createdAfter: start.toISOString(),

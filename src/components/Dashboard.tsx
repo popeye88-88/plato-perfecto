@@ -7,11 +7,12 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CalendarIcon, DollarSign, ShoppingCart, Users, TrendingUp, Building2, Download, Loader2 } from 'lucide-react';
-import { format, startOfWeek, endOfWeek, startOfDay, endOfDay, startOfISOWeek, startOfMonth, differenceInMilliseconds } from 'date-fns';
+import { format, startOfWeek, endOfWeek, startOfISOWeek, startOfMonth, startOfDay, differenceInMilliseconds } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart } from 'recharts';
 import { useBusinessContext } from '@/contexts/BusinessContext';
 import { fetchOrders } from '@/lib/supabase';
+import { DEFAULT_TZ, toZonedWallClock, startOfDayInTz, endOfDayInTz, formatInTz, ymdInTz } from '@/lib/timezone';
 
 interface DashboardFilters {
   dateRange: { from: Date; to: Date };
@@ -31,16 +32,18 @@ interface ChartData {
 
 type OrderType = Awaited<ReturnType<typeof fetchOrders>>[number];
 
-function bucketKey(date: Date, groupBy: 'day' | 'week' | 'month'): { key: string; label: string; sortDate: Date } {
+function bucketKey(date: Date, groupBy: 'day' | 'week' | 'month', tz: string): { key: string; label: string; sortDate: Date } {
+  // Bucket by the business's local wall clock, not the browser's local time.
+  const wall = toZonedWallClock(date, tz);
   if (groupBy === 'day') {
-    const d = startOfDay(date);
+    const d = startOfDay(wall);
     return { key: d.toISOString(), label: format(d, 'dd/MM'), sortDate: d };
   }
   if (groupBy === 'week') {
-    const d = startOfISOWeek(date);
+    const d = startOfISOWeek(wall);
     return { key: d.toISOString(), label: `Sem ${format(d, 'dd/MM')}`, sortDate: d };
   }
-  const d = startOfMonth(date);
+  const d = startOfMonth(wall);
   return { key: d.toISOString(), label: format(d, 'MMM yyyy', { locale: es }), sortDate: d };
 }
 
@@ -62,6 +65,7 @@ function pctDiff(current: number, previous: number): string {
 
 export default function Dashboard() {
   const { currentBusiness } = useBusinessContext();
+  const tz = currentBusiness?.timezone || DEFAULT_TZ;
   const [filters, setFilters] = useState<DashboardFilters>({
     dateRange: {
       from: startOfWeek(new Date(), { weekStartsOn: 1 }),
@@ -121,8 +125,8 @@ export default function Dashboard() {
   }, [currentBusiness?.id]);
 
   useEffect(() => {
-    const from = startOfDay(filters.dateRange.from);
-    const to = endOfDay(filters.dateRange.to);
+    const from = startOfDayInTz(filters.dateRange.from, tz);
+    const to = endOfDayInTz(filters.dateRange.to, tz);
     const inRange = allOrders.filter(o => o.createdAt >= from && o.createdAt <= to);
     setOrders(inRange);
 
@@ -131,7 +135,7 @@ export default function Dashboard() {
     const prevFrom = new Date(prevTo.getTime() - duration);
     const prev = allOrders.filter(o => o.createdAt >= prevFrom && o.createdAt <= prevTo);
     setPreviousOrders(prev);
-  }, [allOrders, filters.dateRange]);
+  }, [allOrders, filters.dateRange, tz]);
 
   const filteredOrders = useMemo(() => {
     return orders.filter(o => {
@@ -157,7 +161,7 @@ export default function Dashboard() {
     const paid = filteredOrders.filter(o => o.status === 'pagado');
     const buckets = new Map<string, ChartData & { sortDate: Date }>();
     for (const o of paid) {
-      const { key, label, sortDate } = bucketKey(o.createdAt, filters.groupBy);
+      const { key, label, sortDate } = bucketKey(o.createdAt, filters.groupBy, tz);
       const existing = buckets.get(key) || {
         name: label, facturacion: 0, pedidos: 0, puesto: 0, takeaway: 0, delivery: 0, sortDate
       };
@@ -171,7 +175,7 @@ export default function Dashboard() {
     return Array.from(buckets.values())
       .sort((a, b) => a.sortDate.getTime() - b.sortDate.getTime())
       .map(({ sortDate, ...rest }) => rest);
-  }, [filteredOrders, filters.groupBy]);
+  }, [filteredOrders, filters.groupBy, tz]);
 
   const topProducts = useMemo(() => {
     const map = new Map<string, { name: string; sold: number; revenue: number }>();
@@ -206,8 +210,8 @@ export default function Dashboard() {
         if (it.cancelled) continue;
         rows.push([
           o.number,
-          format(o.createdAt, 'yyyy-MM-dd'),
-          format(o.createdAt, 'HH:mm'),
+          ymdInTz(o.createdAt, tz),
+          formatInTz(o.createdAt, tz, { hour: '2-digit', minute: '2-digit', hour12: false }),
           `"${it.name.replace(/"/g, '""')}"`,
           it.quantity,
           `"${(o.customerName || '').replace(/"/g, '""')}"`,
@@ -221,7 +225,7 @@ export default function Dashboard() {
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    link.setAttribute('download', `orders_${format(new Date(), 'yyyy-MM-dd')}.csv`);
+    link.setAttribute('download', `orders_${ymdInTz(new Date(), tz)}.csv`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
