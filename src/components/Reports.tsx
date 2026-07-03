@@ -82,6 +82,7 @@ export default function Reports() {
         _business_id: currentBusiness.id,
         _start: startDate.toISOString(),
         _end: endDate.toISOString(),
+        _tz: tz,
       }),
     ]);
     if (!m.error && m.data && m.data[0]) {
