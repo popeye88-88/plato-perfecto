@@ -161,7 +161,7 @@ export default function Dashboard() {
     const paid = filteredOrders.filter(o => o.status === 'pagado');
     const buckets = new Map<string, ChartData & { sortDate: Date }>();
     for (const o of paid) {
-      const { key, label, sortDate } = bucketKey(o.createdAt, filters.groupBy);
+      const { key, label, sortDate } = bucketKey(o.createdAt, filters.groupBy, tz);
       const existing = buckets.get(key) || {
         name: label, facturacion: 0, pedidos: 0, puesto: 0, takeaway: 0, delivery: 0, sortDate
       };
