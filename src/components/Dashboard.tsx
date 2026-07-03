@@ -210,8 +210,8 @@ export default function Dashboard() {
         if (it.cancelled) continue;
         rows.push([
           o.number,
-          format(o.createdAt, 'yyyy-MM-dd'),
-          format(o.createdAt, 'HH:mm'),
+          ymdInTz(o.createdAt, tz),
+          formatInTz(o.createdAt, tz, { hour: '2-digit', minute: '2-digit', hour12: false }),
           `"${it.name.replace(/"/g, '""')}"`,
           it.quantity,
           `"${(o.customerName || '').replace(/"/g, '""')}"`,
