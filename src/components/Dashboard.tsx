@@ -7,11 +7,12 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CalendarIcon, DollarSign, ShoppingCart, Users, TrendingUp, Building2, Download, Loader2 } from 'lucide-react';
-import { format, startOfWeek, endOfWeek, startOfDay, endOfDay, startOfISOWeek, startOfMonth, differenceInMilliseconds } from 'date-fns';
+import { format, startOfWeek, endOfWeek, startOfISOWeek, startOfMonth, startOfDay, differenceInMilliseconds } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart } from 'recharts';
 import { useBusinessContext } from '@/contexts/BusinessContext';
 import { fetchOrders } from '@/lib/supabase';
+import { DEFAULT_TZ, toZonedWallClock, startOfDayInTz, endOfDayInTz, formatInTz, ymdInTz } from '@/lib/timezone';
 
 interface DashboardFilters {
   dateRange: { from: Date; to: Date };
