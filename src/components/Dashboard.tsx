@@ -175,7 +175,7 @@ export default function Dashboard() {
     return Array.from(buckets.values())
       .sort((a, b) => a.sortDate.getTime() - b.sortDate.getTime())
       .map(({ sortDate, ...rest }) => rest);
-  }, [filteredOrders, filters.groupBy]);
+  }, [filteredOrders, filters.groupBy, tz]);
 
   const topProducts = useMemo(() => {
     const map = new Map<string, { name: string; sold: number; revenue: number }>();
