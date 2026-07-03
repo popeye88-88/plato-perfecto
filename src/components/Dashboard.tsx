@@ -125,8 +125,8 @@ export default function Dashboard() {
   }, [currentBusiness?.id]);
 
   useEffect(() => {
-    const from = startOfDay(filters.dateRange.from);
-    const to = endOfDay(filters.dateRange.to);
+    const from = startOfDayInTz(filters.dateRange.from, tz);
+    const to = endOfDayInTz(filters.dateRange.to, tz);
     const inRange = allOrders.filter(o => o.createdAt >= from && o.createdAt <= to);
     setOrders(inRange);
 
@@ -135,7 +135,7 @@ export default function Dashboard() {
     const prevFrom = new Date(prevTo.getTime() - duration);
     const prev = allOrders.filter(o => o.createdAt >= prevFrom && o.createdAt <= prevTo);
     setPreviousOrders(prev);
-  }, [allOrders, filters.dateRange]);
+  }, [allOrders, filters.dateRange, tz]);
 
   const filteredOrders = useMemo(() => {
     return orders.filter(o => {
