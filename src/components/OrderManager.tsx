@@ -328,7 +328,7 @@ export default function OrderManager() {
             return getIndividualStatus(order, item, idx) === 'cobrando';
           });
         });
-      });
+      }));
     }
     if (status === 'pagado') {
       return orders
