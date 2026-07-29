@@ -272,7 +272,7 @@ export default function OrderManager() {
     if (status === 'preparando') {
       // Show orders that have at least one individual item in 'preparando' status AND order is not paid
       // When entregando is disabled, also include orders with 'entregando' individual items
-      return orders.filter(order => {
+      return sortActiveOrders(orders.filter(order => {
         if (order.status === 'pagado') return false;
         
         const activeItems = order.items.filter(item => !item.cancelled);
