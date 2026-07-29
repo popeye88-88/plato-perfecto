@@ -1108,7 +1108,7 @@ export default function OrderManager() {
             ))
           ) : (
             // Individual items for Preparando and Entregando - one line per item
-            activeItems.flatMap((item, itemIndex) => {
+            (() => { const allRows = activeItems.flatMap((item, itemIndex) => {
               const isPreparandoTab = currentTab === 'preparando';
               const isEntregandoTab = currentTab === 'entregando';
               const isResumenTab = currentTab === 'resumen';
@@ -1262,7 +1262,11 @@ export default function OrderManager() {
                   </div>
                 );
               }));
-            })
+            });
+              // Ordenar: primero los no entregados (más antiguos arriba), luego los entregados
+              const isDone = (n: JSX.Element) => String(n.key ?? '').includes('-grouped-done');
+              return [...allRows.filter(n => !isDone(n)), ...allRows.filter(isDone)];
+            })()
           )}
 
         </div>
