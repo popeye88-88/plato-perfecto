@@ -234,10 +234,41 @@ export default function OrderManager() {
   };
 
 
+  // Timestamp of the oldest NOT-delivered (not 'cobrando') item of an order.
+  // Items added later use their "added" edit-history timestamp; initial items use createdAt.
+  const getOldestPendingTime = (order: Order): number => {
+    const activeItems = order.items.filter(item => !item.cancelled);
+    let oldest = Infinity;
+    for (const item of activeItems) {
+      const hasPending = Array.from({ length: item.quantity }, (_, idx) => idx)
+        .some(idx => getIndividualStatus(order, item, idx) !== 'cobrando');
+      if (!hasPending) continue;
+      const addedTimes = (order.editHistory || [])
+        .filter(h => h.action === 'added' && h.itemName === item.name)
+        .map(h => new Date(h.timestamp).getTime())
+        .filter(t => !Number.isNaN(t));
+      const t = addedTimes.length ? Math.min(...addedTimes) : order.createdAt.getTime();
+      oldest = Math.min(oldest, t);
+    }
+    return oldest;
+  };
+
+  // Órdenes con elementos sin entregar primero (más antiguos arriba), luego el resto
+  const sortActiveOrders = (list: Order[]): Order[] =>
+    [...list].sort((a, b) => {
+      const ta = getOldestPendingTime(a);
+      const tb = getOldestPendingTime(b);
+      if (ta === tb) return a.createdAt.getTime() - b.createdAt.getTime();
+      if (ta === Infinity) return 1;
+      if (tb === Infinity) return -1;
+      return ta - tb;
+    });
+
   const getOrdersByStatus = (status: string) => {
     if (status === 'resumen') {
-      return orders.filter(order => order.status !== 'pagado');
+      return sortActiveOrders(orders.filter(order => order.status !== 'pagado'));
     }
+
     if (status === 'preparando') {
       // Show orders that have at least one individual item in 'preparando' status AND order is not paid
       // When entregando is disabled, also include orders with 'entregando' individual items
