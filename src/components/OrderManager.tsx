@@ -285,7 +285,7 @@ export default function OrderManager() {
             return false;
           });
         });
-      });
+      }));
     }
     if (status === 'entregando') {
       // Show orders that have at least one individual item in 'entregando' or 'cobrando' status AND order is not paid
