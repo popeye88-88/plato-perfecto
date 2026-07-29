@@ -1108,7 +1108,7 @@ export default function OrderManager() {
             ))
           ) : (
             // Individual items for Preparando and Entregando - one line per item
-            activeItems.flatMap((item, itemIndex) => {
+            (() => { const allRows = activeItems.flatMap((item, itemIndex) => {
               const isPreparandoTab = currentTab === 'preparando';
               const isEntregandoTab = currentTab === 'entregando';
               const isResumenTab = currentTab === 'resumen';
