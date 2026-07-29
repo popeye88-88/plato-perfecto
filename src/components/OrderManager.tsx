@@ -312,7 +312,7 @@ export default function OrderManager() {
             return individualStatus === 'entregando' || individualStatus === 'cobrando';
           });
         });
-      });
+      }));
     }
     if (status === 'cobrando') {
       // Show orders where ALL individual items are 'entregado' AND order is not paid
