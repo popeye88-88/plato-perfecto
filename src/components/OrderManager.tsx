@@ -1262,7 +1262,11 @@ export default function OrderManager() {
                   </div>
                 );
               }));
-            })
+            });
+              // Ordenar: primero los no entregados (más antiguos arriba), luego los entregados
+              const isDone = (n: JSX.Element) => String(n.key ?? '').includes('-grouped-done');
+              return [...allRows.filter(n => !isDone(n)), ...allRows.filter(isDone)];
+            })()
           )}
 
         </div>
