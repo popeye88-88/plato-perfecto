@@ -290,7 +290,7 @@ export default function OrderManager() {
     if (status === 'entregando') {
       // Show orders that have at least one individual item in 'entregando' or 'cobrando' status AND order is not paid
       // BUT exclude orders where ALL items are in 'cobrando' status
-      return orders.filter(order => {
+      return sortActiveOrders(orders.filter(order => {
         if (order.status === 'pagado') return false;
         
         const activeItems = order.items.filter(item => !item.cancelled);
