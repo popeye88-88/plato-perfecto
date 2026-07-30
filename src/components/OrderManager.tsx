@@ -1193,7 +1193,7 @@ export default function OrderManager() {
                 }
 
                 return (
-                  <div key={individualItemId} className="flex items-center justify-between text-sm py-2 border-b border-border/50 last:border-b-0">
+                  <div key={individualItemId} className="flex items-center justify-between text-xs sm:text-sm py-1 sm:py-2 border-b border-border/50 last:border-b-0">
                     <div className="flex items-center">
                       {showCheckbox && (
                         <Checkbox
