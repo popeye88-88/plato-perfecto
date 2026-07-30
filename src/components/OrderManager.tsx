@@ -1303,9 +1303,9 @@ export default function OrderManager() {
         </div>
         
         {/* Footer with total and actions */}
-        <div className="flex items-center justify-between pt-3 border-t border-border">
+        <div className="flex items-center justify-between pt-2 sm:pt-3 border-t border-border">
           <div>
-            <span className="font-bold text-lg text-foreground">Total: ${order.total.toFixed(2)}</span>
+            <span className="font-bold text-sm sm:text-lg text-foreground">Total: ${order.total.toFixed(2)}</span>
             {order.discountAmount && order.discountAmount > 0 && (
               <div className="text-xs text-success-foreground">
                 (Descuento: -${order.discountAmount.toFixed(2)})
