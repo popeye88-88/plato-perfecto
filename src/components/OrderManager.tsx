@@ -1038,7 +1038,7 @@ export default function OrderManager() {
       : {};
     
     return (
-      <div key={order.id} className="p-4 border border-border rounded-lg bg-card hover:shadow-md transition-shadow space-y-3">
+      <div key={order.id} className="p-2 sm:p-4 border border-border rounded-lg bg-card hover:shadow-md transition-shadow space-y-2 sm:space-y-3">
         {/* Header - Two rows */}
         <div className="space-y-2">
           {/* First row: Number | Status | Edit button */}
