@@ -1131,7 +1131,7 @@ export default function OrderManager() {
           {isCobrandoOrPagado ? (
             // Grouped items for Cobrando and Pagado
             Object.values(groupedItems).map((grouped, index) => (
-              <div key={index} className="grid grid-cols-3 gap-2 text-sm py-1">
+              <div key={index} className="grid grid-cols-3 gap-1 sm:gap-2 text-xs sm:text-sm py-1">
                 <div className="font-medium text-foreground">{grouped.quantity}x {grouped.name}</div>
                 <div className="text-center text-muted-foreground">${grouped.price.toFixed(2)}</div>
                 <div className="text-right font-semibold text-primary">${grouped.totalPrice.toFixed(2)}</div>
