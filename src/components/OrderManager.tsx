@@ -1663,7 +1663,7 @@ export default function OrderManager() {
 
         {(['preparando', ...(enableEntregandoStage ? ['entregando'] : []), 'cobrando'] as const).map((status) => (
           <TabsContent key={status} value={status} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-2 gap-3 sm:gap-4">
               {getOrdersByStatus(status).map((order) => renderOrderCard(order, status))}
               {getOrdersByStatus(status).length === 0 && (
                 <div className="col-span-full text-center text-muted-foreground py-8">
