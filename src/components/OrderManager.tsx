@@ -1145,18 +1145,18 @@ export default function OrderManager() {
 
               const rows: JSX.Element[] = [];
 
-              // Grouped "done" line — Nx Name with checkmark
+              // Grouped "done" line — Nx Name with checkmark on the right
               if (doneIndices.length > 0) {
                 rows.push(
                   <div key={`${item.id}-grouped-done`} className="flex items-center justify-between text-xs sm:text-sm py-1 sm:py-2 border-b border-border/50 last:border-b-0">
                     <div className="flex items-center">
-                      <Checkbox checked disabled className="h-4 w-4" />
+                      <span className="text-lg">{getStatusSymbol('cobrando')}</span>
                     </div>
                     <div className="flex-1 px-3 text-foreground">
                       <span className="font-medium">{doneIndices.length}x {item.name}</span>
                     </div>
                     <div className="flex items-center">
-                      <span className="text-lg">{getStatusSymbol('cobrando')}</span>
+                      <Checkbox checked disabled className="h-4 w-4" />
                     </div>
                   </div>
                 );
