@@ -933,14 +933,6 @@ export default function OrderManager() {
     });
   };
 
-  const getServiceTypeLabel = (serviceType: string) => {
-    switch (serviceType) {
-      case 'puesto': return 'En Puesto';
-      case 'takeaway': return 'Take Away';
-      case 'delivery': return 'Delivery';
-      default: return 'En Puesto';
-    }
-  };
 
   const toDate = (t: Date | string | number): Date => t instanceof Date ? t : new Date(t);
   const getTimestamp = (t: Date | string | number): number => toDate(t).getTime();
