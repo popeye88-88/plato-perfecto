@@ -1042,8 +1042,8 @@ export default function OrderManager() {
         {/* Header - Two rows */}
         <div className="space-y-2">
           {/* First row: Number | Status | Edit button */}
-          <div className="grid grid-cols-3 items-center gap-2">
-            <div className="font-bold text-lg text-foreground">{order.number}</div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 items-center gap-1 sm:gap-2">
+            <div className="font-bold text-base sm:text-lg text-foreground">{order.number}</div>
             <div className="flex justify-center">
               <Badge className={`${getStatusColor(order.status)} font-medium`}>
                 {order.status}
