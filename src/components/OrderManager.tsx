@@ -1187,6 +1187,25 @@ export default function OrderManager() {
                 return (
                   <div key={individualItemId} className="flex items-center justify-between text-xs sm:text-sm py-1 sm:py-2 border-b border-border/50 last:border-b-0">
                     <div className="flex items-center">
+                      {!isCobrandoOrPagado && (
+                        <span className="text-lg">
+                          {getStatusSymbol(individualItemStatus)}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className={`flex-1 px-1 sm:px-3 ${(!individualItemEnabled && showCheckbox) ? 'text-muted-foreground' : 'text-foreground'}`}>
+                      <span className="font-medium text-foreground">
+                        {item.name}
+                      </span>
+                      {!enableEntregandoStage && individualItemStatus === 'entregando' && isPreparandoTab && (
+                        <Badge variant="outline" className="ml-2 text-xs bg-yellow-50 text-yellow-700 border-yellow-300">
+                          Pendiente de asignar
+                        </Badge>
+                      )}
+                    </div>
+
+                    <div className="flex items-center">
                       {showCheckbox && (
                         <Checkbox
                           checked={individualItemChecked}
@@ -1261,25 +1280,6 @@ export default function OrderManager() {
                           }}
                           className="h-4 w-4"
                         />
-                      )}
-                    </div>
-
-                    <div className={`flex-1 px-1 sm:px-3 ${(!individualItemEnabled && showCheckbox) ? 'text-muted-foreground' : 'text-foreground'}`}>
-                      <span className="font-medium text-foreground">
-                        {item.name}
-                      </span>
-                      {!enableEntregandoStage && individualItemStatus === 'entregando' && isPreparandoTab && (
-                        <Badge variant="outline" className="ml-2 text-xs bg-yellow-50 text-yellow-700 border-yellow-300">
-                          Pendiente de asignar
-                        </Badge>
-                      )}
-                    </div>
-
-                    <div className="flex items-center">
-                      {!isCobrandoOrPagado && (
-                        <span className="text-lg">
-                          {getStatusSymbol(individualItemStatus)}
-                        </span>
                       )}
                     </div>
                   </div>
