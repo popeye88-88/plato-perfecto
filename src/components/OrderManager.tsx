@@ -1040,31 +1040,26 @@ export default function OrderManager() {
     return (
       <div key={order.id} className="p-2 sm:p-4 border border-border rounded-lg bg-card hover:shadow-md transition-shadow space-y-2 sm:space-y-3">
         {/* Header - Two rows */}
-        <div className="space-y-2">
-          {/* First row: Number | Status | Edit button */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 items-center gap-1 sm:gap-2">
-            <div className="font-bold text-base sm:text-lg text-foreground">{order.number}</div>
-            <div className="flex justify-center">
-              <Badge className={`${getStatusColor(order.status)} font-medium`}>
-                {order.status}
-            </Badge>
-          </div>
+        <div className="space-y-1">
+          {/* First row: Number + edit button, no status */}
+          <div className="flex items-center justify-between">
+            <div className="font-semibold text-sm text-foreground">{order.number}</div>
             <div className="flex justify-end gap-1">
               {order.edited && (
-            <Button 
+                <Button
                   variant="ghost"
-              size="sm" 
+                  size="sm"
                   onClick={() => {
                     setSelectedOrderForHistory(order);
                     setIsHistoryOpen(true);
                   }}
-                  className="h-8 w-8 p-0 relative"
+                  className="h-7 w-7 p-0 relative"
                   title="Ver historial"
                 >
-                  <History className="h-4 w-4" />
+                  <History className="h-3.5 w-3.5" />
                   {hasDeletedItems && (
                     <span
-                      className="absolute -bottom-1 -right-1 h-4 w-4 rounded-full bg-white border border-red-600 text-red-600 flex items-center justify-center text-[10px] font-bold leading-none"
+                      className="absolute -bottom-1 -right-1 h-3.5 w-3.5 rounded-full bg-white border border-red-600 text-red-600 flex items-center justify-center text-[9px] font-bold leading-none"
                       aria-label="Hay elementos eliminados"
                     >
                       ×
@@ -1072,7 +1067,7 @@ export default function OrderManager() {
                   )}
                   {hasAddedItems && (
                     <span
-                      className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-white border border-blue-600 text-blue-600 flex items-center justify-center text-[10px] font-bold leading-none"
+                      className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-white border border-blue-600 text-blue-600 flex items-center justify-center text-[9px] font-bold leading-none"
                       aria-label="Hay elementos añadidos"
                     >
                       +
@@ -1082,7 +1077,7 @@ export default function OrderManager() {
               )}
               {order.status !== 'pagado' && (
                 <Button
-              variant="ghost" 
+                  variant="ghost"
                   size="sm"
                   onClick={() => {
                     setSelectedOrderForEdit(order);
@@ -1090,7 +1085,7 @@ export default function OrderManager() {
                     const initialQuantities: Record<string, number> = {};
                     order.items.forEach(item => {
                       if (!item.cancelled) {
-                        const matchingMenuItem = menuItems.find(menuItem => 
+                        const matchingMenuItem = menuItems.find(menuItem =>
                           menuItem.id === item.id || menuItem.name === item.name
                         );
                         collectQuantityKeys(item, matchingMenuItem).forEach(key => {
@@ -1103,24 +1098,21 @@ export default function OrderManager() {
                     setLocalEditQuantities(initialQuantities);
                     setIsEditOrderOpen(true);
                   }}
-              className="h-8 w-8 p-0"
-            >
-                  <Edit2 className="h-4 w-4" />
-            </Button>
+                  className="h-7 w-7 p-0"
+                >
+                  <Edit2 className="h-3.5 w-3.5" />
+                </Button>
               )}
+            </div>
           </div>
-        </div>
-        
-          {/* Second row: Name-diners | Service type | Date and time */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 sm:gap-2 text-[10px] sm:text-xs text-muted-foreground">
-            <div className="font-medium">
+
+          {/* Second row: Name-diners | Date and time. No service type */}
+          <div className="flex items-center justify-between text-[10px] sm:text-xs text-muted-foreground">
+            <div className="font-medium truncate pr-2">
               {order.customerName}
               {order.diners && ` - ${order.diners}`}
             </div>
-            <div className="text-center font-medium">
-              {getServiceTypeLabel(order.serviceType || 'puesto')}
-            </div>
-            <div className="text-right font-medium">
+            <div className="font-medium whitespace-nowrap">
               {formatDateTime(order.createdAt)}
             </div>
           </div>
