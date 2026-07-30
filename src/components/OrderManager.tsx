@@ -1038,12 +1038,12 @@ export default function OrderManager() {
       : {};
     
     return (
-      <div key={order.id} className="p-4 border border-border rounded-lg bg-card hover:shadow-md transition-shadow space-y-3">
+      <div key={order.id} className="p-2 sm:p-4 border border-border rounded-lg bg-card hover:shadow-md transition-shadow space-y-2 sm:space-y-3">
         {/* Header - Two rows */}
         <div className="space-y-2">
           {/* First row: Number | Status | Edit button */}
-          <div className="grid grid-cols-3 items-center gap-2">
-            <div className="font-bold text-lg text-foreground">{order.number}</div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 items-center gap-1 sm:gap-2">
+            <div className="font-bold text-base sm:text-lg text-foreground">{order.number}</div>
             <div className="flex justify-center">
               <Badge className={`${getStatusColor(order.status)} font-medium`}>
                 {order.status}
@@ -1112,7 +1112,7 @@ export default function OrderManager() {
         </div>
         
           {/* Second row: Name-diners | Service type | Date and time */}
-          <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 sm:gap-2 text-[10px] sm:text-xs text-muted-foreground">
             <div className="font-medium">
               {order.customerName}
               {order.diners && ` - ${order.diners}`}
@@ -1131,7 +1131,7 @@ export default function OrderManager() {
           {isCobrandoOrPagado ? (
             // Grouped items for Cobrando and Pagado
             Object.values(groupedItems).map((grouped, index) => (
-              <div key={index} className="grid grid-cols-3 gap-2 text-sm py-1">
+              <div key={index} className="grid grid-cols-3 gap-1 sm:gap-2 text-xs sm:text-sm py-1">
                 <div className="font-medium text-foreground">{grouped.quantity}x {grouped.name}</div>
                 <div className="text-center text-muted-foreground">${grouped.price.toFixed(2)}</div>
                 <div className="text-right font-semibold text-primary">${grouped.totalPrice.toFixed(2)}</div>
@@ -1156,7 +1156,7 @@ export default function OrderManager() {
               // Grouped "done" line — Nx Name with checkmark
               if (doneIndices.length > 0) {
                 rows.push(
-                  <div key={`${item.id}-grouped-done`} className="flex items-center justify-between text-sm py-2 border-b border-border/50 last:border-b-0">
+                  <div key={`${item.id}-grouped-done`} className="flex items-center justify-between text-xs sm:text-sm py-1 sm:py-2 border-b border-border/50 last:border-b-0">
                     <div className="flex items-center">
                       <Checkbox checked disabled className="h-4 w-4" />
                     </div>
@@ -1193,7 +1193,7 @@ export default function OrderManager() {
                 }
 
                 return (
-                  <div key={individualItemId} className="flex items-center justify-between text-sm py-2 border-b border-border/50 last:border-b-0">
+                  <div key={individualItemId} className="flex items-center justify-between text-xs sm:text-sm py-1 sm:py-2 border-b border-border/50 last:border-b-0">
                     <div className="flex items-center">
                       {showCheckbox && (
                         <Checkbox
@@ -1272,7 +1272,7 @@ export default function OrderManager() {
                       )}
                     </div>
 
-                    <div className={`flex-1 px-3 ${(!individualItemEnabled && showCheckbox) ? 'text-muted-foreground' : 'text-foreground'}`}>
+                    <div className={`flex-1 px-1 sm:px-3 ${(!individualItemEnabled && showCheckbox) ? 'text-muted-foreground' : 'text-foreground'}`}>
                       <span className="font-medium text-foreground">
                         {item.name}
                       </span>
@@ -1303,9 +1303,9 @@ export default function OrderManager() {
         </div>
         
         {/* Footer with total and actions */}
-        <div className="flex items-center justify-between pt-3 border-t border-border">
+        <div className="flex items-center justify-between pt-2 sm:pt-3 border-t border-border">
           <div>
-            <span className="font-bold text-lg text-foreground">Total: ${order.total.toFixed(2)}</span>
+            <span className="font-bold text-sm sm:text-lg text-foreground">Total: ${order.total.toFixed(2)}</span>
             {order.discountAmount && order.discountAmount > 0 && (
               <div className="text-xs text-success-foreground">
                 (Descuento: -${order.discountAmount.toFixed(2)})
@@ -1323,9 +1323,10 @@ export default function OrderManager() {
                       setSelectedOrderForDiscount(order);
                       setIsDiscountOpen(true);
                     }}
+                    className="px-2 sm:px-3"
                   >
-                    <Percent className="h-4 w-4 mr-1" />
-                    Descuento
+                    <Percent className="h-4 w-4 sm:mr-1" />
+                    <span className="hidden sm:inline">Descuento</span>
                   </Button>
                 )}
                 <Button 
@@ -1336,10 +1337,10 @@ export default function OrderManager() {
                     setCashGiven('');
                     setIsPaymentOpen(true);
                   }}
-                  className="bg-gradient-primary hover:opacity-90 font-medium"
+                  className="bg-gradient-primary hover:opacity-90 font-medium px-2 sm:px-3"
                 >
-                  <Check className="h-4 w-4 mr-1" />
-                  Cobrar
+                  <Check className="h-4 w-4 sm:mr-1" />
+                  <span className="hidden sm:inline">Cobrar</span>
                 </Button>
               </>
             )}
@@ -1640,7 +1641,7 @@ export default function OrderManager() {
           </Card>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-2 gap-3 sm:gap-4">
             {getOrdersByStatus('resumen').map((order) => renderOrderCard(order, 'resumen'))}
             {getOrdersByStatus('resumen').length === 0 && (
               <div className="col-span-full text-center text-muted-foreground py-8">
@@ -1662,7 +1663,7 @@ export default function OrderManager() {
 
         {(['preparando', ...(enableEntregandoStage ? ['entregando'] : []), 'cobrando'] as const).map((status) => (
           <TabsContent key={status} value={status} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-2 gap-3 sm:gap-4">
               {getOrdersByStatus(status).map((order) => renderOrderCard(order, status))}
               {getOrdersByStatus(status).length === 0 && (
                 <div className="col-span-full text-center text-muted-foreground py-8">
