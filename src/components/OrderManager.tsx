@@ -1272,7 +1272,7 @@ export default function OrderManager() {
                       )}
                     </div>
 
-                    <div className={`flex-1 px-3 ${(!individualItemEnabled && showCheckbox) ? 'text-muted-foreground' : 'text-foreground'}`}>
+                    <div className={`flex-1 px-1 sm:px-3 ${(!individualItemEnabled && showCheckbox) ? 'text-muted-foreground' : 'text-foreground'}`}>
                       <span className="font-medium text-foreground">
                         {item.name}
                       </span>
