@@ -1337,10 +1337,10 @@ export default function OrderManager() {
                     setCashGiven('');
                     setIsPaymentOpen(true);
                   }}
-                  className="bg-gradient-primary hover:opacity-90 font-medium"
+                  className="bg-gradient-primary hover:opacity-90 font-medium px-2 sm:px-3"
                 >
-                  <Check className="h-4 w-4 mr-1" />
-                  Cobrar
+                  <Check className="h-4 w-4 sm:mr-1" />
+                  <span className="hidden sm:inline">Cobrar</span>
                 </Button>
               </>
             )}
