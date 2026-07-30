@@ -1112,7 +1112,7 @@ export default function OrderManager() {
         </div>
         
           {/* Second row: Name-diners | Service type | Date and time */}
-          <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 sm:gap-2 text-[10px] sm:text-xs text-muted-foreground">
             <div className="font-medium">
               {order.customerName}
               {order.diners && ` - ${order.diners}`}
