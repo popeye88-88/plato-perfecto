@@ -1641,7 +1641,7 @@ export default function OrderManager() {
           </Card>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-2 gap-3 sm:gap-4">
             {getOrdersByStatus('resumen').map((order) => renderOrderCard(order, 'resumen'))}
             {getOrdersByStatus('resumen').length === 0 && (
               <div className="col-span-full text-center text-muted-foreground py-8">
