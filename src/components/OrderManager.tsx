@@ -1156,7 +1156,7 @@ export default function OrderManager() {
               // Grouped "done" line — Nx Name with checkmark
               if (doneIndices.length > 0) {
                 rows.push(
-                  <div key={`${item.id}-grouped-done`} className="flex items-center justify-between text-sm py-2 border-b border-border/50 last:border-b-0">
+                  <div key={`${item.id}-grouped-done`} className="flex items-center justify-between text-xs sm:text-sm py-1 sm:py-2 border-b border-border/50 last:border-b-0">
                     <div className="flex items-center">
                       <Checkbox checked disabled className="h-4 w-4" />
                     </div>
