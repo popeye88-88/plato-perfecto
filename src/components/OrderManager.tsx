@@ -1582,38 +1582,32 @@ export default function OrderManager() {
         </TabsList>
 
         <TabsContent value="resumen" className="space-y-6">
-          <div className={`grid grid-cols-1 ${enableEntregandoStage ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-6`}>
-          <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Preparando</CardTitle>
+          <div className={`grid ${enableEntregandoStage ? 'grid-cols-3' : 'grid-cols-2'} gap-3`}>
+            <Card className="p-3 md:p-5">
+              <div className="flex items-center justify-between">
+                <span className="text-sm md:text-base font-medium">Preparando</span>
                 <Clock className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-                <div className="text-2xl font-bold">{getStatusCount('preparando')}</div>
-            </CardContent>
-          </Card>
+              </div>
+              <div className="text-xl md:text-2xl font-bold mt-1">{getStatusCount('preparando')}</div>
+            </Card>
 
-          {enableEntregandoStage && (
-          <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Entregando</CardTitle>
-                <Truck className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-                <div className="text-2xl font-bold">{getStatusCount('entregando')}</div>
-            </CardContent>
-          </Card>
-          )}
+            {enableEntregandoStage && (
+              <Card className="p-3 md:p-5">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm md:text-base font-medium">Entregando</span>
+                  <Truck className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <div className="text-xl md:text-2xl font-bold mt-1">{getStatusCount('entregando')}</div>
+              </Card>
+            )}
 
-          <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Cobrando</CardTitle>
+            <Card className="p-3 md:p-5">
+              <div className="flex items-center justify-between">
+                <span className="text-sm md:text-base font-medium">Cobrando</span>
                 <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-                <div className="text-2xl font-bold">{getStatusCount('cobrando')}</div>
-            </CardContent>
-          </Card>
+              </div>
+              <div className="text-xl md:text-2xl font-bold mt-1">{getStatusCount('cobrando')}</div>
+            </Card>
           </div>
           
           <div className="grid grid-cols-2 md:grid-cols-2 gap-3 sm:gap-4">
