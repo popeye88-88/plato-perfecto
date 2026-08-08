@@ -917,7 +917,7 @@ export default function OrderManager() {
           .filter(item => !item.cancelled)
           .reduce((sum, item) => sum + (item.price * item.quantity), 0);
     
-    return {
+    return withRecomputedPaymentStatus({
           ...order,
           items: updatedItems,
           total: newTotal,
@@ -936,7 +936,7 @@ export default function OrderManager() {
                 }]
               : [])
           ]
-        };
+        });
       }
       return order;
     });
