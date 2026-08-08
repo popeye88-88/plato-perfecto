@@ -233,6 +233,26 @@ export default function OrderManager() {
     return 'preparando';
   };
 
+  // Recalcula el estado de la orden: si todos los elementos ACTIVOS están entregados
+  // (individualmente en 'cobrando'), la orden pasa a 'cobrando'. Necesario tras
+  // eliminar/reducir elementos, ya que los cancelados no deben bloquear el cobro.
+  const withRecomputedPaymentStatus = (order: Order): Order => {
+    if (order.status === 'pagado') return order;
+    const activeItems = order.items.filter(i => !i.cancelled && i.quantity > 0);
+    if (activeItems.length === 0) return order;
+    const allReady = activeItems.every(item =>
+      Array.from({ length: item.quantity }, (_, idx) => idx)
+        .every(idx => getIndividualStatus(order, item, idx) === 'cobrando')
+    );
+    if (!allReady) return order;
+    return {
+      ...order,
+      status: 'cobrando',
+      items: order.items.map(i => (i.cancelled ? i : { ...i, status: 'cobrando' as const }))
+    };
+  };
+
+
 
   // Timestamp of the oldest NOT-delivered (not 'cobrando') item of an order.
   // Items added later use their "added" edit-history timestamp; initial items use createdAt.
@@ -897,7 +917,7 @@ export default function OrderManager() {
           .filter(item => !item.cancelled)
           .reduce((sum, item) => sum + (item.price * item.quantity), 0);
     
-    return {
+    return withRecomputedPaymentStatus({
           ...order,
           items: updatedItems,
           total: newTotal,
@@ -916,7 +936,7 @@ export default function OrderManager() {
                 }]
               : [])
           ]
-        };
+        });
       }
       return order;
     });
@@ -2425,7 +2445,7 @@ export default function OrderManager() {
                         const hasAddedItems = editHistoryDelta.some(e => e.action === 'added');
                         const newOrderStatus = hasAddedItems ? 'preparando' : order.status;
 
-                        return {
+                        const editedOrder: Order = {
                           ...order,
                           status: newOrderStatus,
                           items: finalItems,
@@ -2434,6 +2454,7 @@ export default function OrderManager() {
                           edited: true,
                           editHistory: [...(order.editHistory || []), ...editHistoryDelta]
                         };
+                        return hasAddedItems ? editedOrder : withRecomputedPaymentStatus(editedOrder);
                       }
                       return order;
                     });
