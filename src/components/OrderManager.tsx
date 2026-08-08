@@ -2445,7 +2445,7 @@ export default function OrderManager() {
                         const hasAddedItems = editHistoryDelta.some(e => e.action === 'added');
                         const newOrderStatus = hasAddedItems ? 'preparando' : order.status;
 
-                        return {
+                        const editedOrder: Order = {
                           ...order,
                           status: newOrderStatus,
                           items: finalItems,
@@ -2454,6 +2454,7 @@ export default function OrderManager() {
                           edited: true,
                           editHistory: [...(order.editHistory || []), ...editHistoryDelta]
                         };
+                        return hasAddedItems ? editedOrder : withRecomputedPaymentStatus(editedOrder);
                       }
                       return order;
                     });
