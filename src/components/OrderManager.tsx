@@ -233,6 +233,26 @@ export default function OrderManager() {
     return 'preparando';
   };
 
+  // Recalcula el estado de la orden: si todos los elementos ACTIVOS están entregados
+  // (individualmente en 'cobrando'), la orden pasa a 'cobrando'. Necesario tras
+  // eliminar/reducir elementos, ya que los cancelados no deben bloquear el cobro.
+  const withRecomputedPaymentStatus = (order: Order): Order => {
+    if (order.status === 'pagado') return order;
+    const activeItems = order.items.filter(i => !i.cancelled && i.quantity > 0);
+    if (activeItems.length === 0) return order;
+    const allReady = activeItems.every(item =>
+      Array.from({ length: item.quantity }, (_, idx) => idx)
+        .every(idx => getIndividualStatus(order, item, idx) === 'cobrando')
+    );
+    if (!allReady) return order;
+    return {
+      ...order,
+      status: 'cobrando',
+      items: order.items.map(i => (i.cancelled ? i : { ...i, status: 'cobrando' as const }))
+    };
+  };
+
+
 
   // Timestamp of the oldest NOT-delivered (not 'cobrando') item of an order.
   // Items added later use their "added" edit-history timestamp; initial items use createdAt.
