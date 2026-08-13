@@ -339,8 +339,25 @@ export async function saveOrders(businessId: string, orders: Array<{
   editHistory?: Array<{ timestamp: Date; action: string; stage: string; itemName?: string; quantity?: number; details?: string; userId?: string }>;
 }>) {
   for (const order of orders) {
+    // Allocate collision-free persisted ids. Reusing `${orderId}-item-${index}` after
+    // removals can collide with an already-persisted id of another item, which would
+    // make the whole items insert fail and wipe the order's items.
+    const usedIds = new Set<string>();
+    const persistedIds: string[] = [];
+    let nextIndex = 0;
+    for (const item of order.items) {
+      let id = item.id?.startsWith(`${order.id}-item-`) ? item.id : '';
+      if (!id || usedIds.has(id)) {
+        do {
+          id = `${order.id}-item-${nextIndex++}`;
+        } while (usedIds.has(id));
+      }
+      usedIds.add(id);
+      persistedIds.push(id);
+    }
+
     const itemRows = order.items.map((item, index) => ({
-      id: getPersistedOrderItemId(order.id, item.id, index),
+      id: persistedIds[index],
       order_id: order.id,
       name: item.name,
       price: item.price,
@@ -353,6 +370,7 @@ export async function saveOrders(businessId: string, orders: Array<{
       cancelled_in_stage: item.cancelledInStage || null
     }));
     const itemIdByClientId = new Map(order.items.map((item, index) => [item.id, itemRows[index].id]));
+
 
     // Guard: never overwrite individual_items_status with empty/null if the DB already has data.
     let individualItemsStatusToSave: Record<string, string> | null =
@@ -415,14 +433,26 @@ export async function saveOrders(businessId: string, orders: Array<{
       return false;
     }
 
-    await supabase.from('order_items').delete().eq('order_id', order.id);
+    // Write first, delete after: never leave the order without items if the write fails.
     if (itemRows.length > 0) {
-      const { error: itemsError } = await supabase.from('order_items').insert(itemRows);
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .upsert(itemRows, { onConflict: 'id' });
       if (itemsError) {
-        console.error('Order items insert error:', JSON.stringify(itemsError, null, 2));
+        console.error('Order items upsert error:', JSON.stringify(itemsError, null, 2));
         return false;
       }
+      const keepIds = itemRows.map((r) => r.id);
+      const { error: cleanupError } = await supabase
+        .from('order_items')
+        .delete()
+        .eq('order_id', order.id)
+        .not('id', 'in', `(${keepIds.map((id) => `"${id}"`).join(',')})`);
+      if (cleanupError) console.error('Order items cleanup error:', cleanupError);
+    } else {
+      await supabase.from('order_items').delete().eq('order_id', order.id);
     }
+
   }
   return true;
 }
