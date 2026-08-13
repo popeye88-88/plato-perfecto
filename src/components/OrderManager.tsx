@@ -1646,8 +1646,12 @@ export default function OrderManager() {
             </div>
         </TabsContent>
         ))}
+        <TabsContent value="cobrado" className="space-y-4">
+          <PaidOrdersTable />
+        </TabsContent>
 
       </Tabs>
+
 
       {/* Discount Dialog */}
       <Dialog open={isDiscountOpen} onOpenChange={setIsDiscountOpen}>
