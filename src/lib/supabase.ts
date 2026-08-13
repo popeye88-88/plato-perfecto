@@ -433,14 +433,26 @@ export async function saveOrders(businessId: string, orders: Array<{
       return false;
     }
 
-    await supabase.from('order_items').delete().eq('order_id', order.id);
+    // Write first, delete after: never leave the order without items if the write fails.
     if (itemRows.length > 0) {
-      const { error: itemsError } = await supabase.from('order_items').insert(itemRows);
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .upsert(itemRows, { onConflict: 'id' });
       if (itemsError) {
-        console.error('Order items insert error:', JSON.stringify(itemsError, null, 2));
+        console.error('Order items upsert error:', JSON.stringify(itemsError, null, 2));
         return false;
       }
+      const keepIds = itemRows.map((r) => r.id);
+      const { error: cleanupError } = await supabase
+        .from('order_items')
+        .delete()
+        .eq('order_id', order.id)
+        .not('id', 'in', `(${keepIds.map((id) => `"${id}"`).join(',')})`);
+      if (cleanupError) console.error('Order items cleanup error:', cleanupError);
+    } else {
+      await supabase.from('order_items').delete().eq('order_id', order.id);
     }
+
   }
   return true;
 }
