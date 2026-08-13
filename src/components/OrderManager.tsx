@@ -16,6 +16,8 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { fetchActiveOrders as fetchOrdersDb, saveOrders as persistOrdersDb, generateOrderId, deleteOrderById } from '@/lib/supabase';
 import { supabase } from '@/integrations/supabase/client';
 import { getMenuItemCardStyle } from '@/lib/menuItemColor';
+import PaidOrdersTable from '@/components/PaidOrdersTable';
+
 
 interface OrderItem {
   id: string;
@@ -1584,7 +1586,7 @@ export default function OrderManager() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className={`grid w-full ${enableEntregandoStage ? 'grid-cols-4' : 'grid-cols-3'}`}>
+        <TabsList className={`grid w-full ${enableEntregandoStage ? 'grid-cols-5' : 'grid-cols-4'}`}>
           <TabsTrigger value="resumen" className="flex items-center gap-2">
             Resumen ({getStatusCount('resumen')})
           </TabsTrigger>
@@ -1599,7 +1601,11 @@ export default function OrderManager() {
           <TabsTrigger value="cobrando" className="flex items-center gap-2">
             Cobrando ({getStatusCount('cobrando')})
           </TabsTrigger>
+          <TabsTrigger value="cobrado" className="flex items-center gap-2">
+            Cobrado
+          </TabsTrigger>
         </TabsList>
+
 
         <TabsContent value="resumen" className="space-y-6">
           <div className="grid grid-cols-2 md:grid-cols-2 gap-3 sm:gap-4">
@@ -1642,8 +1648,12 @@ export default function OrderManager() {
             </div>
         </TabsContent>
         ))}
+        <TabsContent value="cobrado" className="space-y-4">
+          <PaidOrdersTable />
+        </TabsContent>
 
       </Tabs>
+
 
       {/* Discount Dialog */}
       <Dialog open={isDiscountOpen} onOpenChange={setIsDiscountOpen}>
