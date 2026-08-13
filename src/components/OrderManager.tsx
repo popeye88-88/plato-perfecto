@@ -16,6 +16,8 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { fetchActiveOrders as fetchOrdersDb, saveOrders as persistOrdersDb, generateOrderId, deleteOrderById } from '@/lib/supabase';
 import { supabase } from '@/integrations/supabase/client';
 import { getMenuItemCardStyle } from '@/lib/menuItemColor';
+import PaidOrdersTable from '@/components/PaidOrdersTable';
+
 
 interface OrderItem {
   id: string;
