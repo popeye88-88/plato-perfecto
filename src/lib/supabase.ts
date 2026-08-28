@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { DEFAULT_TZ, startOfDayInTz } from '@/lib/timezone';
+import { DEFAULT_TZ } from '@/lib/timezone';
 
 
 // App Users - removed: now using Supabase Auth (supabase.auth.signInWithPassword)
