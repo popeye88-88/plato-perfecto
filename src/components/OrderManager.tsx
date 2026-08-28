@@ -124,7 +124,7 @@ export default function OrderManager() {
   const [itemToCancel, setItemToCancel] = useState<{orderId: string, itemId: string, individualId?: string} | null>(null);
   const [cancelReason, setCancelReason] = useState('');
 
-  // Load active orders for the current business (only today, only non-paid) + 30s polling.
+  // Load active orders for the current business (all unpaid orders, any date) + 30s polling.
   useEffect(() => {
     if (!currentBusiness?.id) {
       setOrders([]);
