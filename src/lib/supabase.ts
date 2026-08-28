@@ -268,20 +268,20 @@ async function queryOrders(businessId: string, opts: FetchOrdersOptions): Promis
 }
 
 /**
- * Active orders: ONLY today (business timezone) with status in preparando/entregando/cobrando.
- * Capped at 50. No pagination. Items loaded in a single query.
+ * Active orders: ALL unpaid orders (preparando/entregando/cobrando), regardless of date.
+ * Orders that are never closed at the end of the day stay visible until paid or cancelled.
+ * Capped at 200. Items loaded in a single query.
  */
-export async function fetchActiveOrders(businessId: string, tz: string = DEFAULT_TZ) {
-  const start = startOfDayInTz(new Date(), tz);
+export async function fetchActiveOrders(businessId: string, _tz: string = DEFAULT_TZ) {
   const { orders } = await queryOrders(businessId, {
     status: ['preparando', 'entregando', 'cobrando'],
-    createdAfter: start.toISOString(),
     rangeFrom: 0,
-    rangeTo: 49,
+    rangeTo: 199,
     paginateItems: false,
   });
   return orders;
 }
+
 
 /**
  * Historical/analytics orders. Paginated.
