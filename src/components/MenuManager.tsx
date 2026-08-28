@@ -357,7 +357,7 @@ export default function MenuManager() {
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[85dvh] overflow-y-auto overscroll-contain">
           <DialogHeader>
             <DialogTitle>{editingItem ? 'Editar Producto' : 'Agregar Nuevo Producto'}</DialogTitle>
           </DialogHeader>
