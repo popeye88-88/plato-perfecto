@@ -43,6 +43,23 @@ export default function Reports() {
 
   const [metrics, setMetrics] = useState<{ totalOrders: number; totalRevenue: number; avgOrder: number; paidOrders: number } | null>(null);
   const [revenueByDay, setRevenueByDay] = useState<Array<{ day: string; orders_count: number; revenue: number }>>([]);
+  const [ticketMetrics, setTicketMetrics] = useState<{
+    avgTicket: number;
+    avgTicketPerDiner: number;
+    onsiteRevenue: number;
+    onsiteDiners: number;
+    onsiteOrders: number;
+  } | null>(null);
+  const [ticketByDay, setTicketByDay] = useState<
+    Array<{
+      day: string;
+      avg_ticket: number;
+      avg_ticket_per_diner: number;
+      onsite_revenue: number;
+      onsite_diners: number;
+      onsite_orders: number;
+    }>
+  >([]);
   const [exporting, setExporting] = useState(false);
 
   const startDate = parseDateStrInTz(dateFrom, tz);
