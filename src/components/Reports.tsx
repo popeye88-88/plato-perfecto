@@ -43,6 +43,23 @@ export default function Reports() {
 
   const [metrics, setMetrics] = useState<{ totalOrders: number; totalRevenue: number; avgOrder: number; paidOrders: number } | null>(null);
   const [revenueByDay, setRevenueByDay] = useState<Array<{ day: string; orders_count: number; revenue: number }>>([]);
+  const [ticketMetrics, setTicketMetrics] = useState<{
+    avgTicket: number;
+    avgTicketPerDiner: number;
+    onsiteRevenue: number;
+    onsiteDiners: number;
+    onsiteOrders: number;
+  } | null>(null);
+  const [ticketByDay, setTicketByDay] = useState<
+    Array<{
+      day: string;
+      avg_ticket: number;
+      avg_ticket_per_diner: number;
+      onsite_revenue: number;
+      onsite_diners: number;
+      onsite_orders: number;
+    }>
+  >([]);
   const [exporting, setExporting] = useState(false);
 
   const startDate = parseDateStrInTz(dateFrom, tz);
@@ -72,13 +89,24 @@ export default function Reports() {
 
   const loadMetrics = useCallback(async () => {
     if (!currentBusiness?.id) return;
-    const [m, d] = await Promise.all([
+    const [m, d, t, td] = await Promise.all([
       supabase.rpc('orders_analytics', {
         _business_id: currentBusiness.id,
         _start: startDate.toISOString(),
         _end: endDate.toISOString(),
       }),
       supabase.rpc('orders_revenue_by_day', {
+        _business_id: currentBusiness.id,
+        _start: startDate.toISOString(),
+        _end: endDate.toISOString(),
+        _tz: tz,
+      }),
+      supabase.rpc('orders_ticket_metrics', {
+        _business_id: currentBusiness.id,
+        _start: startDate.toISOString(),
+        _end: endDate.toISOString(),
+      }),
+      supabase.rpc('orders_ticket_by_day', {
         _business_id: currentBusiness.id,
         _start: startDate.toISOString(),
         _end: endDate.toISOString(),
@@ -99,8 +127,36 @@ export default function Reports() {
     if (!d.error && d.data) {
       setRevenueByDay(d.data as Array<{ day: string; orders_count: number; revenue: number }>);
     }
+    if (!t.error && t.data && t.data[0]) {
+      const row = t.data[0] as {
+        avg_ticket: number;
+        avg_ticket_per_diner: number;
+        onsite_revenue: number;
+        onsite_diners: number;
+        onsite_orders: number;
+      };
+      setTicketMetrics({
+        avgTicket: Number(row.avg_ticket) || 0,
+        avgTicketPerDiner: Number(row.avg_ticket_per_diner) || 0,
+        onsiteRevenue: Number(row.onsite_revenue) || 0,
+        onsiteDiners: Number(row.onsite_diners) || 0,
+        onsiteOrders: Number(row.onsite_orders) || 0,
+      });
+    } else {
+      setTicketMetrics({ avgTicket: 0, avgTicketPerDiner: 0, onsiteRevenue: 0, onsiteDiners: 0, onsiteOrders: 0 });
+    }
+    if (!td.error && td.data) {
+      setTicketByDay(td.data as Array<{
+        day: string;
+        avg_ticket: number;
+        avg_ticket_per_diner: number;
+        onsite_revenue: number;
+        onsite_diners: number;
+        onsite_orders: number;
+      }>);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentBusiness?.id, dateFrom, dateTo]);
+  }, [currentBusiness?.id, dateFrom, dateTo, tz]);
 
   // Reset page when filters change
   useEffect(() => { setPage(0); }, [dateFrom, dateTo, statusFilter, currentBusiness?.id]);
