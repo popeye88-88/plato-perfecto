@@ -486,6 +486,32 @@ export type Database = {
               revenue: number
             }[]
           }
+      orders_ticket_by_day: {
+        Args: {
+          _business_id: string
+          _end: string
+          _start: string
+          _tz?: string
+        }
+        Returns: {
+          avg_ticket: number
+          avg_ticket_per_diner: number
+          day: string
+          onsite_diners: number
+          onsite_orders: number
+          onsite_revenue: number
+        }[]
+      }
+      orders_ticket_metrics: {
+        Args: { _business_id: string; _end: string; _start: string }
+        Returns: {
+          avg_ticket: number
+          avg_ticket_per_diner: number
+          onsite_diners: number
+          onsite_orders: number
+          onsite_revenue: number
+        }[]
+      }
     }
     Enums: {
       app_role: "admin" | "staff" | "manager"
