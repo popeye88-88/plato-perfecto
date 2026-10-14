@@ -64,7 +64,7 @@ export default function NewOrderDialog({ open, onOpenChange, menuItems, onCreate
 
   const addItem = (menuItem: MenuItem, size?: { id: string; name: string; price: number }) => {
     const itemId = size ? `${menuItem.id}-size-${size.id}` : menuItem.id;
-    const itemName = size ? `${menuItem.name} — ${size.name}` : menuItem.name;
+    const itemName = size ? `${size.name} — ${menuItem.name}` : menuItem.name;
     const itemPrice = size ? size.price : menuItem.price;
     const virtualItem = { id: itemId, name: itemName, price: itemPrice, category: menuItem.category };
 
