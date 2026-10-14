@@ -268,11 +268,12 @@ export default function Reports() {
       </Card>
 
       {/* Metrics */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <Card><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Total órdenes</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{metrics?.totalOrders ?? '—'}</div></CardContent></Card>
         <Card><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Órdenes pagadas</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{metrics?.paidOrders ?? '—'}</div></CardContent></Card>
         <Card><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Ingresos</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{metrics ? fmtMoney(metrics.totalRevenue, currency) : '—'}</div></CardContent></Card>
-        <Card><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Promedio por orden</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{metrics ? fmtMoney(metrics.avgOrder, currency) : '—'}</div></CardContent></Card>
+        <Card><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Ticket promedio</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{ticketMetrics ? fmtMoney(ticketMetrics.avgTicket, currency) : '—'}</div></CardContent></Card>
+        <Card><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Ticket promedio por comensal</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{ticketMetrics ? fmtMoney(ticketMetrics.avgTicketPerDiner, currency) : '—'}</div>{ticketMetrics && <p className="text-xs text-muted-foreground mt-1">{ticketMetrics.onsiteOrders} ord. en puesto · {ticketMetrics.onsiteDiners} comensales</p>}</CardContent></Card>
       </div>
 
       {/* Revenue by day */}
@@ -295,6 +296,51 @@ export default function Reports() {
                   </div>
                 );
               })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Ticket promedio por día (Gráfica 2) */}
+      {ticketByDay.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3"><CardTitle className="text-sm">Ticket promedio por día</CardTitle></CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {ticketByDay.map((r) => {
+                const max = Math.max(
+                  ...ticketByDay.map(x => Math.max(Number(x.avg_ticket) || 0, Number(x.avg_ticket_per_diner) || 0)),
+                  1
+                );
+                const pctTicket = ((Number(r.avg_ticket) || 0) / max) * 100;
+                const pctPerDiner = ((Number(r.avg_ticket_per_diner) || 0) / max) * 100;
+                return (
+                  <div key={r.day}>
+                    <div className="flex items-center justify-between text-sm mb-1">
+                      <span className="w-24 text-muted-foreground tabular-nums">{r.day}</span>
+                      <span className="text-xs text-muted-foreground tabular-nums">{r.onsite_orders} ord. en puesto</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-sm">
+                      <span className="w-20 text-xs text-muted-foreground shrink-0">Ticket</span>
+                      <div className="flex-1 bg-muted h-2 rounded overflow-hidden">
+                        <div className="h-full bg-primary" style={{ width: `${pctTicket}%` }} />
+                      </div>
+                      <span className="w-28 text-right tabular-nums">{fmtMoney(Number(r.avg_ticket), currency)}</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-sm mt-1">
+                      <span className="w-20 text-xs text-muted-foreground shrink-0">/ comensal</span>
+                      <div className="flex-1 bg-muted h-2 rounded overflow-hidden">
+                        <div className="h-full bg-accent" style={{ width: `${pctPerDiner}%` }} />
+                      </div>
+                      <span className="w-28 text-right tabular-nums">{fmtMoney(Number(r.avg_ticket_per_diner), currency)}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex items-center gap-4 mt-4 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-sm bg-primary" /> Ticket promedio</div>
+              <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-sm bg-accent" /> Ticket / comensal (en puesto)</div>
             </div>
           </CardContent>
         </Card>

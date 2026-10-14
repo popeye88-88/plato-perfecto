@@ -403,7 +403,7 @@ export default function OrderManager() {
 
   const addItemToOrder = (item: typeof menuItems[0], size?: { id: string; name: string; price: number }) => {
     const itemId = size ? `${item.id}-size-${size.id}` : item.id;
-    const itemName = size ? `${item.name} — ${size.name}` : item.name;
+    const itemName = size ? `${size.name} — ${item.name}` : item.name;
     const itemPrice = size ? size.price : item.price;
     
     const existingItem = newOrderForm.selectedItems.find(i => i.id === itemId);
@@ -2053,7 +2053,7 @@ export default function OrderManager() {
                               const isExpanded = expandedEditOrderItems.has(menuItem.id);
                               const totalQty = menuItem.sizes!.reduce((sum, size) => {
                                 const sizeItemId = `${menuItem.id}-size-${size.id}`;
-                                const sizeItemName = `${menuItem.name} — ${size.name}`;
+                                const sizeItemName = `${size.name} — ${menuItem.name}`;
                                 const orderItem = selectedOrderForEdit.items.find(item =>
                                   !item.cancelled && (item.id === sizeItemId || item.name === sizeItemName)
                                 );
@@ -2079,7 +2079,7 @@ export default function OrderManager() {
                                     <div className="grid grid-cols-3 gap-2 border-t bg-background/60 p-2">
                                       {menuItem.sizes!.map(size => {
                                         const sizeItemId = `${menuItem.id}-size-${size.id}`;
-                                        const sizeItemName = `${menuItem.name} — ${size.name}`;
+                                        const sizeItemName = `${size.name} — ${menuItem.name}`;
                                         const orderItem = selectedOrderForEdit.items.find(item =>
                                           !item.cancelled && (item.id === sizeItemId || item.name === sizeItemName)
                                         );
@@ -2381,7 +2381,7 @@ export default function OrderManager() {
                           const itemVariants = menuItem.hasSizes && menuItem.sizes?.length
                             ? menuItem.sizes.map(size => ({
                                 id: `${menuItem.id}-size-${size.id}`,
-                                name: `${menuItem.name} — ${size.name}`,
+                                name: `${size.name} — ${menuItem.name}`,
                                 price: size.price
                               }))
                             : [{ id: menuItem.id, name: menuItem.name, price: menuItem.price }];
