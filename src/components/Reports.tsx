@@ -268,11 +268,12 @@ export default function Reports() {
       </Card>
 
       {/* Metrics */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <Card><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Total órdenes</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{metrics?.totalOrders ?? '—'}</div></CardContent></Card>
         <Card><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Órdenes pagadas</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{metrics?.paidOrders ?? '—'}</div></CardContent></Card>
         <Card><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Ingresos</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{metrics ? fmtMoney(metrics.totalRevenue, currency) : '—'}</div></CardContent></Card>
-        <Card><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Promedio por orden</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{metrics ? fmtMoney(metrics.avgOrder, currency) : '—'}</div></CardContent></Card>
+        <Card><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Ticket promedio</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{ticketMetrics ? fmtMoney(ticketMetrics.avgTicket, currency) : '—'}</div></CardContent></Card>
+        <Card><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Ticket promedio por comensal</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{ticketMetrics ? fmtMoney(ticketMetrics.avgTicketPerDiner, currency) : '—'}</div>{ticketMetrics && <p className="text-xs text-muted-foreground mt-1">{ticketMetrics.onsiteOrders} ord. en puesto · {ticketMetrics.onsiteDiners} comensales</p>}</CardContent></Card>
       </div>
 
       {/* Revenue by day */}
