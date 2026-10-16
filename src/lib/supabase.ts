@@ -67,6 +67,7 @@ interface OrderRow {
   business_id?: string;
   service_type?: string;
   diners?: number;
+  diner_tags?: string[];
   edited?: boolean;
   discount_amount?: number;
   discount_reason?: string;
@@ -188,6 +189,7 @@ function mapOrderRow(o: OrderRow, items: OrderItemRow[]) {
     createdAt: new Date(o.created_at),
     serviceType: toServiceType(o.service_type),
     diners: o.diners,
+    dinerTags: o.diner_tags && o.diner_tags.length > 0 ? o.diner_tags : undefined,
     edited: o.edited,
     discountAmount: o.discount_amount ? parseFloat(String(o.discount_amount)) : undefined,
     discountReason: o.discount_reason,
@@ -330,6 +332,7 @@ export async function saveOrders(businessId: string, orders: Array<{
   createdAt: Date;
   serviceType?: string;
   diners?: number;
+  dinerTags?: string[];
   edited?: boolean;
   discountAmount?: number;
   discountReason?: string;
@@ -416,6 +419,7 @@ export async function saveOrders(businessId: string, orders: Array<{
       business_id: businessId,
       service_type: order.serviceType || null,
       diners: order.diners ?? null,
+      diner_tags: order.dinerTags ?? [],
       edited: order.edited ?? false,
       discount_amount: order.discountAmount ?? null,
       discount_reason: order.discountReason || null,
