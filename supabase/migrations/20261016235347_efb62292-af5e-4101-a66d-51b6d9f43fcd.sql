@@ -1,0 +1,1 @@
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS diner_tags text[] NOT NULL DEFAULT '{}';
