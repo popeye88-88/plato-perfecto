@@ -55,7 +55,7 @@ export default function NewOrderDialog({ open, onOpenChange, menuItems, onCreate
       setCustomerName('');
       setServiceType('puesto');
       setDiners('');
-      setRepeat(false);
+      setDinerTags([]);
       setDeliveryCharge(0);
       setSelectedItems([]);
       setExpandedItems(new Set());
@@ -109,7 +109,7 @@ export default function NewOrderDialog({ open, onOpenChange, menuItems, onCreate
     setCustomerName('');
     setServiceType('puesto');
     setDiners('');
-    setRepeat(false);
+    setDinerTags([]);
     setDeliveryCharge(0);
     setSelectedItems([]);
     onOpenChange(false);
