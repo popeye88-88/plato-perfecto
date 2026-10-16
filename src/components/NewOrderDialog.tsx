@@ -31,7 +31,7 @@ interface NewOrderDialogProps {
     diners: number;
     customerName: string;
     deliveryCharge: number;
-    repeat?: boolean;
+    dinerTags: string[];
   }) => void;
 }
 
@@ -39,7 +39,7 @@ export default function NewOrderDialog({ open, onOpenChange, menuItems, onCreate
   const [customerName, setCustomerName] = useState('');
   const [serviceType, setServiceType] = useState<'puesto' | 'takeaway' | 'delivery'>('puesto');
   const [diners, setDiners] = useState<number | ''>('');
-  const [repeat, setRepeat] = useState(false);
+  const [dinerTags, setDinerTags] = useState<string[]>([]);
   const [deliveryCharge, setDeliveryCharge] = useState(0);
   const [selectedItems, setSelectedItems] = useState<Array<{menuItem: {id: string; name: string; price: number; category: string}, quantity: number, customIngredients?: string[]}>>([]);
   const [sizePickerOpen, setSizePickerOpen] = useState<string | null>(null);
@@ -55,7 +55,7 @@ export default function NewOrderDialog({ open, onOpenChange, menuItems, onCreate
       setCustomerName('');
       setServiceType('puesto');
       setDiners('');
-      setRepeat(false);
+      setDinerTags([]);
       setDeliveryCharge(0);
       setSelectedItems([]);
       setExpandedItems(new Set());
@@ -105,11 +105,11 @@ export default function NewOrderDialog({ open, onOpenChange, menuItems, onCreate
   const handleSubmit = () => {
     if (!customerName.trim()) return;
     if (typeof diners !== 'number' || diners < 1) return;
-    onCreateOrder({ items: selectedItems, serviceType, diners, customerName: customerName.trim(), deliveryCharge, repeat });
+    onCreateOrder({ items: selectedItems, serviceType, diners, customerName: customerName.trim(), deliveryCharge, dinerTags });
     setCustomerName('');
     setServiceType('puesto');
     setDiners('');
-    setRepeat(false);
+    setDinerTags([]);
     setDeliveryCharge(0);
     setSelectedItems([]);
     onOpenChange(false);
@@ -153,10 +153,17 @@ export default function NewOrderDialog({ open, onOpenChange, menuItems, onCreate
                   setDiners(v === '' ? '' : (parseInt(v) || ''));
                 }}
               />
-              <label className="flex items-center gap-2 mt-2 text-sm cursor-pointer">
-                <Checkbox checked={repeat} onCheckedChange={(c) => setRepeat(c === true)} />
-                <span>Repiten</span>
-              </label>
+              <div className="mt-2 space-y-2">
+                {([['repite', 'Repite'], ['trabajo', 'Trabajo'], ['vecino', 'Vecino']] as const).map(([value, label]) => (
+                  <label key={value} className="flex items-center gap-2 text-sm cursor-pointer">
+                    <Checkbox
+                      checked={dinerTags.includes(value)}
+                      onCheckedChange={(c) => setDinerTags(prev => c === true ? [...prev, value] : prev.filter(t => t !== value))}
+                    />
+                    <span>{label}</span>
+                  </label>
+                ))}
+              </div>
             </div>
           </div>
 

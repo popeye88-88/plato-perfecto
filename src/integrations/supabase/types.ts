@@ -245,6 +245,7 @@ export type Database = {
           business_id: string
           created_at: string
           customer_name: string
+          diner_tags: string[]
           diners: number | null
           discount_amount: number | null
           discount_reason: string | null
@@ -264,6 +265,7 @@ export type Database = {
           business_id: string
           created_at?: string
           customer_name: string
+          diner_tags?: string[]
           diners?: number | null
           discount_amount?: number | null
           discount_reason?: string | null
@@ -283,6 +285,7 @@ export type Database = {
           business_id?: string
           created_at?: string
           customer_name?: string
+          diner_tags?: string[]
           diners?: number | null
           discount_amount?: number | null
           discount_reason?: string | null

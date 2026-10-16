@@ -53,7 +53,7 @@ interface Order {
   createdAt: Date;
   serviceType?: 'puesto' | 'takeaway' | 'delivery';
   diners?: number;
-  repeat?: boolean;
+  dinerTags?: string[];
   edited?: boolean;
   discountAmount?: number;
   discountReason?: string;
@@ -104,7 +104,7 @@ export default function OrderManager() {
     customerName: '',
     serviceType: 'puesto' as 'puesto' | 'takeaway' | 'delivery',
     diners: '' as number | '',
-    repeat: false,
+    dinerTags: [] as string[],
     selectedItems: [] as Array<{id: string, name: string, price: number, quantity: number}>
   });
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -512,7 +512,7 @@ export default function OrderManager() {
       customerName: newOrderForm.customerName,
       serviceType: newOrderForm.serviceType,
       diners: newOrderForm.diners as number,
-      repeat: newOrderForm.repeat,
+      dinerTags: newOrderForm.dinerTags,
       items: newOrderForm.selectedItems.map(item => ({
         ...item,
         originalQuantity: item.quantity,
@@ -539,7 +539,7 @@ export default function OrderManager() {
       customerName: '',
       serviceType: 'puesto',
       diners: '',
-      repeat: false,
+      dinerTags: [],
       selectedItems: []
     });
     setIsNewOrderDialogOpen(false);
@@ -555,7 +555,7 @@ export default function OrderManager() {
       customerName: '',
       serviceType: 'puesto',
       diners: '',
-      repeat: false,
+      dinerTags: [],
       selectedItems: []
     });
     setIsNewOrderDialogOpen(false);
@@ -1116,6 +1116,11 @@ export default function OrderManager() {
             <div className="font-medium truncate pr-2">
               {order.customerName}
               {order.diners && ` - ${order.diners}`}
+              {order.dinerTags && order.dinerTags.length > 0 && (
+                <span className="ml-1 text-[9px] sm:text-[10px] font-semibold text-primary whitespace-nowrap">
+                  {order.dinerTags.map(t => t.charAt(0).toUpperCase() + t.slice(1)).join(' · ')}
+                </span>
+              )}
             </div>
             <div className="font-medium whitespace-nowrap">
               {formatDateTime(order.createdAt)}
@@ -1441,13 +1446,22 @@ export default function OrderManager() {
                     }}
                     className="mt-2"
                   />
-                  <label className="flex items-center gap-2 mt-3 text-sm cursor-pointer">
-                    <Checkbox
-                      checked={newOrderForm.repeat}
-                      onCheckedChange={(c) => setNewOrderForm(prev => ({ ...prev, repeat: c === true }))}
-                    />
-                    <span>Cliente habitual (repite)</span>
-                  </label>
+                  <div className="mt-3 space-y-2">
+                    {([['repite', 'Repite'], ['trabajo', 'Trabajo'], ['vecino', 'Vecino']] as const).map(([value, label]) => (
+                      <label key={value} className="flex items-center gap-2 text-sm cursor-pointer">
+                        <Checkbox
+                          checked={newOrderForm.dinerTags.includes(value)}
+                          onCheckedChange={(c) => setNewOrderForm(prev => ({
+                            ...prev,
+                            dinerTags: c === true
+                              ? [...prev.dinerTags, value]
+                              : prev.dinerTags.filter(t => t !== value)
+                          }))}
+                        />
+                        <span>{label}</span>
+                      </label>
+                    ))}
+                  </div>
                       </div>
                 </div>
                 
