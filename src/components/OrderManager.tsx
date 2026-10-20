@@ -1948,26 +1948,56 @@ export default function OrderManager() {
           <div className="space-y-4">
             {selectedOrderForPayment && (
               <div className="p-4 border border-border rounded-lg bg-card">
-                <h3 className="font-semibold text-foreground mb-2">Orden: {selectedOrderForPayment.number}</h3>
-                <p className="text-sm text-muted-foreground mb-2">Cliente: {selectedOrderForPayment.customerName}</p>
-                <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] gap-3 items-start">
-                  <div className="text-lg font-bold text-primary">
-                    Total: ${paymentAmounts.total.toFixed(2)}
-                    {paymentAmounts.discount > 0 && <p className="text-xs font-normal text-muted-foreground line-through">${selectedOrderForPayment.total.toFixed(2)}</p>}
-                  </div>
-                  {can.applyDiscount && <div className="space-y-2 min-w-0">
-                    <Label htmlFor="payment-discount">Descuento</Label>
-                    <div className="grid grid-cols-2 gap-1" role="group" aria-label="Tipo de descuento">
-                      <Button type="button" size="sm" className="px-1 text-xs" aria-pressed={paymentDiscountMode === 'percentage'} disabled={isProcessingPayment} variant={paymentDiscountMode === 'percentage' ? 'default' : 'outline'} onClick={() => { setPaymentDiscountMode('percentage'); setPaymentDiscountInput(''); }}><Percent className="h-3 w-3 mr-1 shrink-0" />Porcentaje</Button>
-                      <Button type="button" size="sm" className="px-1 text-xs" aria-pressed={paymentDiscountMode === 'final'} disabled={isProcessingPayment} variant={paymentDiscountMode === 'final' ? 'default' : 'outline'} onClick={() => { setPaymentDiscountMode('final'); setPaymentDiscountInput(''); }}>Total final</Button>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 space-y-1">
+                    <h3 className="font-semibold text-foreground">Orden: {selectedOrderForPayment.number}</h3>
+                    <p className="text-sm text-muted-foreground">Cliente: {selectedOrderForPayment.customerName}</p>
+                    <div className="text-lg font-bold text-primary">
+                      Total: ${paymentAmounts.total.toFixed(2)}
+                      {paymentAmounts.discount > 0 && <p className="text-xs font-normal text-muted-foreground line-through">${selectedOrderForPayment.total.toFixed(2)}</p>}
                     </div>
-                    <Label htmlFor="payment-discount" className="text-xs text-muted-foreground">{paymentDiscountMode === 'percentage' ? 'Porcentaje (%)' : 'Importe final ($)'}</Label>
-                    <Input id="payment-discount" type="text" inputMode="decimal" placeholder={paymentDiscountMode === 'percentage' ? '0' : selectedOrderForPayment.total.toFixed(2)} value={paymentDiscountInput} disabled={isProcessingPayment} aria-invalid={!paymentAmounts.valid} onChange={(event) => setPaymentDiscountInput(event.target.value)} />
-                    {!paymentAmounts.valid && <p className="text-xs text-destructive">{paymentDiscountMode === 'percentage' ? 'Introduce un porcentaje entre 0 y 100.' : `Introduce un total entre $0 y $${selectedOrderForPayment.total.toFixed(2)}.`}</p>}
-                  </div>}
+                  </div>
+                  {can.applyDiscount && (
+                    <div className="flex flex-col items-end gap-2 shrink-0">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={showDiscountEditor ? 'secondary' : 'outline'}
+                        disabled={isProcessingPayment}
+                        aria-expanded={showDiscountEditor}
+                        onClick={() => {
+                          setShowDiscountEditor((open) => !open);
+                          if (showDiscountEditor) setPaymentDiscountInput('');
+                        }}
+                      >
+                        <Percent className="h-4 w-4 sm:mr-1" />
+                        <span className="hidden sm:inline">Descuento</span>
+                      </Button>
+                      {showDiscountEditor && (
+                        <div className="w-40 space-y-2">
+                          <div className="grid grid-cols-2 gap-1" role="group" aria-label="Tipo de descuento">
+                            <Button type="button" size="sm" className="px-1 text-xs" aria-pressed={paymentDiscountMode === 'percentage'} disabled={isProcessingPayment} variant={paymentDiscountMode === 'percentage' ? 'default' : 'outline'} onClick={() => { setPaymentDiscountMode('percentage'); setPaymentDiscountInput(''); }}>%</Button>
+                            <Button type="button" size="sm" className="px-1 text-xs" aria-pressed={paymentDiscountMode === 'final'} disabled={isProcessingPayment} variant={paymentDiscountMode === 'final' ? 'default' : 'outline'} onClick={() => { setPaymentDiscountMode('final'); setPaymentDiscountInput(''); }}>Total</Button>
+                          </div>
+                          <Input
+                            id="payment-discount"
+                            type="text"
+                            inputMode="decimal"
+                            aria-label={paymentDiscountMode === 'percentage' ? 'Porcentaje de descuento' : 'Importe final a cobrar'}
+                            placeholder={paymentDiscountMode === 'percentage' ? '0' : selectedOrderForPayment.total.toFixed(2)}
+                            value={paymentDiscountInput}
+                            disabled={isProcessingPayment}
+                            aria-invalid={!paymentAmounts.valid}
+                            onChange={(event) => setPaymentDiscountInput(event.target.value)}
+                          />
+                          {!paymentAmounts.valid && <p className="text-xs text-destructive text-right">{paymentDiscountMode === 'percentage' ? 'Entre 0 y 100.' : `Entre $0 y $${selectedOrderForPayment.total.toFixed(2)}.`}</p>}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
                 {(selectedOrderForPayment.discountAmount ?? 0) + paymentAmounts.discount > 0 && (
-                  <div className="text-sm text-success-foreground">
+                  <div className="mt-2 text-sm text-success-foreground">
                     Descuento aplicado: -${((selectedOrderForPayment.discountAmount ?? 0) + paymentAmounts.discount).toFixed(2)}
                   </div>
                 )}
