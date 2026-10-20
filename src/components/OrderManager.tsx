@@ -119,6 +119,7 @@ export default function OrderManager() {
   const [cashGiven, setCashGiven] = useState<string>('');
   const [paymentDiscountMode, setPaymentDiscountMode] = useState<PaymentDiscountMode>('percentage');
   const [paymentDiscountInput, setPaymentDiscountInput] = useState('');
+  const [showDiscountEditor, setShowDiscountEditor] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const paymentAmounts = calculatePaymentDiscount(selectedOrderForPayment?.total ?? 0, paymentDiscountMode, paymentDiscountInput);
   const [paymentMethod, setPaymentMethod] = useState<'tarjeta' | 'efectivo' | 'transferencia' | ''>('');
