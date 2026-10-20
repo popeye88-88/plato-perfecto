@@ -1939,7 +1939,7 @@ export default function OrderManager() {
       </Dialog>
 
       {/* Payment Dialog */}
-      <Dialog open={isPaymentOpen} onOpenChange={(open) => { if (!isProcessingPayment) setIsPaymentOpen(open); }}>
+      <Dialog open={isPaymentOpen} onOpenChange={(open) => { if (!isProcessingPayment) { if (!open) setShowDiscountEditor(false); setIsPaymentOpen(open); } }}>
         <DialogContent className="max-h-[85dvh] overflow-y-auto overscroll-contain" onInteractOutside={(event) => { if (isProcessingPayment) event.preventDefault(); }}>
           <DialogHeader>
             <DialogTitle>Procesar Pago</DialogTitle>
