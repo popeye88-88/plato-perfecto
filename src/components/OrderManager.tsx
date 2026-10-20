@@ -1364,6 +1364,7 @@ export default function OrderManager() {
                     setCashGiven('');
                     setPaymentDiscountMode('percentage');
                     setPaymentDiscountInput('');
+                    setShowDiscountEditor(false);
                     setIsPaymentOpen(true);
                   }}
                   className="bg-gradient-primary hover:opacity-90 font-medium px-2 sm:px-3"
