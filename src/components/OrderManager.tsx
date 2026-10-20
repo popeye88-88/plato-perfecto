@@ -17,6 +17,7 @@ import { fetchActiveOrders as fetchOrdersDb, saveOrders as persistOrdersDb, gene
 import { supabase } from '@/integrations/supabase/client';
 import { getMenuItemCardStyle } from '@/lib/menuItemColor';
 import PaidOrdersTable from '@/components/PaidOrdersTable';
+import { calculatePaymentDiscount, type PaymentDiscountMode } from '@/lib/paymentDiscount';
 
 
 interface OrderItem {
@@ -116,6 +117,10 @@ export default function OrderManager() {
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [selectedOrderForPayment, setSelectedOrderForPayment] = useState<Order | null>(null);
   const [cashGiven, setCashGiven] = useState<string>('');
+  const [paymentDiscountMode, setPaymentDiscountMode] = useState<PaymentDiscountMode>('percentage');
+  const [paymentDiscountInput, setPaymentDiscountInput] = useState('');
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const paymentAmounts = calculatePaymentDiscount(selectedOrderForPayment?.total ?? 0, paymentDiscountMode, paymentDiscountInput);
   const [paymentMethod, setPaymentMethod] = useState<'tarjeta' | 'efectivo' | 'transferencia' | ''>('');
   const [isEditOrderOpen, setIsEditOrderOpen] = useState(false);
   const [selectedOrderForEdit, setSelectedOrderForEdit] = useState<Order | null>(null);
@@ -657,7 +662,8 @@ export default function OrderManager() {
   };
 
   const processPayment = async () => {
-    if (!selectedOrderForPayment || !paymentMethod) {
+    if (isProcessingPayment) return;
+    if (!selectedOrderForPayment || !paymentMethod || !currentBusiness?.id) {
       toast({
         title: "Error",
         description: "Debes seleccionar un método de pago",
@@ -665,6 +671,12 @@ export default function OrderManager() {
       });
       return;
     }
+    const received = Number(cashGiven.replace(',', '.'));
+    if (!paymentAmounts.valid || (paymentMethod === 'efectivo' && (!cashGiven.trim() || !Number.isFinite(received) || received < paymentAmounts.total))) {
+      toast({ title: 'Revisa los importes', description: 'El descuento y el dinero recibido deben ser válidos.', variant: 'destructive' });
+      return;
+    }
+    setIsProcessingPayment(true);
 
     const updatedOrders = orders.map(order =>
       order.id === selectedOrderForPayment.id
@@ -672,18 +684,27 @@ export default function OrderManager() {
             ...order,
             status: 'pagado' as const,
             paymentMethod,
+            total: paymentAmounts.total,
+            discountAmount: (order.discountAmount ?? 0) + paymentAmounts.discount,
+            discountReason: paymentAmounts.discount > 0
+              ? [order.discountReason, paymentDiscountMode === 'percentage' ? `Descuento al cobrar: ${paymentDiscountInput}%` : `Importe final al cobrar: $${paymentAmounts.total.toFixed(2)}`].filter(Boolean).join('; ')
+              : order.discountReason,
+            editHistory: paymentAmounts.discount > 0 ? [...(order.editHistory ?? []), {
+              timestamp: new Date(), action: 'discount_applied' as const, stage: 'cobrando' as const,
+              details: `Descuento al cobrar: $${paymentAmounts.discount.toFixed(2)}. Total final: $${paymentAmounts.total.toFixed(2)}`,
+              userId: currentUser?.id
+            }] : order.editHistory,
             edited: true
           }
         : order
     );
-
-    setOrders(updatedOrders);
 
     const paidOrder = updatedOrders.find(o => o.id === selectedOrderForPayment.id);
     if (paidOrder && currentBusiness?.id) {
       try {
         const success = await persistOrdersDb(currentBusiness.id, [paidOrder]);
         if (!success) {
+          setIsProcessingPayment(false);
           toast({
             title: "Error al procesar pago",
             description: "El pago no se pudo guardar. Intenta de nuevo.",
@@ -692,6 +713,7 @@ export default function OrderManager() {
           return;
         }
       } catch (error) {
+        setIsProcessingPayment(false);
         console.error('Error processing payment:', error);
         toast({
           title: "Error al procesar pago",
@@ -702,6 +724,8 @@ export default function OrderManager() {
       }
     }
 
+    setOrders(updatedOrders.filter(order => order.status !== 'pagado'));
+    setIsProcessingPayment(false);
     setIsPaymentOpen(false);
     setPaymentMethod('');
     setCashGiven('');
@@ -1337,6 +1361,8 @@ export default function OrderManager() {
                     setSelectedOrderForPayment(order);
                     setPaymentMethod('');
                     setCashGiven('');
+                    setPaymentDiscountMode('percentage');
+                    setPaymentDiscountInput('');
                     setIsPaymentOpen(true);
                   }}
                   className="bg-gradient-primary hover:opacity-90 font-medium px-2 sm:px-3"
@@ -1911,8 +1937,8 @@ export default function OrderManager() {
       </Dialog>
 
       {/* Payment Dialog */}
-      <Dialog open={isPaymentOpen} onOpenChange={setIsPaymentOpen}>
-        <DialogContent>
+      <Dialog open={isPaymentOpen} onOpenChange={(open) => { if (!isProcessingPayment) setIsPaymentOpen(open); }}>
+        <DialogContent className="max-h-[85dvh] overflow-y-auto overscroll-contain" onInteractOutside={(event) => { if (isProcessingPayment) event.preventDefault(); }}>
           <DialogHeader>
             <DialogTitle>Procesar Pago</DialogTitle>
           </DialogHeader>
@@ -1922,12 +1948,25 @@ export default function OrderManager() {
               <div className="p-4 border border-border rounded-lg bg-card">
                 <h3 className="font-semibold text-foreground mb-2">Orden: {selectedOrderForPayment.number}</h3>
                 <p className="text-sm text-muted-foreground mb-2">Cliente: {selectedOrderForPayment.customerName}</p>
-                <div className="text-lg font-bold text-primary">
-                  Total: ${selectedOrderForPayment.total.toFixed(2)}
+                <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] gap-3 items-start">
+                  <div className="text-lg font-bold text-primary">
+                    Total: ${paymentAmounts.total.toFixed(2)}
+                    {paymentAmounts.discount > 0 && <p className="text-xs font-normal text-muted-foreground line-through">${selectedOrderForPayment.total.toFixed(2)}</p>}
+                  </div>
+                  {can.applyDiscount && <div className="space-y-2 min-w-0">
+                    <Label htmlFor="payment-discount">Descuento</Label>
+                    <div className="grid grid-cols-2 gap-1" role="group" aria-label="Tipo de descuento">
+                      <Button type="button" size="sm" className="px-1 text-xs" aria-pressed={paymentDiscountMode === 'percentage'} disabled={isProcessingPayment} variant={paymentDiscountMode === 'percentage' ? 'default' : 'outline'} onClick={() => { setPaymentDiscountMode('percentage'); setPaymentDiscountInput(''); }}><Percent className="h-3 w-3 mr-1 shrink-0" />Porcentaje</Button>
+                      <Button type="button" size="sm" className="px-1 text-xs" aria-pressed={paymentDiscountMode === 'final'} disabled={isProcessingPayment} variant={paymentDiscountMode === 'final' ? 'default' : 'outline'} onClick={() => { setPaymentDiscountMode('final'); setPaymentDiscountInput(''); }}>Total final</Button>
+                    </div>
+                    <Label htmlFor="payment-discount" className="text-xs text-muted-foreground">{paymentDiscountMode === 'percentage' ? 'Porcentaje (%)' : 'Importe final ($)'}</Label>
+                    <Input id="payment-discount" type="text" inputMode="decimal" placeholder={paymentDiscountMode === 'percentage' ? '0' : selectedOrderForPayment.total.toFixed(2)} value={paymentDiscountInput} disabled={isProcessingPayment} aria-invalid={!paymentAmounts.valid} onChange={(event) => setPaymentDiscountInput(event.target.value)} />
+                    {!paymentAmounts.valid && <p className="text-xs text-destructive">{paymentDiscountMode === 'percentage' ? 'Introduce un porcentaje entre 0 y 100.' : `Introduce un total entre $0 y $${selectedOrderForPayment.total.toFixed(2)}.`}</p>}
+                  </div>}
                 </div>
-                {selectedOrderForPayment.discountAmount && selectedOrderForPayment.discountAmount > 0 && (
+                {(selectedOrderForPayment.discountAmount ?? 0) + paymentAmounts.discount > 0 && (
                   <div className="text-sm text-success-foreground">
-                    Descuento aplicado: -${selectedOrderForPayment.discountAmount.toFixed(2)}
+                    Descuento aplicado: -${((selectedOrderForPayment.discountAmount ?? 0) + paymentAmounts.discount).toFixed(2)}
                   </div>
                 )}
               </div>
@@ -1961,10 +2000,10 @@ export default function OrderManager() {
             </div>
 
             {paymentMethod === 'efectivo' && selectedOrderForPayment && (() => {
-              const total = selectedOrderForPayment.total;
-              const given = parseFloat(cashGiven.replace(',', '.'));
-              const validGiven = !isNaN(given) && given >= 0;
-              const change = validGiven ? given - total : 0;
+              const total = paymentAmounts.total;
+              const given = Number(cashGiven.replace(',', '.'));
+              const validGiven = cashGiven.trim() !== '' && Number.isFinite(given) && given >= 0;
+              const change = validGiven ? Math.round((given - total) * 100) / 100 : 0;
               return (
                 <div className="space-y-2 p-4 border border-border rounded-lg bg-card">
                   <Label htmlFor="cashGiven">Dinero recibido</Label>
@@ -1996,21 +2035,21 @@ export default function OrderManager() {
             })()}
 
             <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={() => setIsPaymentOpen(false)}>
+              <Button variant="outline" disabled={isProcessingPayment} onClick={() => setIsPaymentOpen(false)}>
                 Cancelar
               </Button>
               <Button
                 onClick={processPayment}
                 className="bg-gradient-primary hover:opacity-90"
                 disabled={
-                  !paymentMethod ||
+                  isProcessingPayment || !paymentAmounts.valid || !paymentMethod ||
                   (paymentMethod === 'efectivo' && (() => {
-                    const g = parseFloat(cashGiven.replace(',', '.'));
-                    return isNaN(g) || g < (selectedOrderForPayment?.total ?? 0);
+                    const g = Number(cashGiven.replace(',', '.'));
+                    return !cashGiven.trim() || !Number.isFinite(g) || g < paymentAmounts.total;
                   })())
                 }
               >
-                Procesar Pago
+                {isProcessingPayment ? 'Procesando…' : 'Procesar Pago'}
               </Button>
             </div>
           </div>
